@@ -38,7 +38,7 @@
 #import <Foundation/Foundation.h>
 
 #if PLATFORM(IPHONE_SIMULATOR)
-#import <Foundation/NSDistributedNotificationCenter.h>
+//#import <Foundation/NSDistributedNotificationCenter.h>
 #endif
 
 
