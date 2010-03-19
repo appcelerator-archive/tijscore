@@ -41,7 +41,8 @@
 #elif USE(WINCE_UNICODE)
 #include <wtf/unicode/wince/UnicodeWince.h>
 #else
-#error "Unknown Unicode implementation"
+//#error "Unknown Unicode implementation"
+#include <wtf/unicode/foundation/UnicodeFoundation.h>
 #endif
 
 COMPILE_ASSERT(sizeof(UChar) == 2, UCharIsTwoBytes);

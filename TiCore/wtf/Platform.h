@@ -472,8 +472,11 @@
 #elif PLATFORM(GTK)
 /* The GTK+ Unicode backend is configurable */
 #else
-#define WTF_USE_ICU_UNICODE 1
+#define WTF_USE_ICU_UNICODE 0
 #endif
+
+//JGH: this is a port of ICU Unicode to use Foundation for Titanium
+#define WTF_USE_FOUNDATION_UNICODE 1
 
 #if PLATFORM(MAC) && !PLATFORM(IPHONE)
 #define WTF_PLATFORM_CF 1
@@ -879,6 +882,7 @@ on MinGW. See https://bugs.webkit.org/show_bug.cgi?id=29268 */
 #endif
 
 /* Set up a define for a common error that is intended to cause a build error -- thus the space after Error. */
+
 #define WTF_PLATFORM_CFNETWORK Error USE_macro_should_be_used_with_CFNETWORK
 
 #endif /* WTF_Platform_h */
