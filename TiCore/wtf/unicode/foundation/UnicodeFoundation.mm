@@ -6,6 +6,7 @@
  */
 #import "UnicodeFoundation.h"
 
+#import "config.h" // Required to include Foundation.h
 #import <Foundation/Foundation.h>
 
 namespace WTI 
@@ -26,7 +27,7 @@ namespace WTI
         
         int toLower(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
         {
-             NSString *s = [NSString stringWithFormat:@"%C",src];
+             NSString *s = [NSString stringWithFormat:@"%S",src];
              s = [s lowercaseString];
              [s getCharacters:result range:NSMakeRange(0, resultLength)];
              return [s length];
@@ -52,7 +53,7 @@ namespace WTI
         
         int toUpper(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
         {
-            NSString *s = [NSString stringWithFormat:@"%C",src];
+            NSString *s = [NSString stringWithFormat:@"%S",src];
             s = [s uppercaseString];
             [s getCharacters:result range:NSMakeRange(0, resultLength)];
             return [s length];
