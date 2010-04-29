@@ -3393,7 +3393,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Debug;
 		};
@@ -3402,7 +3402,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Release;
 		};
@@ -3414,7 +3414,7 @@
 					normal,
 					debug,
 				);
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Production;
 		};
@@ -3469,9 +3469,11 @@
 				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
 				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1.3;
+				SDKROOT = iphoneos3.1;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
+				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Debug;
 		};
@@ -3481,9 +3483,11 @@
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1.3;
+				SDKROOT = iphoneos3.1;
 				STRIP_INSTALLED_PRODUCT = NO;
+				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Release;
 		};
@@ -3493,8 +3497,10 @@
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1.3;
+				SDKROOT = iphoneos3.1;
+				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Production;
 		};
@@ -3523,7 +3529,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_UNIVERSAL_IPHONE_OS)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				COPY_PHASE_STRIP = NO;
 				DYLIB_COMPATIBILITY_VERSION = 1;
 				DYLIB_CURRENT_VERSION = 532.5;
@@ -3538,10 +3544,11 @@
 					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
 				);
 				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"${BUILT_PRODUCTS_DIR}/DerivedSources/TiCore\"";
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				OTHER_LDFLAGS = "$(OTHER_LDFLAGS_$(REAL_PLATFORM_NAME))";
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.1;
 				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
 			};
 			name = Debug;
@@ -3550,7 +3557,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_UNIVERSAL_IPHONE_OS)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
@@ -3562,9 +3569,10 @@
 					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/DerivedSources/TiCore",
 					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
 				);
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.1;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -3573,11 +3581,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_UNIVERSAL_IPHONE_OS)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.1;
 			};
 			name = Profiling;
 		};
@@ -3585,11 +3594,12 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_UNIVERSAL_IPHONE_OS)";
+				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.1;
 			};
 			name = Production;
 		};
@@ -3620,9 +3630,11 @@
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1.3;
+				SDKROOT = iphoneos3.1;
 				STRIP_INSTALLED_PRODUCT = NO;
+				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Profiling;
 		};
@@ -3638,7 +3650,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.0;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Profiling;
 		};
