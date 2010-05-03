@@ -532,7 +532,7 @@ class RegexGenerator : private MacroAssembler {
         if (m_pattern.m_ignoreCase && isASCIIAlpha(ch)) {
             readCharacter(state.inputOffset(), character);
             or32(Imm32(32), character);
-            state.jumpToBacktrack(branch32(NotEqual, character, Imm32(Unicode::toLower(ch))), this);
+            state.jumpToBacktrack(branch32(NotEqual, character, Imm32(ch | 32)), this);
         } else {
             ASSERT(!m_pattern.m_ignoreCase || (Unicode::toLower(ch) == Unicode::toUpper(ch)));
             state.jumpToBacktrack(jumpIfCharNotEquals(ch, state.inputOffset()), this);
