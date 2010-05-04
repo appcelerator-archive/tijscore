@@ -102,12 +102,12 @@ void TiLock::unlock(TiLockBehavior lockBehavior)
 #endif
 
     intptr_t newLockCount = lockCount() - 1;
-    setLockCount(newLockCount);
     if (!newLockCount && lockBehavior == LockForReal) {
         int result;
         result = pthread_mutex_unlock(&JSMutex);
         ASSERT(!result);
     }
+    setLockCount(newLockCount);
 }
 
 void TiLock::lock(TiExcState* exec)
