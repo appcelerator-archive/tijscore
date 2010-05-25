@@ -225,19 +225,29 @@ void Heap::destroy()
 }
 
 #if PLATFORM(DARWIN)
-kern_return_t generateVm_MapAddress(vm_address_t *address,vm_address_t *unused)
+
+vm_address_t generateVm_MapAddress();
+
+vm_address_t generateVm_MapAddress()
 {
-    return vm_map(current_task(),address,BLOCK_SIZE,BLOCK_OFFSET_MASK,VM_FLAGS_ANYWHERE | VM_TAG_FOR_COLLECTOR_MEMORY,MEMORY_OBJECT_NULL,0,FALSE,VM_PROT_DEFAULT,VM_PROT_DEFAULT,VM_INHERIT_DEFAULT);
+    vm_address_t resultAddress = 0;
+    kern_return_t result = vm_map(current_task(),&resultAddress,BLOCK_SIZE,BLOCK_OFFSET_MASK,VM_FLAGS_ANYWHERE | VM_TAG_FOR_COLLECTOR_MEMORY,MEMORY_OBJECT_NULL,0,FALSE,VM_PROT_DEFAULT,VM_PROT_DEFAULT,VM_INHERIT_DEFAULT);
+    if (result != 0)
+    {
+        printf("[WARN] An error %d occured with vm_map. Falling back to malloc.",result);
+        resultAddress = (vm_address_t)malloc(BLOCK_SIZE);
+    }
+    return resultAddress;
 }
+
 #endif
 
 template <HeapType heapType>
 NEVER_INLINE CollectorBlock* Heap::allocateBlock()
 {
 #if PLATFORM(DARWIN)
-    vm_address_t address = 0;
+    vm_address_t address = generateVm_MapAddress();
     // FIXME: tag the region as a TiCore heap when we get a registered VM tag: <rdar://problem/6054788>.
-    generateVm_MapAddress(&address,NULL);
 #elif PLATFORM(SYMBIAN)
     // Allocate a 64 kb aligned CollectorBlock
     unsigned char* mask = reinterpret_cast<unsigned char*>(userChunk->Alloc(BLOCK_SIZE));
@@ -286,6 +296,12 @@ NEVER_INLINE CollectorBlock* Heap::allocateBlock()
     address += adjust;
     memset(reinterpret_cast<void*>(address), 0, BLOCK_SIZE);
 #endif
+
+    if (address == 0)
+    {
+        printf("[WARN] Invalid address. Bailing out");
+        return NULL;
+    }
 
     CollectorBlock* block = reinterpret_cast<CollectorBlock*>(address);
     block->freeList = block->cells;
