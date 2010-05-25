@@ -224,13 +224,20 @@ void Heap::destroy()
     m_globalData = 0;
 }
 
+#if PLATFORM(DARWIN)
+kern_return_t generateVm_MapAddress(vm_address_t *address,vm_address_t *unused)
+{
+    return vm_map(current_task(),address,BLOCK_SIZE,BLOCK_OFFSET_MASK,VM_FLAGS_ANYWHERE | VM_TAG_FOR_COLLECTOR_MEMORY,MEMORY_OBJECT_NULL,0,FALSE,VM_PROT_DEFAULT,VM_PROT_DEFAULT,VM_INHERIT_DEFAULT);
+}
+#endif
+
 template <HeapType heapType>
 NEVER_INLINE CollectorBlock* Heap::allocateBlock()
 {
 #if PLATFORM(DARWIN)
     vm_address_t address = 0;
     // FIXME: tag the region as a TiCore heap when we get a registered VM tag: <rdar://problem/6054788>.
-    vm_map(current_task(), &address, BLOCK_SIZE, BLOCK_OFFSET_MASK, VM_FLAGS_ANYWHERE | VM_TAG_FOR_COLLECTOR_MEMORY, MEMORY_OBJECT_NULL, 0, FALSE, VM_PROT_DEFAULT, VM_PROT_DEFAULT, VM_INHERIT_DEFAULT);
+    generateVm_MapAddress(&address,NULL);
 #elif PLATFORM(SYMBIAN)
     // Allocate a 64 kb aligned CollectorBlock
     unsigned char* mask = reinterpret_cast<unsigned char*>(userChunk->Alloc(BLOCK_SIZE));

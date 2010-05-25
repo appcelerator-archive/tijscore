@@ -3471,7 +3471,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -3485,7 +3485,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -3499,7 +3499,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Production;
@@ -3548,7 +3548,7 @@
 				OTHER_LDFLAGS = "$(OTHER_LDFLAGS_$(REAL_PLATFORM_NAME))";
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
 			};
 			name = Debug;
@@ -3572,7 +3572,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -3586,7 +3586,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Profiling;
 		};
@@ -3599,7 +3599,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 			};
 			name = Production;
 		};
@@ -3632,7 +3632,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.1;
+				SDKROOT = iphoneos3.2;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
