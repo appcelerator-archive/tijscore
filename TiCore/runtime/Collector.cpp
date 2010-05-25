@@ -234,7 +234,7 @@ vm_address_t generateVm_MapAddress()
     kern_return_t result = vm_map(current_task(),&resultAddress,BLOCK_SIZE,BLOCK_OFFSET_MASK,VM_FLAGS_ANYWHERE | VM_TAG_FOR_COLLECTOR_MEMORY,MEMORY_OBJECT_NULL,0,FALSE,VM_PROT_DEFAULT,VM_PROT_DEFAULT,VM_INHERIT_DEFAULT);
     if (result != 0)
     {
-        printf("[WARN] An error %d occured with vm_map. Falling back to malloc.",result);
+        printf("[WARN] An error %d occured with vm_map. Falling back to malloc.\n",result);
         resultAddress = (vm_address_t)malloc(BLOCK_SIZE);
     }
     return resultAddress;
@@ -299,7 +299,7 @@ NEVER_INLINE CollectorBlock* Heap::allocateBlock()
 
     if (address == 0)
     {
-        printf("[WARN] Invalid address. Bailing out");
+        printf("[WARN] Invalid address. Bailing out\n");
         return NULL;
     }
 
