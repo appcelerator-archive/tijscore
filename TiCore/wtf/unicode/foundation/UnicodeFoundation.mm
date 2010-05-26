@@ -7,7 +7,7 @@
 #import "UnicodeFoundation.h"
 
 #import "config.h" // Required to include Foundation.h
-#import <Foundation/Foundation.h>
+#import <CoreFoundation/CoreFoundation.h>
 
 namespace WTI 
 {
@@ -27,45 +27,57 @@ namespace WTI
         
         int toLower(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
         {
-             NSString *s = [NSString stringWithFormat:@"%S",src];
-             s = [s lowercaseString];
-             [s getCharacters:result range:NSMakeRange(0, resultLength)];
-             return [s length];
+            CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,srcLength);
+            CFStringAppendCharacters(sourceRef, src, srcLength);
+            CFStringLowercase(sourceRef, NULL);
+            int resultLength = CFStringGetLength(sourceRef);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultLength), result);
+            CFRelease(sourceRef);
+            return resultLength;
         }
         
         UChar32 toLower(UChar32 c)
         {
-             NSString *s = [NSString stringWithFormat:@"%C",c];
-             s = [s lowercaseString];
-             UChar32 ch; 
-             [s getCharacters:(unichar*)&ch range:NSMakeRange(0, 1)];
-             return ch;
+            CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,1);
+            UniChar character = (UniChar)c;
+            CFStringAppendCharacters(sourceRef, &character, 1);
+            CFStringLowercase(sourceRef, NULL);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, 1), &character);
+            CFRelease(sourceRef);
+            return (UChar32)character;
         }
         
         UChar32 toUpper(UChar32 c)
         {
-             NSString *s = [NSString stringWithFormat:@"%C",c];
-             s = [s uppercaseString];
-             UChar32 ch; 
-             [s getCharacters:(unichar*)&ch range:NSMakeRange(0, 1)];
-             return ch;
+            CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,1);
+            UniChar character = (UniChar)c;
+            CFStringAppendCharacters(sourceRef, &character, 1);
+            CFStringUppercase(sourceRef, NULL);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, 1), &character);
+            CFRelease(sourceRef);
+            return (UChar32)character;
         }
         
         int toUpper(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
         {
-            NSString *s = [NSString stringWithFormat:@"%S",src];
-            s = [s uppercaseString];
-            [s getCharacters:result range:NSMakeRange(0, resultLength)];
-            return [s length];
+            CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,srcLength);
+            CFStringAppendCharacters(sourceRef, src, srcLength);
+            CFStringUppercase(sourceRef, NULL);
+            int resultLength = CFStringGetLength(sourceRef);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultLength), result);
+            CFRelease(sourceRef);
+            return resultLength;
         }
         
         UChar32 toTitleCase(UChar32 c)
         {
-            NSString *s = [NSString stringWithFormat:@"%C",c];
-             s = [s capitalizedString];
-             UChar32 ch; 
-             [s getCharacters:(unichar*)&ch range:NSMakeRange(0, 1)];
-             return ch;
+            CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,1);
+            UniChar character = (UniChar)c;
+            CFStringAppendCharacters(sourceRef, &character, 1);
+            CFStringCapitalize(sourceRef, NULL);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, 1), &character);
+            CFRelease(sourceRef);
+            return (UChar32)character;
         }
         
         bool isArabicChar(UChar32 c)
@@ -80,7 +92,8 @@ namespace WTI
         
         bool isSeparatorSpace(UChar32 c)
         {
-            return [[NSCharacterSet whitespaceCharacterSet] characterIsMember:c];
+            CFCharacterSetRef charSet = CFCharacterSetGetPredefined(kCFCharacterSetWhitespace);
+            return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
         bool isPrintableChar(UChar32 c)
@@ -90,12 +103,14 @@ namespace WTI
         
         bool isDigit(UChar32 c)
         {
-            return [[NSCharacterSet decimalDigitCharacterSet] characterIsMember:c];
+            CFCharacterSetRef charSet = CFCharacterSetGetPredefined(kCFCharacterSetDecimalDigit);
+            return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
         bool isPunct(UChar32 c)
         {
-            return [[NSCharacterSet punctuationCharacterSet] characterIsMember:c];
+            CFCharacterSetRef charSet = CFCharacterSetGetPredefined(kCFCharacterSetPunctuation);
+            return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
         bool hasLineBreakingPropertyComplexContext(UChar32 c)
@@ -157,7 +172,8 @@ namespace WTI
         
         bool isLower(UChar32 c)
         {
-            return [[NSCharacterSet lowercaseLetterCharacterSet] characterIsMember:c];
+            CFCharacterSetRef charSet = CFCharacterSetGetPredefined(kCFCharacterSetLowercaseLetter);
+            return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
         int digitValue(UChar32 c)
