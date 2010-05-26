@@ -36,37 +36,44 @@
 #import "config.h"
 #import "MainThread.h"
 
-#import <Foundation/NSThread.h>
 #import <wtf/Assertions.h>
+#import <CoreFoundation/CoreFoundation.h>
 
-@interface WTIMainThreadCaller : NSObject {
-}
-- (void)call;
-@end
+void dispatchFunctionsFromCFRunLoopSource(void *unused);
 
-@implementation WTIMainThreadCaller
-
-- (void)call
+void dispatchFunctionsFromCFRunLoopSource(void *unused)
 {
     WTI::dispatchFunctionsFromMainThread();
 }
 
-@end // implementation WTIMainThreadCaller
-
 namespace WTI {
 
-static WTIMainThreadCaller* staticMainThreadCaller = nil;
+static CFRunLoopSourceRef dispatchRunLoopSource = NULL;
 
 void initializeMainThreadPlatform()
 {
-    ASSERT(!staticMainThreadCaller);
-    staticMainThreadCaller = [[WTIMainThreadCaller alloc] init];
+    ASSERT(!dispatchRunLoopSource);
+
+    CFRunLoopSourceContext ourContext;
+    ourContext.version = 0;
+    ourContext.info = NULL;
+    ourContext.retain = NULL;
+    ourContext.release = NULL;
+    ourContext.copyDescription = NULL;
+    ourContext.equal = NULL;
+    ourContext.hash = NULL;
+    ourContext.schedule = NULL;
+    ourContext.cancel = NULL;
+    ourContext.perform = dispatchFunctionsFromCFRunLoopSource;
+
+    dispatchRunLoopSource = CFRunLoopSourceCreate(NULL, 0, &ourContext);
+    CFRunLoopAddSource(CFRunLoopGetMain(), dispatchRunLoopSource, kCFRunLoopCommonModes);
 }
 
 void scheduleDispatchFunctionsOnMainThread()
 {
-    ASSERT(staticMainThreadCaller);
-    [staticMainThreadCaller performSelectorOnMainThread:@selector(call) withObject:nil waitUntilDone:NO];
+    ASSERT(dispatchRunLoopSource);
+    CFRunLoopSourceSignal(dispatchRunLoopSource);
 }
 
 } // namespace WTI

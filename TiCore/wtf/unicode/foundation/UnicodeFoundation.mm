@@ -19,21 +19,21 @@ namespace WTI
             return 0;
         }
         
-        int foldCase(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
+        int foldCase(__unused UChar* result, __unused int resultLength, __unused const UChar* src, __unused int srcLength, __unused bool* error)
         {
             //FIXME -- currently can't find a use in KJS
             return 0;
         }
         
-        int toLower(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
+        int toLower(UChar* result, __unused int resultLength, const UChar* src, int srcLength, __unused bool* error)
         {
             CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,srcLength);
             CFStringAppendCharacters(sourceRef, src, srcLength);
             CFStringLowercase(sourceRef, NULL);
-            int resultLength = CFStringGetLength(sourceRef);
-            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultLength), result);
+            int resultCharacterLength = CFStringGetLength(sourceRef);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultCharacterLength), result);
             CFRelease(sourceRef);
-            return resultLength;
+            return resultCharacterLength;
         }
         
         UChar32 toLower(UChar32 c)
@@ -58,15 +58,15 @@ namespace WTI
             return (UChar32)character;
         }
         
-        int toUpper(UChar* result, int resultLength, const UChar* src, int srcLength, bool* error)
+        int toUpper(UChar* result, __unused int resultLength, const UChar* src, int srcLength, __unused bool* error)
         {
             CFMutableStringRef sourceRef = CFStringCreateMutable(NULL,srcLength);
             CFStringAppendCharacters(sourceRef, src, srcLength);
             CFStringUppercase(sourceRef, NULL);
-            int resultLength = CFStringGetLength(sourceRef);
-            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultLength), result);
+            int resultCharacterLength = CFStringGetLength(sourceRef);
+            CFStringGetCharacters(sourceRef, CFRangeMake(0, resultCharacterLength), result);
             CFRelease(sourceRef);
-            return resultLength;
+            return resultCharacterLength;
         }
         
         UChar32 toTitleCase(UChar32 c)
@@ -85,7 +85,7 @@ namespace WTI
             return c >= 0x0600 && c <= 0x06FF;
         }
         
-        bool isFormatChar(UChar32 c)
+        bool isFormatChar(__unused UChar32 c)
         {
             return false; //FIXME -- currently can't find a use in KJS
         }
@@ -96,7 +96,7 @@ namespace WTI
             return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
-        bool isPrintableChar(UChar32 c)
+        bool isPrintableChar(__unused UChar32 c)
         {
             return false; //FIXME -- currently can't find a use in KJS
         }
@@ -113,19 +113,19 @@ namespace WTI
             return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
-        bool hasLineBreakingPropertyComplexContext(UChar32 c)
+        bool hasLineBreakingPropertyComplexContext(__unused UChar32 c)
         {
             // FIXME -- currently can't find a use in KJS
             return false; 
         }
         
-        bool hasLineBreakingPropertyComplexContextOrIdeographic(UChar32 c)
+        bool hasLineBreakingPropertyComplexContextOrIdeographic(__unused UChar32 c)
         {
             // FIXME -- currently can't find a use in KJS
             return false;
         }
         
-        UChar32 mirroredChar(UChar32 c)
+        UChar32 mirroredChar(__unused UChar32 c)
         {
             return '0'; //FIXME -- currently can't find a use in KJS
         }
@@ -176,25 +176,25 @@ namespace WTI
             return CFCharacterSetIsCharacterMember(charSet, (UniChar)c);
         }
         
-        int digitValue(UChar32 c)
+        int digitValue(__unused UChar32 c)
         {
             //FIXME -- currently can't find a use in KJS
             return 0;
         }
         
-        uint8_t combiningClass(UChar32 c)
+        uint8_t combiningClass(__unused UChar32 c)
         {
             //FIXME -- currently can't find a use in KJS
             return 0;
         }
         
-        DecompositionType decompositionType(UChar32 c)
+        DecompositionType decompositionType(__unused UChar32 c)
         {
             //FIXME -- currently can't find a use in KJS
             return DecompositionNone;
         }
         
-        int umemcasecmp(const UChar*, const UChar*, int len)
+        int umemcasecmp(__unused const UChar*, __unused const UChar*, __unused int len)
         {
             return 0;  //FIXME -- currently can't find a use in KJS
         }

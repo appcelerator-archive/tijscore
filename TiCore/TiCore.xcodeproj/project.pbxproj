@@ -584,8 +584,6 @@
 		2415875010CC8F0700E212F2 /* DateInstanceCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A1563010966365006FA260 /* DateInstanceCache.h */; };
 		2415875110CC8F0700E212F2 /* WeakRandom.h in Headers */ = {isa = PBXBuildFile; fileRef = 1420BE7A10AA6DDB00F455D2 /* WeakRandom.h */; };
 		2415875F10CC8FA500E212F2 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */; };
-		2415876010CC8FB000E212F2 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 51F0EB6105C86C6B00E6DF1B /* Foundation.framework */; };
-		2415876C10CC909100E212F2 /* libobjc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 51F0EC0705C86C9A00E6DF1B /* libobjc.dylib */; };
 		24C379381152BBB5004BC328 /* UnicodeFoundation.h in Headers */ = {isa = PBXBuildFile; fileRef = 24C379361152BBB5004BC328 /* UnicodeFoundation.h */; };
 		24C379391152BBB5004BC328 /* UnicodeFoundation.mm in Sources */ = {isa = PBXBuildFile; fileRef = 24C379371152BBB5004BC328 /* UnicodeFoundation.mm */; };
 		41359CF30FDD89AD00206180 /* DateConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = D21202290AD4310C00ED79B6 /* DateConversion.h */; };
@@ -647,8 +645,6 @@
 		930754D008B0F74600AB3056 /* pcre_tables.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 930754CE08B0F74500AB3056 /* pcre_tables.cpp */; };
 		930754EB08B0F78500AB3056 /* pcre_exec.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 930754E908B0F78500AB3056 /* pcre_exec.cpp */; settings = {COMPILER_FLAGS = "-fno-move-loop-invariants"; }; };
 		932F5BD30822A1C700736975 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */; };
-		932F5BD50822A1C700736975 /* Foundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 51F0EB6105C86C6B00E6DF1B /* Foundation.framework */; };
-		932F5BD60822A1C700736975 /* libobjc.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = 51F0EC0705C86C9A00E6DF1B /* libobjc.dylib */; };
 		932F5BDD0822A1C700736975 /* jsc.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 45E12D8806A49B0F00E9DF84 /* jsc.cpp */; };
 		932F5BEA0822A1C700736975 /* TiCore in Frameworks */ = {isa = PBXBuildFile; fileRef = 932F5BD90822A1C700736975 /* TiCore */; };
 		933040040E6A749400786E6A /* SmallStrings.h in Headers */ = {isa = PBXBuildFile; fileRef = 93303FEA0E6A72C000786E6A /* SmallStrings.h */; settings = {ATTRIBUTES = (Private, ); }; };
@@ -1073,8 +1069,6 @@
 		44DD48520FAEA85000D6B4EB /* PassOwnPtr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PassOwnPtr.h; sourceTree = "<group>"; };
 		45E12D8806A49B0F00E9DF84 /* jsc.cpp */ = {isa = PBXFileReference; fileEncoding = 30; indentWidth = 4; lastKnownFileType = sourcecode.cpp.cpp; path = jsc.cpp; sourceTree = "<group>"; tabWidth = 4; };
 		5186111D0CC824830081412B /* Deque.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Deque.h; sourceTree = "<group>"; };
-		51F0EB6105C86C6B00E6DF1B /* Foundation.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = Foundation.framework; path = /System/Library/Frameworks/Foundation.framework; sourceTree = "<absolute>"; };
-		51F0EC0705C86C9A00E6DF1B /* libobjc.dylib */ = {isa = PBXFileReference; lastKnownFileType = "compiled.mach-o.dylib"; name = libobjc.dylib; path = /usr/lib/libobjc.dylib; sourceTree = "<absolute>"; };
 		51F648D60BB4E2CA0033D760 /* RetainPtr.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; path = RetainPtr.h; sourceTree = "<group>"; };
 		5D53726D0E1C546B0021E549 /* Tracing.d */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; path = Tracing.d; sourceTree = "<group>"; };
 		5D53726E0E1C54880021E549 /* Tracing.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Tracing.h; sourceTree = "<group>"; };
@@ -1443,8 +1437,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				2415875F10CC8FA500E212F2 /* CoreFoundation.framework in Frameworks */,
-				2415876010CC8FB000E212F2 /* Foundation.framework in Frameworks */,
-				2415876C10CC909100E212F2 /* libobjc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1453,8 +1445,6 @@
 			buildActionMask = 2147483647;
 			files = (
 				932F5BD30822A1C700736975 /* CoreFoundation.framework in Frameworks */,
-				932F5BD50822A1C700736975 /* Foundation.framework in Frameworks */,
-				932F5BD60822A1C700736975 /* libobjc.dylib in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1528,8 +1518,6 @@
 			isa = PBXGroup;
 			children = (
 				6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */,
-				51F0EB6105C86C6B00E6DF1B /* Foundation.framework */,
-				51F0EC0705C86C9A00E6DF1B /* libobjc.dylib */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
