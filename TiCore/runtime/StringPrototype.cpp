@@ -716,7 +716,7 @@ TiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec, TiObject*, Ti
     if (!(ored & ~0x7f))
         return jsString(exec, UString(buffer.releaseBuffer(), sSize, false));
 
-    bool error;
+    bool error = 0;
     int length = Unicode::toLower(buffer.data(), sSize, sData, sSize, &error);
     if (error) {
         buffer.resize(length);
@@ -750,7 +750,7 @@ TiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec, TiObject*, Ti
     if (!(ored & ~0x7f))
         return jsString(exec, UString(buffer.releaseBuffer(), sSize, false));
 
-    bool error;
+    bool error = 0;
     int length = Unicode::toUpper(buffer.data(), sSize, sData, sSize, &error);
     if (error) {
         buffer.resize(length);
