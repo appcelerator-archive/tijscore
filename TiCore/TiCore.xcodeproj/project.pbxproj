@@ -2785,7 +2785,14 @@
 			isa = PBXProject;
 			buildConfigurationList = 149C277108902AFE008A9EFC /* Build configuration list for PBXProject "TiCore" */;
 			compatibilityVersion = "Xcode 3.2";
+			developmentRegion = English;
 			hasScannedForEncodings = 1;
+			knownRegions = (
+				English,
+				Japanese,
+				French,
+				German,
+			);
 			mainGroup = 0867D691FE84028FC02AAC07 /* TiCore */;
 			productRefGroup = 034768DFFF38A50411DB9C8B /* Products */;
 			projectDirPath = "";
@@ -3381,7 +3388,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Debug;
 		};
@@ -3390,7 +3397,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Release;
 		};
@@ -3402,7 +3409,7 @@
 					normal,
 					debug,
 				);
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Production;
 		};
@@ -3459,7 +3466,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -3473,7 +3480,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -3487,7 +3494,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Production;
@@ -3536,7 +3543,7 @@
 				OTHER_LDFLAGS = "$(OTHER_LDFLAGS_$(REAL_PLATFORM_NAME))";
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
 			};
 			name = Debug;
@@ -3560,7 +3567,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -3574,7 +3581,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Profiling;
 		};
@@ -3587,7 +3594,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Production;
 		};
@@ -3620,7 +3627,7 @@
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -3638,7 +3645,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Profiling;
 		};
