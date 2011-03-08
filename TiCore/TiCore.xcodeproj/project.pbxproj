@@ -584,531 +584,6 @@
 		2415875010CC8F0700E212F2 /* DateInstanceCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A1563010966365006FA260 /* DateInstanceCache.h */; };
 		2415875110CC8F0700E212F2 /* WeakRandom.h in Headers */ = {isa = PBXBuildFile; fileRef = 1420BE7A10AA6DDB00F455D2 /* WeakRandom.h */; };
 		2415875F10CC8FA500E212F2 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */; };
-		242E8E9511BA3BD30046A0D0 /* AbstractMacroAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161DF0F3A83C100F84710 /* AbstractMacroAssembler.h */; };
-		242E8E9611BA3BD30046A0D0 /* AlwaysInline.h in Headers */ = {isa = PBXBuildFile; fileRef = 93AA4F770957251F0084B3A7 /* AlwaysInline.h */; };
-		242E8E9711BA3BD30046A0D0 /* APICast.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B78A0A4305AB00517CFC /* APICast.h */; };
-		242E8E9811BA3BD30046A0D0 /* ArgList.h in Headers */ = {isa = PBXBuildFile; fileRef = BCF605120E203EF800B9A64D /* ArgList.h */; };
-		242E8E9911BA3BD30046A0D0 /* Arguments.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DE60E1F51C50016B6C9 /* Arguments.h */; };
-		242E8E9A11BA3BD30046A0D0 /* ARMAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C010156BDE002865E7 /* ARMAssembler.h */; };
-		242E8E9B11BA3BD30046A0D0 /* ARMv7Assembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86ADD1430FDDEA980006EEC2 /* ARMv7Assembler.h */; };
-		242E8E9C11BA3BD30046A0D0 /* ArrayConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC7952070E15E8A800A898AB /* ArrayConstructor.h */; };
-		242E8E9D11BA3BD30046A0D0 /* ArrayPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A84E0255597D01FF60F7 /* ArrayPrototype.h */; };
-		242E8E9E11BA3BD30046A0D0 /* ASCIICType.h in Headers */ = {isa = PBXBuildFile; fileRef = 938C4F690CA06BC700D9310A /* ASCIICType.h */; };
-		242E8E9F11BA3BD30046A0D0 /* AssemblerBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 9688CB130ED12B4E001D649F /* AssemblerBuffer.h */; };
-		242E8EA011BA3BD30046A0D0 /* AssemblerBufferWithConstantPool.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C110156BDE002865E7 /* AssemblerBufferWithConstantPool.h */; };
-		242E8EA111BA3BD30046A0D0 /* Assertions.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E217B708E7EECC0023E5F6 /* Assertions.h */; };
-		242E8EA211BA3BD30046A0D0 /* AVLTree.h in Headers */ = {isa = PBXBuildFile; fileRef = E1A596370DE3E1C300C17E37 /* AVLTree.h */; };
-		242E8EA311BA3BD30046A0D0 /* BatchedTransitionOptimizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 147B83AA0E6DB8C9004775A4 /* BatchedTransitionOptimizer.h */; };
-		242E8EA411BA3BD30046A0D0 /* BooleanObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 704FD35305697E6D003DBED9 /* BooleanObject.h */; };
-		242E8EA511BA3BD30046A0D0 /* ByteArray.h in Headers */ = {isa = PBXBuildFile; fileRef = A7A1F7AB0F252B3C00E184E2 /* ByteArray.h */; };
-		242E8EA611BA3BD30046A0D0 /* BytecodeGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07210ED1CE3300F1F681 /* BytecodeGenerator.h */; };
-		242E8EA711BA3BD30046A0D0 /* CallData.h in Headers */ = {isa = PBXBuildFile; fileRef = 145C507F0D9DF63B0088F6B9 /* CallData.h */; };
-		242E8EA811BA3BD30046A0D0 /* CallFrame.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D8DC0ED2205B00B89619 /* CallFrame.h */; };
-		242E8EA911BA3BD30046A0D0 /* CallIdentifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 95E3BC040E1AE68200B2D1C1 /* CallIdentifier.h */; };
-		242E8EAA11BA3BD30046A0D0 /* CharacterClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D9C30ED23C3900B89619 /* CharacterClass.h */; };
-		242E8EAB11BA3BD30046A0D0 /* CharacterClassConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E2ADD8D0E79AAD500D50C51 /* CharacterClassConstructor.h */; };
-		242E8EAC11BA3BD30046A0D0 /* ClassInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = BC6AAAE40E1F426500AD87D8 /* ClassInfo.h */; };
-		242E8EAD11BA3BD30046A0D0 /* CodeBlock.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07910ED1D3AE00F1F681 /* CodeBlock.h */; };
-		242E8EAE11BA3BD30046A0D0 /* CodeLocation.h in Headers */ = {isa = PBXBuildFile; fileRef = 86E116B00FE75AC800B512BC /* CodeLocation.h */; };
-		242E8EAF11BA3BD30046A0D0 /* Collator.h in Headers */ = {isa = PBXBuildFile; fileRef = E1A862AA0D7EBB7D001EC6AA /* Collator.h */; };
-		242E8EB011BA3BD30046A0D0 /* Collector.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8530255597D01FF60F7 /* Collector.h */; };
-		242E8EB111BA3BD30046A0D0 /* CollectorHeapIterator.h in Headers */ = {isa = PBXBuildFile; fileRef = 14F3488E0E95EF8A003648BC /* CollectorHeapIterator.h */; };
-		242E8EB211BA3BD30046A0D0 /* CommonIdentifiers.h in Headers */ = {isa = PBXBuildFile; fileRef = 65EA73630BAE35D1001BB560 /* CommonIdentifiers.h */; };
-		242E8EB311BA3BD30046A0D0 /* Completion.h in Headers */ = {isa = PBXBuildFile; fileRef = F5BB2BC5030F772101FCFE1D /* Completion.h */; };
-		242E8EB411BA3BD30046A0D0 /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = F68EBB8C0255D4C601FF60F7 /* config.h */; };
-		242E8EB511BA3BD30046A0D0 /* ConstructData.h in Headers */ = {isa = PBXBuildFile; fileRef = BC8F3CCF0DAF17BA00577A80 /* ConstructData.h */; };
-		242E8EB611BA3BD30046A0D0 /* create_hash_table in Headers */ = {isa = PBXBuildFile; fileRef = F692A8540255597D01FF60F7 /* create_hash_table */; };
-		242E8EB711BA3BD30046A0D0 /* CrossThreadRefCounted.h in Headers */ = {isa = PBXBuildFile; fileRef = 0BDFFAD40FC6171000D69EF4 /* CrossThreadRefCounted.h */; };
-		242E8EB811BA3BD30046A0D0 /* CurrentTime.h in Headers */ = {isa = PBXBuildFile; fileRef = 180B9AF00F16C569009BDBC5 /* CurrentTime.h */; };
-		242E8EB911BA3BD30046A0D0 /* DateConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD203460E17135E002C7E82 /* DateConstructor.h */; };
-		242E8EBA11BA3BD30046A0D0 /* DateConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = D21202290AD4310C00ED79B6 /* DateConversion.h */; };
-		242E8EBB11BA3BD30046A0D0 /* DateInstance.h in Headers */ = {isa = PBXBuildFile; fileRef = BC1166010E1997B1008066DD /* DateInstance.h */; };
-		242E8EBC11BA3BD30046A0D0 /* DateMath.h in Headers */ = {isa = PBXBuildFile; fileRef = 41359CF50FDD89CB00206180 /* DateMath.h */; };
-		242E8EBD11BA3BD30046A0D0 /* DatePrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD203480E17135E002C7E82 /* DatePrototype.h */; };
-		242E8EBE11BA3BD30046A0D0 /* Debugger.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8590255597D01FF60F7 /* Debugger.h */; };
-		242E8EBF11BA3BD30046A0D0 /* DebuggerActivation.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3135620F302FA3003DFD3A /* DebuggerActivation.h */; };
-		242E8EC011BA3BD30046A0D0 /* DebuggerCallFrame.h in Headers */ = {isa = PBXBuildFile; fileRef = 1480DB9B0DDC227F003CFDF2 /* DebuggerCallFrame.h */; };
-		242E8EC111BA3BD30046A0D0 /* Deque.h in Headers */ = {isa = PBXBuildFile; fileRef = 5186111D0CC824830081412B /* Deque.h */; };
-		242E8EC211BA3BD30046A0D0 /* DisallowCType.h in Headers */ = {isa = PBXBuildFile; fileRef = 938C4F6B0CA06BCE00D9310A /* DisallowCType.h */; };
-		242E8EC311BA3BD30046A0D0 /* dtoa.h in Headers */ = {isa = PBXBuildFile; fileRef = 651F6413039D5B5F0078395C /* dtoa.h */; };
-		242E8EC411BA3BD30046A0D0 /* Error.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3046060E1F497F003232CF /* Error.h */; };
-		242E8EC511BA3BD30046A0D0 /* ErrorConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9050E1839DB000F9297 /* ErrorConstructor.h */; };
-		242E8EC611BA3BD30046A0D0 /* ErrorInstance.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E98B0E183E38000F9297 /* ErrorInstance.h */; };
-		242E8EC711BA3BD30046A0D0 /* ErrorPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9070E1839DB000F9297 /* ErrorPrototype.h */; };
-		242E8EC811BA3BD30046A0D0 /* Escapes.h in Headers */ = {isa = PBXBuildFile; fileRef = 96A7463F0EDDF70600904779 /* Escapes.h */; };
-		242E8EC911BA3BD30046A0D0 /* EvalCodeCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07920ED1D3AE00F1F681 /* EvalCodeCache.h */; };
-		242E8ECA11BA3BD30046A0D0 /* ExceptionHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = A72701B30DADE94900E548D7 /* ExceptionHelpers.h */; };
-		242E8ECB11BA3BD30046A0D0 /* ExecutableAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = A7B48DB50EE74CFC00DCBDB6 /* ExecutableAllocator.h */; };
-		242E8ECC11BA3BD30046A0D0 /* FastAllocBase.h in Headers */ = {isa = PBXBuildFile; fileRef = E48E0F2C0F82151700A8CA37 /* FastAllocBase.h */; };
-		242E8ECD11BA3BD30046A0D0 /* FastMalloc.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E217BA08E7EECC0023E5F6 /* FastMalloc.h */; };
-		242E8ECE11BA3BD30046A0D0 /* Forward.h in Headers */ = {isa = PBXBuildFile; fileRef = 935AF46909E9D9DB00ACD1D8 /* Forward.h */; };
-		242E8ECF11BA3BD30046A0D0 /* FunctionConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C10E16D4E900A06E92 /* FunctionConstructor.h */; };
-		242E8ED011BA3BD30046A0D0 /* FunctionPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A85D0255597D01FF60F7 /* FunctionPrototype.h */; };
-		242E8ED111BA3BD30046A0D0 /* GetPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 93B6A0DE0AA64DA40076DE27 /* GetPtr.h */; };
-		242E8ED211BA3BD30046A0D0 /* GlobalEvalFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DEE0E1F52ED0016B6C9 /* GlobalEvalFunction.h */; };
-		242E8ED311BA3BD30046A0D0 /* Grammar.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52F0E16FCEB00B34460 /* Grammar.h */; };
-		242E8ED411BA3BD30046A0D0 /* HashCountedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 657EEBBF094E445E008C9C7B /* HashCountedSet.h */; };
-		242E8ED511BA3BD30046A0D0 /* HashFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92A08EA173A00F7300B /* HashFunctions.h */; };
-		242E8ED611BA3BD30046A0D0 /* HashIterators.h in Headers */ = {isa = PBXBuildFile; fileRef = 652246A40C8D7A0E007BDAF7 /* HashIterators.h */; };
-		242E8ED711BA3BD30046A0D0 /* HashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92B08EA173A00F7300B /* HashMap.h */; };
-		242E8ED811BA3BD30046A0D0 /* HashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92C08EA173A00F7300B /* HashSet.h */; };
-		242E8ED911BA3BD30046A0D0 /* HashTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92E08EA173A00F7300B /* HashTable.h */; };
-		242E8EDA11BA3BD30046A0D0 /* HashTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92F08EA173A00F7300B /* HashTraits.h */; };
-		242E8EDB11BA3BD30046A0D0 /* Identifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 933A349A038AE7C6008635CE /* Identifier.h */; };
-		242E8EDC11BA3BD30046A0D0 /* InitializeThreading.h in Headers */ = {isa = PBXBuildFile; fileRef = E178633F0D9BEC0000D74E75 /* InitializeThreading.h */; };
-		242E8EDD11BA3BD30046A0D0 /* Instruction.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07930ED1D3AE00F1F681 /* Instruction.h */; };
-		242E8EDE11BA3BD30046A0D0 /* InternalFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC11667A0E199C05008066DD /* InternalFunction.h */; };
-		242E8EDF11BA3BD30046A0D0 /* Interpreter.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D77B0ED20D7300B89619 /* Interpreter.h */; };
-		242E8EE011BA3BD30046A0D0 /* Ti.h in Headers */ = {isa = PBXBuildFile; fileRef = 1CAA8B4A0D32C39A0041BCFF /* Ti.h */; };
-		242E8EE111BA3BD30046A0D0 /* TiCore.h in Headers */ = {isa = PBXBuildFile; fileRef = 1CAA8B4B0D32C39A0041BCFF /* TiCore.h */; };
-		242E8EE211BA3BD30046A0D0 /* TiCorePrefix.h in Headers */ = {isa = PBXBuildFile; fileRef = F5C290E60284F98E018635CA /* TiCorePrefix.h */; };
-		242E8EE311BA3BD30046A0D0 /* JIT.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D92E0ED22D7000B89619 /* JIT.h */; };
-		242E8EE411BA3BD30046A0D0 /* JITCode.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CCEFDD0F413F8900FD7F9E /* JITCode.h */; };
-		242E8EE511BA3BD30046A0D0 /* JITInlineMethods.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CC85A00EE79A4700288682 /* JITInlineMethods.h */; };
-		242E8EE611BA3BD30046A0D0 /* JITStubCall.h in Headers */ = {isa = PBXBuildFile; fileRef = 960626950FB8EC02009798AB /* JITStubCall.h */; };
-		242E8EE711BA3BD30046A0D0 /* JITStubs.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A6581A0F4E36F4000150FD /* JITStubs.h */; };
-		242E8EE811BA3BD30046A0D0 /* JSActivation.h in Headers */ = {isa = PBXBuildFile; fileRef = 14DA818E0D99FD2000B0A4FB /* JSActivation.h */; };
-		242E8EE911BA3BD30046A0D0 /* TiAPIValueWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = BC0894D60FAFBA2D00001865 /* TiAPIValueWrapper.h */; };
-		242E8EEA11BA3BD30046A0D0 /* TiArray.h in Headers */ = {isa = PBXBuildFile; fileRef = 938772E5038BFE19008635CE /* TiArray.h */; };
-		242E8EEB11BA3BD30046A0D0 /* TiBase.h in Headers */ = {isa = PBXBuildFile; fileRef = 142711380A460BBB0080EEEA /* TiBase.h */; };
-		242E8EEC11BA3BD30046A0D0 /* TiBasePrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 140D17D60E8AD4A9000CD17D /* TiBasePrivate.h */; };
-		242E8EED11BA3BD30046A0D0 /* TiArrayArray.h in Headers */ = {isa = PBXBuildFile; fileRef = A791EF260F11E07900AE1F68 /* TiArrayArray.h */; };
-		242E8EEE11BA3BD30046A0D0 /* TiCallbackConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440F8AC0A508D200005F061 /* TiCallbackConstructor.h */; };
-		242E8EEF11BA3BD30046A0D0 /* TiCallbackFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440F88F0A508B100005F061 /* TiCallbackFunction.h */; };
-		242E8EF011BA3BD30046A0D0 /* TiCallbackObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABDF5D0A437FEF00ECCA01 /* TiCallbackObject.h */; };
-		242E8EF111BA3BD30046A0D0 /* TiCallbackObjectFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = A8E894310CD0602400367179 /* TiCallbackObjectFunctions.h */; };
-		242E8EF211BA3BD30046A0D0 /* TiCell.h in Headers */ = {isa = PBXBuildFile; fileRef = BC1167D80E19BCC9008066DD /* TiCell.h */; };
-		242E8EF311BA3BD30046A0D0 /* TiClassRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440FCE10A51E46B0005F061 /* TiClassRef.h */; };
-		242E8EF411BA3BD30046A0D0 /* TiContextRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 14BD5A2A0A3E91F600BAF59C /* TiContextRef.h */; };
-		242E8EF511BA3BD30046A0D0 /* TiFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A85F0255597D01FF60F7 /* TiFunction.h */; };
-		242E8EF611BA3BD30046A0D0 /* TiGlobalData.h in Headers */ = {isa = PBXBuildFile; fileRef = E18E3A560DF9278C00D90B34 /* TiGlobalData.h */; };
-		242E8EF711BA3BD30046A0D0 /* TiGlobalObject.h in Headers */ = {isa = PBXBuildFile; fileRef = A8E894330CD0603F00367179 /* TiGlobalObject.h */; };
-		242E8EF811BA3BD30046A0D0 /* TiGlobalObjectFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = BC756FC70E2031B200DE7D12 /* TiGlobalObjectFunctions.h */; };
-		242E8EF911BA3BD30046A0D0 /* JSImmediate.h in Headers */ = {isa = PBXBuildFile; fileRef = 1483B589099BC1950016E4F0 /* JSImmediate.h */; };
-		242E8EFA11BA3BD30046A0D0 /* TiLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 65EA4C9A092AF9E20093D800 /* TiLock.h */; };
-		242E8EFB11BA3BD30046A0D0 /* JSNumberCell.h in Headers */ = {isa = PBXBuildFile; fileRef = BC7F8FB80E19D1C3008632C0 /* JSNumberCell.h */; };
-		242E8EFC11BA3BD30046A0D0 /* TiObject.h in Headers */ = {isa = PBXBuildFile; fileRef = BC22A3990E16E14800AF21C8 /* TiObject.h */; };
-		242E8EFD11BA3BD30046A0D0 /* TiObjectRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B7E10A43076000517CFC /* TiObjectRef.h */; };
-		242E8EFE11BA3BD30046A0D0 /* JSONObject.h in Headers */ = {isa = PBXBuildFile; fileRef = A7F9935D0FD7325100A0B2D0 /* JSONObject.h */; };
-		242E8EFF11BA3BD30046A0D0 /* TiProfilerPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 952C63AC0E4777D600C13936 /* TiProfilerPrivate.h */; };
-		242E8F0011BA3BD30046A0D0 /* TiRetainPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 95C18D3E0C90E7EF00E72F73 /* TiRetainPtr.h */; };
-		242E8F0111BA3BD30046A0D0 /* TiString.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8620255597D01FF60F7 /* TiString.h */; };
-		242E8F0211BA3BD30046A0D0 /* TiStringRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B74B0A43032800517CFC /* TiStringRef.h */; };
-		242E8F0311BA3BD30046A0D0 /* TiStringRefCF.h in Headers */ = {isa = PBXBuildFile; fileRef = 146AAB2A0B66A84900E55F16 /* TiStringRefCF.h */; };
-		242E8F0411BA3BD30046A0D0 /* TiType.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABB454099C2A0F00E2A24F /* TiType.h */; };
-		242E8F0511BA3BD30046A0D0 /* TiValue.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABB36E099C076400E2A24F /* TiValue.h */; };
-		242E8F0611BA3BD30046A0D0 /* TiValueRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B6EA0A4300B300517CFC /* TiValueRef.h */; };
-		242E8F0711BA3BD30046A0D0 /* JSVariableObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 14F252560D08DD8D004ECFFF /* JSVariableObject.h */; };
-		242E8F0811BA3BD30046A0D0 /* JSWrapperObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C7A1720A8EAACB00FA37EA /* JSWrapperObject.h */; };
-		242E8F0911BA3BD30046A0D0 /* JumpTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BCFD8C910EEB2EE700283848 /* JumpTable.h */; };
-		242E8F0A11BA3BD30046A0D0 /* Label.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07270ED1CE6900F1F681 /* Label.h */; };
-		242E8F0B11BA3BD30046A0D0 /* LabelScope.h in Headers */ = {isa = PBXBuildFile; fileRef = 960097A50EBABB58007A7297 /* LabelScope.h */; };
-		242E8F0C11BA3BD30046A0D0 /* Lexer.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8660255597D01FF60F7 /* Lexer.h */; };
-		242E8F0D11BA3BD30046A0D0 /* Lexer.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52D0E16FCE100B34460 /* Lexer.lut.h */; };
-		242E8F0E11BA3BD30046A0D0 /* LinkBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B3C110159D7F002865E7 /* LinkBuffer.h */; };
-		242E8F0F11BA3BD30046A0D0 /* ListHashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 657EB7450B708F540063461B /* ListHashSet.h */; };
-		242E8F1011BA3BD30046A0D0 /* ListRefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 148A1626095D16BB00666D0D /* ListRefPtr.h */; };
-		242E8F1111BA3BD30046A0D0 /* LiteralParser.h in Headers */ = {isa = PBXBuildFile; fileRef = A7E2EA690FB460CF00601F06 /* LiteralParser.h */; };
-		242E8F1211BA3BD30046A0D0 /* Locker.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE79270D6C964500FEA3BA /* Locker.h */; };
-		242E8F1311BA3BD30046A0D0 /* Lookup.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8690255597D01FF60F7 /* Lookup.h */; };
-		242E8F1411BA3BD30046A0D0 /* MacroAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86C36EE90EE1289D00B3DF59 /* MacroAssembler.h */; };
-		242E8F1511BA3BD30046A0D0 /* MacroAssemblerARM.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C210156BDE002865E7 /* MacroAssemblerARM.h */; };
-		242E8F1611BA3BD30046A0D0 /* MacroAssemblerARMv7.h in Headers */ = {isa = PBXBuildFile; fileRef = 86ADD1440FDDEA980006EEC2 /* MacroAssemblerARMv7.h */; };
-		242E8F1711BA3BD30046A0D0 /* MacroAssemblerCodeRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 863B23DF0FC60E6200703AA4 /* MacroAssemblerCodeRef.h */; };
-		242E8F1811BA3BD30046A0D0 /* MacroAssemblerX86.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E00F3A83C100F84710 /* MacroAssemblerX86.h */; };
-		242E8F1911BA3BD30046A0D0 /* MacroAssemblerX86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E10F3A83C100F84710 /* MacroAssemblerX86_64.h */; };
-		242E8F1A11BA3BD30046A0D0 /* MacroAssemblerX86Common.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E20F3A83C100F84710 /* MacroAssemblerX86Common.h */; };
-		242E8F1B11BA3BD30046A0D0 /* MainThread.h in Headers */ = {isa = PBXBuildFile; fileRef = 06D358A30DAAD9C4003B174E /* MainThread.h */; };
-		242E8F1C11BA3BD30046A0D0 /* MallocZoneSupport.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DBD18AF0C5401A700C15EAE /* MallocZoneSupport.h */; };
-		242E8F1D11BA3BD30046A0D0 /* MathExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = BCF6553B0A2048DE0038A194 /* MathExtras.h */; };
-		242E8F1E11BA3BD30046A0D0 /* MathObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A86B0255597D01FF60F7 /* MathObject.h */; };
-		242E8F1F11BA3BD30046A0D0 /* MathObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C5290E16FCC200B34460 /* MathObject.lut.h */; };
-		242E8F2011BA3BD30046A0D0 /* MessageQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE798B0D6CA53D00FEA3BA /* MessageQueue.h */; };
-		242E8F2111BA3BD30046A0D0 /* NativeErrorConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9090E1839DB000F9297 /* NativeErrorConstructor.h */; };
-		242E8F2211BA3BD30046A0D0 /* NativeErrorPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E90B0E1839DB000F9297 /* NativeErrorPrototype.h */; };
-		242E8F2311BA3BD30046A0D0 /* NativeFunctionWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = A76EE6580FAE59D5003F069A /* NativeFunctionWrapper.h */; };
-		242E8F2411BA3BD30046A0D0 /* NodeInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = 7EFF00630EC05A9A00AA7C93 /* NodeInfo.h */; };
-		242E8F2511BA3BD30046A0D0 /* Nodes.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A86E0255597D01FF60F7 /* Nodes.h */; };
-		242E8F2611BA3BD30046A0D0 /* Noncopyable.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F5690991190000AD71B8 /* Noncopyable.h */; };
-		242E8F2711BA3BD30046A0D0 /* NotFound.h in Headers */ = {isa = PBXBuildFile; fileRef = C0A2723F0E509F1E00E96E15 /* NotFound.h */; };
-		242E8F2811BA3BD30046A0D0 /* NumberConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C30E16D4E900A06E92 /* NumberConstructor.h */; };
-		242E8F2911BA3BD30046A0D0 /* NumberConstructor.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680E60E16D52300A06E92 /* NumberConstructor.lut.h */; };
-		242E8F2A11BA3BD30046A0D0 /* NumberObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8710255597D01FF60F7 /* NumberObject.h */; };
-		242E8F2B11BA3BD30046A0D0 /* NumberPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C50E16D4E900A06E92 /* NumberPrototype.h */; };
-		242E8F2C11BA3BD30046A0D0 /* ObjectConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C70E16D4E900A06E92 /* ObjectConstructor.h */; };
-		242E8F2D11BA3BD30046A0D0 /* ObjectPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C90E16D4E900A06E92 /* ObjectPrototype.h */; };
-		242E8F2E11BA3BD30046A0D0 /* OpaqueTiString.h in Headers */ = {isa = PBXBuildFile; fileRef = E124A8F50E555775003091F1 /* OpaqueTiString.h */; };
-		242E8F2F11BA3BD30046A0D0 /* Opcode.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07950ED1D3AE00F1F681 /* Opcode.h */; };
-		242E8F3011BA3BD30046A0D0 /* Operations.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8780255597D01FF60F7 /* Operations.h */; };
-		242E8F3111BA3BD30046A0D0 /* OwnArrayPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F5A409911A5800AD71B8 /* OwnArrayPtr.h */; };
-		242E8F3211BA3BD30046A0D0 /* OwnFastMallocPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 0BDFFAD10FC616EC00D69EF4 /* OwnFastMallocPtr.h */; };
-		242E8F3311BA3BD30046A0D0 /* OwnPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F567099118FA00AD71B8 /* OwnPtr.h */; };
-		242E8F3411BA3BD30046A0D0 /* OwnPtrCommon.h in Headers */ = {isa = PBXBuildFile; fileRef = 440B7AED0FAF7FCB0073323E /* OwnPtrCommon.h */; };
-		242E8F3511BA3BD30046A0D0 /* Parser.h in Headers */ = {isa = PBXBuildFile; fileRef = 93F0B3AA09BB4DC00068FCE3 /* Parser.h */; };
-		242E8F3611BA3BD30046A0D0 /* ParserArena.h in Headers */ = {isa = PBXBuildFile; fileRef = 93052C330FB792190048FDC3 /* ParserArena.h */; };
-		242E8F3711BA3BD30046A0D0 /* PassOwnPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 44DD48520FAEA85000D6B4EB /* PassOwnPtr.h */; };
-		242E8F3811BA3BD30046A0D0 /* PassRefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 6580F795094070560082C219 /* PassRefPtr.h */; };
-		242E8F3911BA3BD30046A0D0 /* pcre.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541720F039E08B90058BFEB /* pcre.h */; };
-		242E8F3A11BA3BD30046A0D0 /* pcre_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = 93E26BE508B1517100F85226 /* pcre_internal.h */; };
-		242E8F3B11BA3BD30046A0D0 /* Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = 65D6D87E09B5A32E0002E4D7 /* Platform.h */; };
-		242E8F3C11BA3BD30046A0D0 /* Profile.h in Headers */ = {isa = PBXBuildFile; fileRef = 95742F640DD11F5A000917FB /* Profile.h */; };
-		242E8F3D11BA3BD30046A0D0 /* ProfileGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 95CD45750E1C4FDD0085358E /* ProfileGenerator.h */; };
-		242E8F3E11BA3BD30046A0D0 /* ProfileNode.h in Headers */ = {isa = PBXBuildFile; fileRef = 95AB83550DA43B4400BC83F3 /* ProfileNode.h */; };
-		242E8F3F11BA3BD30046A0D0 /* Profiler.h in Headers */ = {isa = PBXBuildFile; fileRef = 95AB832F0DA42CAD00BC83F3 /* Profiler.h */; };
-		242E8F4011BA3BD30046A0D0 /* ProfilerServer.h in Headers */ = {isa = PBXBuildFile; fileRef = 1C61516B0EBAC7A00031376F /* ProfilerServer.h */; };
-		242E8F4111BA3BD30046A0D0 /* PropertyMapHashTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BC95437C0EBA70FD0072B6D3 /* PropertyMapHashTable.h */; };
-		242E8F4211BA3BD30046A0D0 /* PropertyNameArray.h in Headers */ = {isa = PBXBuildFile; fileRef = 65400C100A69BAF200509887 /* PropertyNameArray.h */; };
-		242E8F4311BA3BD30046A0D0 /* PropertySlot.h in Headers */ = {isa = PBXBuildFile; fileRef = 65621E6C089E859700760F35 /* PropertySlot.h */; };
-		242E8F4411BA3BD30046A0D0 /* Protect.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C02FBB0637462A003E7EE6 /* Protect.h */; };
-		242E8F4511BA3BD30046A0D0 /* PrototypeFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DF20E1F53740016B6C9 /* PrototypeFunction.h */; };
-		242E8F4611BA3BD30046A0D0 /* PtrAndFlags.h in Headers */ = {isa = PBXBuildFile; fileRef = 0B1F921B0F17502D0036468E /* PtrAndFlags.h */; };
-		242E8F4711BA3BD30046A0D0 /* PutPropertySlot.h in Headers */ = {isa = PBXBuildFile; fileRef = 147B84620E6DE6B1004775A4 /* PutPropertySlot.h */; };
-		242E8F4811BA3BD30046A0D0 /* Quantifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DA490ED245EC00B89619 /* Quantifier.h */; };
-		242E8F4911BA3BD30046A0D0 /* RandomNumber.h in Headers */ = {isa = PBXBuildFile; fileRef = 088FA5BA0EF76D4300578E6F /* RandomNumber.h */; };
-		242E8F4A11BA3BD30046A0D0 /* RandomNumberSeed.h in Headers */ = {isa = PBXBuildFile; fileRef = 08E279E80EF83B10007DB523 /* RandomNumberSeed.h */; };
-		242E8F4B11BA3BD30046A0D0 /* RefCounted.h in Headers */ = {isa = PBXBuildFile; fileRef = 1419D32C0CEA7CDE00FF507A /* RefCounted.h */; };
-		242E8F4C11BA3BD30046A0D0 /* RefCountedLeakCounter.h in Headers */ = {isa = PBXBuildFile; fileRef = 90D3469B0E285280009492EE /* RefCountedLeakCounter.h */; };
-		242E8F4D11BA3BD30046A0D0 /* RefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C647B3093EF8D60022C380 /* RefPtr.h */; };
-		242E8F4E11BA3BD30046A0D0 /* RefPtrHashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 148A1ECD0D10C23B0069A47C /* RefPtrHashMap.h */; };
-		242E8F4F11BA3BD30046A0D0 /* RegexCompiler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC48E0F93E8D1008EC948 /* RegexCompiler.h */; };
-		242E8F5011BA3BD30046A0D0 /* RegexInterpreter.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4900F93E8D1008EC948 /* RegexInterpreter.h */; };
-		242E8F5111BA3BD30046A0D0 /* RegexJIT.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4920F93E8D1008EC948 /* RegexJIT.h */; };
-		242E8F5211BA3BD30046A0D0 /* RegExp.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A87E0255597D01FF60F7 /* RegExp.h */; };
-		242E8F5311BA3BD30046A0D0 /* RegexParser.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4930F93E8D1008EC948 /* RegexParser.h */; };
-		242E8F5411BA3BD30046A0D0 /* RegexPattern.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4940F93E8D1008EC948 /* RegexPattern.h */; };
-		242E8F5511BA3BD30046A0D0 /* RegExpConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202BE0E1706A7002C7E82 /* RegExpConstructor.h */; };
-		242E8F5611BA3BD30046A0D0 /* RegExpConstructor.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202D50E170708002C7E82 /* RegExpConstructor.lut.h */; };
-		242E8F5711BA3BD30046A0D0 /* RegExpObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A87C0255597D01FF60F7 /* RegExpObject.h */; };
-		242E8F5811BA3BD30046A0D0 /* RegExpObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52B0E16FCD200B34460 /* RegExpObject.lut.h */; };
-		242E8F5911BA3BD30046A0D0 /* RegExpPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202C00E1706A7002C7E82 /* RegExpPrototype.h */; };
-		242E8F5A11BA3BD30046A0D0 /* Register.h in Headers */ = {isa = PBXBuildFile; fileRef = 149B24FF0D8AF6D1009CB8C7 /* Register.h */; };
-		242E8F5B11BA3BD30046A0D0 /* RegisterFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D792640DAA03FB001A9F05 /* RegisterFile.h */; };
-		242E8F5C11BA3BD30046A0D0 /* RegisterID.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07280ED1CE6900F1F681 /* RegisterID.h */; };
-		242E8F5D11BA3BD30046A0D0 /* RepatchBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B3C210159D7F002865E7 /* RepatchBuffer.h */; };
-		242E8F5E11BA3BD30046A0D0 /* ResultType.h in Headers */ = {isa = PBXBuildFile; fileRef = 869EBCB60E8C6D4A008722CC /* ResultType.h */; };
-		242E8F5F11BA3BD30046A0D0 /* RetainPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 51F648D60BB4E2CA0033D760 /* RetainPtr.h */; };
-		242E8F6011BA3BD30046A0D0 /* SamplingTool.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D8840ED21C3D00B89619 /* SamplingTool.h */; };
-		242E8F6111BA3BD30046A0D0 /* ScopeChain.h in Headers */ = {isa = PBXBuildFile; fileRef = 9374D3A7038D9D74008635CE /* ScopeChain.h */; };
-		242E8F6211BA3BD30046A0D0 /* SegmentedVector.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07290ED1CE6900F1F681 /* SegmentedVector.h */; };
-		242E8F6311BA3BD30046A0D0 /* SmallStrings.h in Headers */ = {isa = PBXBuildFile; fileRef = 93303FEA0E6A72C000786E6A /* SmallStrings.h */; };
-		242E8F6411BA3BD30046A0D0 /* SourceCode.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E866EE0DD59AFA00A2B2A1 /* SourceCode.h */; };
-		242E8F6511BA3BD30046A0D0 /* SourceProvider.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E866ED0DD59AFA00A2B2A1 /* SourceProvider.h */; };
-		242E8F6611BA3BD30046A0D0 /* StdLibExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = FE1B44790ECCD73B004F4DD1 /* StdLibExtras.h */; };
-		242E8F6711BA3BD30046A0D0 /* StringConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C10E16EE3300B34460 /* StringConstructor.h */; };
-		242E8F6811BA3BD30046A0D0 /* StringExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = E11D51750B2E798D0056C188 /* StringExtras.h */; };
-		242E8F6911BA3BD30046A0D0 /* StringObject.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C30E16EE3300B34460 /* StringObject.h */; };
-		242E8F6A11BA3BD30046A0D0 /* StringObjectThatMasqueradesAsUndefined.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C40E16EE3300B34460 /* StringObjectThatMasqueradesAsUndefined.h */; };
-		242E8F6B11BA3BD30046A0D0 /* StringPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C60E16EE3300B34460 /* StringPrototype.h */; };
-		242E8F6C11BA3BD30046A0D0 /* StringPrototype.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C5250E16FCA700B34460 /* StringPrototype.lut.h */; };
-		242E8F6D11BA3BD30046A0D0 /* Structure.h in Headers */ = {isa = PBXBuildFile; fileRef = BCDE3AB10E6C82CF001453A7 /* Structure.h */; };
-		242E8F6E11BA3BD30046A0D0 /* StructureChain.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E4EE7080EBB7963005934AA /* StructureChain.h */; };
-		242E8F6F11BA3BD30046A0D0 /* StructureStubInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = BCCF0D070EF0AAB900413C8F /* StructureStubInfo.h */; };
-		242E8F7011BA3BD30046A0D0 /* StructureTransitionTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BC9041470EB9250900FE26FA /* StructureTransitionTable.h */; };
-		242E8F7111BA3BD30046A0D0 /* SymbolTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A396A60CD2933100B5B4FF /* SymbolTable.h */; };
-		242E8F7211BA3BD30046A0D0 /* TCPackedCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DA479650CFBCF56009328A0 /* TCPackedCache.h */; };
-		242E8F7311BA3BD30046A0D0 /* TCPageMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD6E08E80A17002CBEE7 /* TCPageMap.h */; };
-		242E8F7411BA3BD30046A0D0 /* TCSpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD6F08E80A17002CBEE7 /* TCSpinLock.h */; };
-		242E8F7511BA3BD30046A0D0 /* TCSystemAlloc.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD7108E80A17002CBEE7 /* TCSystemAlloc.h */; };
-		242E8F7611BA3BD30046A0D0 /* Threading.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE79220D6C95CD00FEA3BA /* Threading.h */; };
-		242E8F7711BA3BD30046A0D0 /* ThreadSpecific.h in Headers */ = {isa = PBXBuildFile; fileRef = E1B7C8BD0DA3A3360074B0DC /* ThreadSpecific.h */; };
-		242E8F7811BA3BD30046A0D0 /* TimeoutChecker.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A42E3E0F4F60EE00599099 /* TimeoutChecker.h */; };
-		242E8F7911BA3BD30046A0D0 /* Tracing.h in Headers */ = {isa = PBXBuildFile; fileRef = 5D53726E0E1C54880021E549 /* Tracing.h */; };
-		242E8F7A11BA3BD30046A0D0 /* TiTypeInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = 6507D2970E871E4A00D7D896 /* TiTypeInfo.h */; };
-		242E8F7B11BA3BD30046A0D0 /* TypeTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 0B4D7E620F319AC800AD7E58 /* TypeTraits.h */; };
-		242E8F7C11BA3BD30046A0D0 /* ucpinternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 93E26BFC08B151D400F85226 /* ucpinternal.h */; };
-		242E8F7D11BA3BD30046A0D0 /* Unicode.h in Headers */ = {isa = PBXBuildFile; fileRef = E195679409E7CF1200B89D13 /* Unicode.h */; };
-		242E8F7E11BA3BD30046A0D0 /* UnusedParam.h in Headers */ = {isa = PBXBuildFile; fileRef = 935AF46B09E9D9DB00ACD1D8 /* UnusedParam.h */; };
-		242E8F7F11BA3BD30046A0D0 /* UString.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8860255597D01FF60F7 /* UString.h */; };
-		242E8F8011BA3BD30046A0D0 /* UTF8.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EF79A90CE97BA60088D500 /* UTF8.h */; };
-		242E8F8111BA3BD30046A0D0 /* Vector.h in Headers */ = {isa = PBXBuildFile; fileRef = 6592C316098B7DE10003D4F6 /* Vector.h */; };
-		242E8F8211BA3BD30046A0D0 /* VectorTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 6592C317098B7DE10003D4F6 /* VectorTraits.h */; };
-		242E8F8311BA3BD30046A0D0 /* VMTags.h in Headers */ = {isa = PBXBuildFile; fileRef = 96DD73780F9DA3100027FBCC /* VMTags.h */; };
-		242E8F8411BA3BD30046A0D0 /* WebKitAvailability.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DE3D0F40DD8DDFB00468714 /* WebKitAvailability.h */; };
-		242E8F8511BA3BD30046A0D0 /* WREC.h in Headers */ = {isa = PBXBuildFile; fileRef = 869083140E6518D7000D36ED /* WREC.h */; };
-		242E8F8611BA3BD30046A0D0 /* WRECFunctors.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DA810ED2482900B89619 /* WRECFunctors.h */; };
-		242E8F8711BA3BD30046A0D0 /* WRECGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DADE0ED2645B00B89619 /* WRECGenerator.h */; };
-		242E8F8811BA3BD30046A0D0 /* WRECParser.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DABD0ED263E700B89619 /* WRECParser.h */; };
-		242E8F8911BA3BD30046A0D0 /* X86Assembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 9688CB140ED12B4E001D649F /* X86Assembler.h */; };
-		242E8F8A11BA3BD30046A0D0 /* MarkStack.h in Headers */ = {isa = PBXBuildFile; fileRef = A779558F101A74D500114E55 /* MarkStack.h */; };
-		242E8F8B11BA3BD30046A0D0 /* PossiblyNull.h in Headers */ = {isa = PBXBuildFile; fileRef = A7D649A91015224E009B2E1B /* PossiblyNull.h */; };
-		242E8F8C11BA3BD30046A0D0 /* Executable.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CAFEE21035DDE60028A609 /* Executable.h */; };
-		242E8F8D11BA3BD30046A0D0 /* NumericStrings.h in Headers */ = {isa = PBXBuildFile; fileRef = 142D3938103E4560007DCB52 /* NumericStrings.h */; };
-		242E8F8E11BA3BD30046A0D0 /* PropertyDescriptor.h in Headers */ = {isa = PBXBuildFile; fileRef = A7FB604B103F5EAB0017A286 /* PropertyDescriptor.h */; };
-		242E8F8F11BA3BD30046A0D0 /* JSONObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC87CDB810712ACA000614CF /* JSONObject.lut.h */; };
-		242E8F9011BA3BD30046A0D0 /* TiContextRefPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 148CD1D7108CF902008163C6 /* TiContextRefPrivate.h */; };
-		242E8F9111BA3BD30046A0D0 /* DateInstanceCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A1563010966365006FA260 /* DateInstanceCache.h */; };
-		242E8F9211BA3BD30046A0D0 /* WeakRandom.h in Headers */ = {isa = PBXBuildFile; fileRef = 1420BE7A10AA6DDB00F455D2 /* WeakRandom.h */; };
-		242E8F9311BA3BD30046A0D0 /* UnicodeFoundation.h in Headers */ = {isa = PBXBuildFile; fileRef = 24C379361152BBB5004BC328 /* UnicodeFoundation.h */; };
-		242E902F11BA3BD30046A0D0 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */; };
-		242E903611BA3BF70046A0D0 /* Debugger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F692A8580255597D01FF60F7 /* Debugger.cpp */; };
-		242E903711BA3BF70046A0D0 /* DebuggerActivation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BC3135630F302FA3003DFD3A /* DebuggerActivation.cpp */; };
-		242E903811BA3BF70046A0D0 /* DebuggerCallFrame.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 149559ED0DDCDDF700648087 /* DebuggerCallFrame.cpp */; };
-		242E905311BA3C680046A0D0 /* Profile.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 95742F630DD11F5A000917FB /* Profile.cpp */; };
-		242E905411BA3C680046A0D0 /* ProfileGenerator.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 95CD45740E1C4FDD0085358E /* ProfileGenerator.cpp */; };
-		242E905511BA3C680046A0D0 /* ProfileNode.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 95AB83540DA43B4400BC83F3 /* ProfileNode.cpp */; };
-		242E905611BA3C680046A0D0 /* Profiler.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 95AB832E0DA42CAD00BC83F3 /* Profiler.cpp */; };
-		242E908711BA405A0046A0D0 /* Debugger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F692A8580255597D01FF60F7 /* Debugger.cpp */; };
-		242E908811BA405A0046A0D0 /* DebuggerActivation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BC3135630F302FA3003DFD3A /* DebuggerActivation.cpp */; };
-		242E908911BA405A0046A0D0 /* DebuggerCallFrame.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 149559ED0DDCDDF700648087 /* DebuggerCallFrame.cpp */; };
-		242E919011BA4B350046A0D0 /* Debugger.cpp in Sources */ = {isa = PBXBuildFile; fileRef = F692A8580255597D01FF60F7 /* Debugger.cpp */; };
-		242E919111BA4B350046A0D0 /* DebuggerActivation.cpp in Sources */ = {isa = PBXBuildFile; fileRef = BC3135630F302FA3003DFD3A /* DebuggerActivation.cpp */; };
-		242E919211BA4B350046A0D0 /* DebuggerCallFrame.cpp in Sources */ = {isa = PBXBuildFile; fileRef = 149559ED0DDCDDF700648087 /* DebuggerCallFrame.cpp */; };
-		242E91D211BA4BF20046A0D0 /* CoreFoundation.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 6560A4CF04B3B3E7008AE952 /* CoreFoundation.framework */; };
-		242E91D711BA4C330046A0D0 /* AbstractMacroAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161DF0F3A83C100F84710 /* AbstractMacroAssembler.h */; };
-		242E91D811BA4C330046A0D0 /* AlwaysInline.h in Headers */ = {isa = PBXBuildFile; fileRef = 93AA4F770957251F0084B3A7 /* AlwaysInline.h */; };
-		242E91D911BA4C330046A0D0 /* APICast.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B78A0A4305AB00517CFC /* APICast.h */; };
-		242E91DA11BA4C330046A0D0 /* ArgList.h in Headers */ = {isa = PBXBuildFile; fileRef = BCF605120E203EF800B9A64D /* ArgList.h */; };
-		242E91DB11BA4C330046A0D0 /* Arguments.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DE60E1F51C50016B6C9 /* Arguments.h */; };
-		242E91DC11BA4C330046A0D0 /* ARMAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C010156BDE002865E7 /* ARMAssembler.h */; };
-		242E91DD11BA4C330046A0D0 /* ARMv7Assembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86ADD1430FDDEA980006EEC2 /* ARMv7Assembler.h */; };
-		242E91DE11BA4C330046A0D0 /* ArrayConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC7952070E15E8A800A898AB /* ArrayConstructor.h */; };
-		242E91DF11BA4C330046A0D0 /* ArrayPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A84E0255597D01FF60F7 /* ArrayPrototype.h */; };
-		242E91E011BA4C330046A0D0 /* ASCIICType.h in Headers */ = {isa = PBXBuildFile; fileRef = 938C4F690CA06BC700D9310A /* ASCIICType.h */; };
-		242E91E111BA4C330046A0D0 /* AssemblerBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 9688CB130ED12B4E001D649F /* AssemblerBuffer.h */; };
-		242E91E211BA4C330046A0D0 /* AssemblerBufferWithConstantPool.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C110156BDE002865E7 /* AssemblerBufferWithConstantPool.h */; };
-		242E91E311BA4C330046A0D0 /* Assertions.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E217B708E7EECC0023E5F6 /* Assertions.h */; };
-		242E91E411BA4C330046A0D0 /* AVLTree.h in Headers */ = {isa = PBXBuildFile; fileRef = E1A596370DE3E1C300C17E37 /* AVLTree.h */; };
-		242E91E511BA4C330046A0D0 /* BatchedTransitionOptimizer.h in Headers */ = {isa = PBXBuildFile; fileRef = 147B83AA0E6DB8C9004775A4 /* BatchedTransitionOptimizer.h */; };
-		242E91E611BA4C330046A0D0 /* BooleanObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 704FD35305697E6D003DBED9 /* BooleanObject.h */; };
-		242E91E711BA4C330046A0D0 /* ByteArray.h in Headers */ = {isa = PBXBuildFile; fileRef = A7A1F7AB0F252B3C00E184E2 /* ByteArray.h */; };
-		242E91E811BA4C330046A0D0 /* BytecodeGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07210ED1CE3300F1F681 /* BytecodeGenerator.h */; };
-		242E91E911BA4C330046A0D0 /* CallData.h in Headers */ = {isa = PBXBuildFile; fileRef = 145C507F0D9DF63B0088F6B9 /* CallData.h */; };
-		242E91EA11BA4C330046A0D0 /* CallFrame.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D8DC0ED2205B00B89619 /* CallFrame.h */; };
-		242E91EB11BA4C330046A0D0 /* CallIdentifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 95E3BC040E1AE68200B2D1C1 /* CallIdentifier.h */; };
-		242E91EC11BA4C330046A0D0 /* CharacterClass.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D9C30ED23C3900B89619 /* CharacterClass.h */; };
-		242E91ED11BA4C330046A0D0 /* CharacterClassConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E2ADD8D0E79AAD500D50C51 /* CharacterClassConstructor.h */; };
-		242E91EE11BA4C330046A0D0 /* ClassInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = BC6AAAE40E1F426500AD87D8 /* ClassInfo.h */; };
-		242E91EF11BA4C330046A0D0 /* CodeBlock.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07910ED1D3AE00F1F681 /* CodeBlock.h */; };
-		242E91F011BA4C330046A0D0 /* CodeLocation.h in Headers */ = {isa = PBXBuildFile; fileRef = 86E116B00FE75AC800B512BC /* CodeLocation.h */; };
-		242E91F111BA4C330046A0D0 /* Collator.h in Headers */ = {isa = PBXBuildFile; fileRef = E1A862AA0D7EBB7D001EC6AA /* Collator.h */; };
-		242E91F211BA4C330046A0D0 /* Collector.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8530255597D01FF60F7 /* Collector.h */; };
-		242E91F311BA4C330046A0D0 /* CollectorHeapIterator.h in Headers */ = {isa = PBXBuildFile; fileRef = 14F3488E0E95EF8A003648BC /* CollectorHeapIterator.h */; };
-		242E91F411BA4C330046A0D0 /* CommonIdentifiers.h in Headers */ = {isa = PBXBuildFile; fileRef = 65EA73630BAE35D1001BB560 /* CommonIdentifiers.h */; };
-		242E91F511BA4C330046A0D0 /* Completion.h in Headers */ = {isa = PBXBuildFile; fileRef = F5BB2BC5030F772101FCFE1D /* Completion.h */; };
-		242E91F611BA4C330046A0D0 /* config.h in Headers */ = {isa = PBXBuildFile; fileRef = F68EBB8C0255D4C601FF60F7 /* config.h */; };
-		242E91F711BA4C330046A0D0 /* ConstructData.h in Headers */ = {isa = PBXBuildFile; fileRef = BC8F3CCF0DAF17BA00577A80 /* ConstructData.h */; };
-		242E91F811BA4C330046A0D0 /* create_hash_table in Headers */ = {isa = PBXBuildFile; fileRef = F692A8540255597D01FF60F7 /* create_hash_table */; };
-		242E91F911BA4C330046A0D0 /* CrossThreadRefCounted.h in Headers */ = {isa = PBXBuildFile; fileRef = 0BDFFAD40FC6171000D69EF4 /* CrossThreadRefCounted.h */; };
-		242E91FA11BA4C330046A0D0 /* CurrentTime.h in Headers */ = {isa = PBXBuildFile; fileRef = 180B9AF00F16C569009BDBC5 /* CurrentTime.h */; };
-		242E91FB11BA4C330046A0D0 /* DateConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD203460E17135E002C7E82 /* DateConstructor.h */; };
-		242E91FC11BA4C330046A0D0 /* DateConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = D21202290AD4310C00ED79B6 /* DateConversion.h */; };
-		242E91FD11BA4C330046A0D0 /* DateInstance.h in Headers */ = {isa = PBXBuildFile; fileRef = BC1166010E1997B1008066DD /* DateInstance.h */; };
-		242E91FE11BA4C330046A0D0 /* DateMath.h in Headers */ = {isa = PBXBuildFile; fileRef = 41359CF50FDD89CB00206180 /* DateMath.h */; };
-		242E91FF11BA4C330046A0D0 /* DatePrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD203480E17135E002C7E82 /* DatePrototype.h */; };
-		242E920011BA4C330046A0D0 /* Debugger.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8590255597D01FF60F7 /* Debugger.h */; };
-		242E920111BA4C330046A0D0 /* DebuggerActivation.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3135620F302FA3003DFD3A /* DebuggerActivation.h */; };
-		242E920211BA4C330046A0D0 /* DebuggerCallFrame.h in Headers */ = {isa = PBXBuildFile; fileRef = 1480DB9B0DDC227F003CFDF2 /* DebuggerCallFrame.h */; };
-		242E920311BA4C330046A0D0 /* Deque.h in Headers */ = {isa = PBXBuildFile; fileRef = 5186111D0CC824830081412B /* Deque.h */; };
-		242E920411BA4C330046A0D0 /* DisallowCType.h in Headers */ = {isa = PBXBuildFile; fileRef = 938C4F6B0CA06BCE00D9310A /* DisallowCType.h */; };
-		242E920511BA4C330046A0D0 /* dtoa.h in Headers */ = {isa = PBXBuildFile; fileRef = 651F6413039D5B5F0078395C /* dtoa.h */; };
-		242E920611BA4C330046A0D0 /* Error.h in Headers */ = {isa = PBXBuildFile; fileRef = BC3046060E1F497F003232CF /* Error.h */; };
-		242E920711BA4C330046A0D0 /* ErrorConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9050E1839DB000F9297 /* ErrorConstructor.h */; };
-		242E920811BA4C330046A0D0 /* ErrorInstance.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E98B0E183E38000F9297 /* ErrorInstance.h */; };
-		242E920911BA4C330046A0D0 /* ErrorPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9070E1839DB000F9297 /* ErrorPrototype.h */; };
-		242E920A11BA4C330046A0D0 /* Escapes.h in Headers */ = {isa = PBXBuildFile; fileRef = 96A7463F0EDDF70600904779 /* Escapes.h */; };
-		242E920B11BA4C330046A0D0 /* EvalCodeCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07920ED1D3AE00F1F681 /* EvalCodeCache.h */; };
-		242E920C11BA4C330046A0D0 /* ExceptionHelpers.h in Headers */ = {isa = PBXBuildFile; fileRef = A72701B30DADE94900E548D7 /* ExceptionHelpers.h */; };
-		242E920D11BA4C330046A0D0 /* ExecutableAllocator.h in Headers */ = {isa = PBXBuildFile; fileRef = A7B48DB50EE74CFC00DCBDB6 /* ExecutableAllocator.h */; };
-		242E920E11BA4C330046A0D0 /* FastAllocBase.h in Headers */ = {isa = PBXBuildFile; fileRef = E48E0F2C0F82151700A8CA37 /* FastAllocBase.h */; };
-		242E920F11BA4C330046A0D0 /* FastMalloc.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E217BA08E7EECC0023E5F6 /* FastMalloc.h */; };
-		242E921011BA4C330046A0D0 /* Forward.h in Headers */ = {isa = PBXBuildFile; fileRef = 935AF46909E9D9DB00ACD1D8 /* Forward.h */; };
-		242E921111BA4C330046A0D0 /* FunctionConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C10E16D4E900A06E92 /* FunctionConstructor.h */; };
-		242E921211BA4C330046A0D0 /* FunctionPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A85D0255597D01FF60F7 /* FunctionPrototype.h */; };
-		242E921311BA4C330046A0D0 /* GetPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 93B6A0DE0AA64DA40076DE27 /* GetPtr.h */; };
-		242E921411BA4C330046A0D0 /* GlobalEvalFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DEE0E1F52ED0016B6C9 /* GlobalEvalFunction.h */; };
-		242E921511BA4C330046A0D0 /* Grammar.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52F0E16FCEB00B34460 /* Grammar.h */; };
-		242E921611BA4C330046A0D0 /* HashCountedSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 657EEBBF094E445E008C9C7B /* HashCountedSet.h */; };
-		242E921711BA4C330046A0D0 /* HashFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92A08EA173A00F7300B /* HashFunctions.h */; };
-		242E921811BA4C330046A0D0 /* HashIterators.h in Headers */ = {isa = PBXBuildFile; fileRef = 652246A40C8D7A0E007BDAF7 /* HashIterators.h */; };
-		242E921911BA4C330046A0D0 /* HashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92B08EA173A00F7300B /* HashMap.h */; };
-		242E921A11BA4C330046A0D0 /* HashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92C08EA173A00F7300B /* HashSet.h */; };
-		242E921B11BA4C330046A0D0 /* HashTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92E08EA173A00F7300B /* HashTable.h */; };
-		242E921C11BA4C330046A0D0 /* HashTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 65DFC92F08EA173A00F7300B /* HashTraits.h */; };
-		242E921D11BA4C330046A0D0 /* Identifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 933A349A038AE7C6008635CE /* Identifier.h */; };
-		242E921E11BA4C330046A0D0 /* InitializeThreading.h in Headers */ = {isa = PBXBuildFile; fileRef = E178633F0D9BEC0000D74E75 /* InitializeThreading.h */; };
-		242E921F11BA4C330046A0D0 /* Instruction.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07930ED1D3AE00F1F681 /* Instruction.h */; };
-		242E922011BA4C330046A0D0 /* InternalFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC11667A0E199C05008066DD /* InternalFunction.h */; };
-		242E922111BA4C330046A0D0 /* Interpreter.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D77B0ED20D7300B89619 /* Interpreter.h */; };
-		242E922211BA4C330046A0D0 /* Ti.h in Headers */ = {isa = PBXBuildFile; fileRef = 1CAA8B4A0D32C39A0041BCFF /* Ti.h */; };
-		242E922311BA4C330046A0D0 /* TiCore.h in Headers */ = {isa = PBXBuildFile; fileRef = 1CAA8B4B0D32C39A0041BCFF /* TiCore.h */; };
-		242E922411BA4C330046A0D0 /* TiCorePrefix.h in Headers */ = {isa = PBXBuildFile; fileRef = F5C290E60284F98E018635CA /* TiCorePrefix.h */; };
-		242E922511BA4C330046A0D0 /* JIT.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D92E0ED22D7000B89619 /* JIT.h */; };
-		242E922611BA4C330046A0D0 /* JITCode.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CCEFDD0F413F8900FD7F9E /* JITCode.h */; };
-		242E922711BA4C330046A0D0 /* JITInlineMethods.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CC85A00EE79A4700288682 /* JITInlineMethods.h */; };
-		242E922811BA4C330046A0D0 /* JITStubCall.h in Headers */ = {isa = PBXBuildFile; fileRef = 960626950FB8EC02009798AB /* JITStubCall.h */; };
-		242E922911BA4C330046A0D0 /* JITStubs.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A6581A0F4E36F4000150FD /* JITStubs.h */; };
-		242E922A11BA4C330046A0D0 /* JSActivation.h in Headers */ = {isa = PBXBuildFile; fileRef = 14DA818E0D99FD2000B0A4FB /* JSActivation.h */; };
-		242E922B11BA4C330046A0D0 /* TiAPIValueWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = BC0894D60FAFBA2D00001865 /* TiAPIValueWrapper.h */; };
-		242E922C11BA4C330046A0D0 /* TiArray.h in Headers */ = {isa = PBXBuildFile; fileRef = 938772E5038BFE19008635CE /* TiArray.h */; };
-		242E922D11BA4C330046A0D0 /* TiBase.h in Headers */ = {isa = PBXBuildFile; fileRef = 142711380A460BBB0080EEEA /* TiBase.h */; };
-		242E922E11BA4C330046A0D0 /* TiBasePrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 140D17D60E8AD4A9000CD17D /* TiBasePrivate.h */; };
-		242E922F11BA4C330046A0D0 /* TiArrayArray.h in Headers */ = {isa = PBXBuildFile; fileRef = A791EF260F11E07900AE1F68 /* TiArrayArray.h */; };
-		242E923011BA4C330046A0D0 /* TiCallbackConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440F8AC0A508D200005F061 /* TiCallbackConstructor.h */; };
-		242E923111BA4C330046A0D0 /* TiCallbackFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440F88F0A508B100005F061 /* TiCallbackFunction.h */; };
-		242E923211BA4C330046A0D0 /* TiCallbackObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABDF5D0A437FEF00ECCA01 /* TiCallbackObject.h */; };
-		242E923311BA4C330046A0D0 /* TiCallbackObjectFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = A8E894310CD0602400367179 /* TiCallbackObjectFunctions.h */; };
-		242E923411BA4C330046A0D0 /* TiCell.h in Headers */ = {isa = PBXBuildFile; fileRef = BC1167D80E19BCC9008066DD /* TiCell.h */; };
-		242E923511BA4C330046A0D0 /* TiClassRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1440FCE10A51E46B0005F061 /* TiClassRef.h */; };
-		242E923611BA4C330046A0D0 /* TiContextRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 14BD5A2A0A3E91F600BAF59C /* TiContextRef.h */; };
-		242E923711BA4C330046A0D0 /* TiFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A85F0255597D01FF60F7 /* TiFunction.h */; };
-		242E923811BA4C330046A0D0 /* TiGlobalData.h in Headers */ = {isa = PBXBuildFile; fileRef = E18E3A560DF9278C00D90B34 /* TiGlobalData.h */; };
-		242E923911BA4C330046A0D0 /* TiGlobalObject.h in Headers */ = {isa = PBXBuildFile; fileRef = A8E894330CD0603F00367179 /* TiGlobalObject.h */; };
-		242E923A11BA4C330046A0D0 /* TiGlobalObjectFunctions.h in Headers */ = {isa = PBXBuildFile; fileRef = BC756FC70E2031B200DE7D12 /* TiGlobalObjectFunctions.h */; };
-		242E923B11BA4C330046A0D0 /* JSImmediate.h in Headers */ = {isa = PBXBuildFile; fileRef = 1483B589099BC1950016E4F0 /* JSImmediate.h */; };
-		242E923C11BA4C330046A0D0 /* TiLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 65EA4C9A092AF9E20093D800 /* TiLock.h */; };
-		242E923D11BA4C330046A0D0 /* JSNumberCell.h in Headers */ = {isa = PBXBuildFile; fileRef = BC7F8FB80E19D1C3008632C0 /* JSNumberCell.h */; };
-		242E923E11BA4C330046A0D0 /* TiObject.h in Headers */ = {isa = PBXBuildFile; fileRef = BC22A3990E16E14800AF21C8 /* TiObject.h */; };
-		242E923F11BA4C330046A0D0 /* TiObjectRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B7E10A43076000517CFC /* TiObjectRef.h */; };
-		242E924011BA4C330046A0D0 /* JSONObject.h in Headers */ = {isa = PBXBuildFile; fileRef = A7F9935D0FD7325100A0B2D0 /* JSONObject.h */; };
-		242E924111BA4C330046A0D0 /* TiProfilerPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 952C63AC0E4777D600C13936 /* TiProfilerPrivate.h */; };
-		242E924211BA4C330046A0D0 /* TiRetainPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 95C18D3E0C90E7EF00E72F73 /* TiRetainPtr.h */; };
-		242E924311BA4C330046A0D0 /* TiString.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8620255597D01FF60F7 /* TiString.h */; };
-		242E924411BA4C330046A0D0 /* TiStringRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B74B0A43032800517CFC /* TiStringRef.h */; };
-		242E924511BA4C330046A0D0 /* TiStringRefCF.h in Headers */ = {isa = PBXBuildFile; fileRef = 146AAB2A0B66A84900E55F16 /* TiStringRefCF.h */; };
-		242E924611BA4C330046A0D0 /* TiType.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABB454099C2A0F00E2A24F /* TiType.h */; };
-		242E924711BA4C330046A0D0 /* TiValue.h in Headers */ = {isa = PBXBuildFile; fileRef = 14ABB36E099C076400E2A24F /* TiValue.h */; };
-		242E924811BA4C330046A0D0 /* TiValueRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 1482B6EA0A4300B300517CFC /* TiValueRef.h */; };
-		242E924911BA4C330046A0D0 /* JSVariableObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 14F252560D08DD8D004ECFFF /* JSVariableObject.h */; };
-		242E924A11BA4C330046A0D0 /* JSWrapperObject.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C7A1720A8EAACB00FA37EA /* JSWrapperObject.h */; };
-		242E924B11BA4C330046A0D0 /* JumpTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BCFD8C910EEB2EE700283848 /* JumpTable.h */; };
-		242E924C11BA4C330046A0D0 /* Label.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07270ED1CE6900F1F681 /* Label.h */; };
-		242E924D11BA4C330046A0D0 /* LabelScope.h in Headers */ = {isa = PBXBuildFile; fileRef = 960097A50EBABB58007A7297 /* LabelScope.h */; };
-		242E924E11BA4C330046A0D0 /* Lexer.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8660255597D01FF60F7 /* Lexer.h */; };
-		242E924F11BA4C330046A0D0 /* Lexer.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52D0E16FCE100B34460 /* Lexer.lut.h */; };
-		242E925011BA4C330046A0D0 /* LinkBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B3C110159D7F002865E7 /* LinkBuffer.h */; };
-		242E925111BA4C330046A0D0 /* ListHashSet.h in Headers */ = {isa = PBXBuildFile; fileRef = 657EB7450B708F540063461B /* ListHashSet.h */; };
-		242E925211BA4C330046A0D0 /* ListRefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 148A1626095D16BB00666D0D /* ListRefPtr.h */; };
-		242E925311BA4C330046A0D0 /* LiteralParser.h in Headers */ = {isa = PBXBuildFile; fileRef = A7E2EA690FB460CF00601F06 /* LiteralParser.h */; };
-		242E925411BA4C330046A0D0 /* Locker.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE79270D6C964500FEA3BA /* Locker.h */; };
-		242E925511BA4C330046A0D0 /* Lookup.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8690255597D01FF60F7 /* Lookup.h */; };
-		242E925611BA4C330046A0D0 /* MacroAssembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86C36EE90EE1289D00B3DF59 /* MacroAssembler.h */; };
-		242E925711BA4C330046A0D0 /* MacroAssemblerARM.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B2C210156BDE002865E7 /* MacroAssemblerARM.h */; };
-		242E925811BA4C330046A0D0 /* MacroAssemblerARMv7.h in Headers */ = {isa = PBXBuildFile; fileRef = 86ADD1440FDDEA980006EEC2 /* MacroAssemblerARMv7.h */; };
-		242E925911BA4C330046A0D0 /* MacroAssemblerCodeRef.h in Headers */ = {isa = PBXBuildFile; fileRef = 863B23DF0FC60E6200703AA4 /* MacroAssemblerCodeRef.h */; };
-		242E925A11BA4C330046A0D0 /* MacroAssemblerX86.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E00F3A83C100F84710 /* MacroAssemblerX86.h */; };
-		242E925B11BA4C330046A0D0 /* MacroAssemblerX86_64.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E10F3A83C100F84710 /* MacroAssemblerX86_64.h */; };
-		242E925C11BA4C330046A0D0 /* MacroAssemblerX86Common.h in Headers */ = {isa = PBXBuildFile; fileRef = 860161E20F3A83C100F84710 /* MacroAssemblerX86Common.h */; };
-		242E925D11BA4C330046A0D0 /* MainThread.h in Headers */ = {isa = PBXBuildFile; fileRef = 06D358A30DAAD9C4003B174E /* MainThread.h */; };
-		242E925E11BA4C330046A0D0 /* MallocZoneSupport.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DBD18AF0C5401A700C15EAE /* MallocZoneSupport.h */; };
-		242E925F11BA4C330046A0D0 /* MathExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = BCF6553B0A2048DE0038A194 /* MathExtras.h */; };
-		242E926011BA4C330046A0D0 /* MathObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A86B0255597D01FF60F7 /* MathObject.h */; };
-		242E926111BA4C330046A0D0 /* MathObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C5290E16FCC200B34460 /* MathObject.lut.h */; };
-		242E926211BA4C330046A0D0 /* MessageQueue.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE798B0D6CA53D00FEA3BA /* MessageQueue.h */; };
-		242E926311BA4C330046A0D0 /* NativeErrorConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E9090E1839DB000F9297 /* NativeErrorConstructor.h */; };
-		242E926411BA4C330046A0D0 /* NativeErrorPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC02E90B0E1839DB000F9297 /* NativeErrorPrototype.h */; };
-		242E926511BA4C330046A0D0 /* NativeFunctionWrapper.h in Headers */ = {isa = PBXBuildFile; fileRef = A76EE6580FAE59D5003F069A /* NativeFunctionWrapper.h */; };
-		242E926611BA4C330046A0D0 /* NodeInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = 7EFF00630EC05A9A00AA7C93 /* NodeInfo.h */; };
-		242E926711BA4C330046A0D0 /* Nodes.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A86E0255597D01FF60F7 /* Nodes.h */; };
-		242E926811BA4C330046A0D0 /* Noncopyable.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F5690991190000AD71B8 /* Noncopyable.h */; };
-		242E926911BA4C330046A0D0 /* NotFound.h in Headers */ = {isa = PBXBuildFile; fileRef = C0A2723F0E509F1E00E96E15 /* NotFound.h */; };
-		242E926A11BA4C330046A0D0 /* NumberConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C30E16D4E900A06E92 /* NumberConstructor.h */; };
-		242E926B11BA4C330046A0D0 /* NumberConstructor.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680E60E16D52300A06E92 /* NumberConstructor.lut.h */; };
-		242E926C11BA4C330046A0D0 /* NumberObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8710255597D01FF60F7 /* NumberObject.h */; };
-		242E926D11BA4C330046A0D0 /* NumberPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C50E16D4E900A06E92 /* NumberPrototype.h */; };
-		242E926E11BA4C330046A0D0 /* ObjectConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C70E16D4E900A06E92 /* ObjectConstructor.h */; };
-		242E926F11BA4C330046A0D0 /* ObjectPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC2680C90E16D4E900A06E92 /* ObjectPrototype.h */; };
-		242E927011BA4C330046A0D0 /* OpaqueTiString.h in Headers */ = {isa = PBXBuildFile; fileRef = E124A8F50E555775003091F1 /* OpaqueTiString.h */; };
-		242E927111BA4C330046A0D0 /* Opcode.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07950ED1D3AE00F1F681 /* Opcode.h */; };
-		242E927211BA4C330046A0D0 /* Operations.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8780255597D01FF60F7 /* Operations.h */; };
-		242E927311BA4C330046A0D0 /* OwnArrayPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F5A409911A5800AD71B8 /* OwnArrayPtr.h */; };
-		242E927411BA4C330046A0D0 /* OwnFastMallocPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 0BDFFAD10FC616EC00D69EF4 /* OwnFastMallocPtr.h */; };
-		242E927511BA4C330046A0D0 /* OwnPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 9303F567099118FA00AD71B8 /* OwnPtr.h */; };
-		242E927611BA4C330046A0D0 /* OwnPtrCommon.h in Headers */ = {isa = PBXBuildFile; fileRef = 440B7AED0FAF7FCB0073323E /* OwnPtrCommon.h */; };
-		242E927711BA4C330046A0D0 /* Parser.h in Headers */ = {isa = PBXBuildFile; fileRef = 93F0B3AA09BB4DC00068FCE3 /* Parser.h */; };
-		242E927811BA4C330046A0D0 /* ParserArena.h in Headers */ = {isa = PBXBuildFile; fileRef = 93052C330FB792190048FDC3 /* ParserArena.h */; };
-		242E927911BA4C330046A0D0 /* PassOwnPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 44DD48520FAEA85000D6B4EB /* PassOwnPtr.h */; };
-		242E927A11BA4C330046A0D0 /* PassRefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 6580F795094070560082C219 /* PassRefPtr.h */; };
-		242E927B11BA4C330046A0D0 /* pcre.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541720F039E08B90058BFEB /* pcre.h */; };
-		242E927C11BA4C330046A0D0 /* pcre_internal.h in Headers */ = {isa = PBXBuildFile; fileRef = 93E26BE508B1517100F85226 /* pcre_internal.h */; };
-		242E927D11BA4C330046A0D0 /* Platform.h in Headers */ = {isa = PBXBuildFile; fileRef = 65D6D87E09B5A32E0002E4D7 /* Platform.h */; };
-		242E927E11BA4C330046A0D0 /* Profile.h in Headers */ = {isa = PBXBuildFile; fileRef = 95742F640DD11F5A000917FB /* Profile.h */; };
-		242E927F11BA4C330046A0D0 /* ProfileGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 95CD45750E1C4FDD0085358E /* ProfileGenerator.h */; };
-		242E928011BA4C330046A0D0 /* ProfileNode.h in Headers */ = {isa = PBXBuildFile; fileRef = 95AB83550DA43B4400BC83F3 /* ProfileNode.h */; };
-		242E928111BA4C330046A0D0 /* Profiler.h in Headers */ = {isa = PBXBuildFile; fileRef = 95AB832F0DA42CAD00BC83F3 /* Profiler.h */; };
-		242E928211BA4C330046A0D0 /* ProfilerServer.h in Headers */ = {isa = PBXBuildFile; fileRef = 1C61516B0EBAC7A00031376F /* ProfilerServer.h */; };
-		242E928311BA4C330046A0D0 /* PropertyMapHashTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BC95437C0EBA70FD0072B6D3 /* PropertyMapHashTable.h */; };
-		242E928411BA4C330046A0D0 /* PropertyNameArray.h in Headers */ = {isa = PBXBuildFile; fileRef = 65400C100A69BAF200509887 /* PropertyNameArray.h */; };
-		242E928511BA4C330046A0D0 /* PropertySlot.h in Headers */ = {isa = PBXBuildFile; fileRef = 65621E6C089E859700760F35 /* PropertySlot.h */; };
-		242E928611BA4C330046A0D0 /* Protect.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C02FBB0637462A003E7EE6 /* Protect.h */; };
-		242E928711BA4C330046A0D0 /* PrototypeFunction.h in Headers */ = {isa = PBXBuildFile; fileRef = BC257DF20E1F53740016B6C9 /* PrototypeFunction.h */; };
-		242E928811BA4C330046A0D0 /* PtrAndFlags.h in Headers */ = {isa = PBXBuildFile; fileRef = 0B1F921B0F17502D0036468E /* PtrAndFlags.h */; };
-		242E928911BA4C330046A0D0 /* PutPropertySlot.h in Headers */ = {isa = PBXBuildFile; fileRef = 147B84620E6DE6B1004775A4 /* PutPropertySlot.h */; };
-		242E928A11BA4C330046A0D0 /* Quantifier.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DA490ED245EC00B89619 /* Quantifier.h */; };
-		242E928B11BA4C330046A0D0 /* RandomNumber.h in Headers */ = {isa = PBXBuildFile; fileRef = 088FA5BA0EF76D4300578E6F /* RandomNumber.h */; };
-		242E928C11BA4C330046A0D0 /* RandomNumberSeed.h in Headers */ = {isa = PBXBuildFile; fileRef = 08E279E80EF83B10007DB523 /* RandomNumberSeed.h */; };
-		242E928D11BA4C330046A0D0 /* RefCounted.h in Headers */ = {isa = PBXBuildFile; fileRef = 1419D32C0CEA7CDE00FF507A /* RefCounted.h */; };
-		242E928E11BA4C330046A0D0 /* RefCountedLeakCounter.h in Headers */ = {isa = PBXBuildFile; fileRef = 90D3469B0E285280009492EE /* RefCountedLeakCounter.h */; };
-		242E928F11BA4C330046A0D0 /* RefPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 65C647B3093EF8D60022C380 /* RefPtr.h */; };
-		242E929011BA4C330046A0D0 /* RefPtrHashMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 148A1ECD0D10C23B0069A47C /* RefPtrHashMap.h */; };
-		242E929111BA4C330046A0D0 /* RegexCompiler.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC48E0F93E8D1008EC948 /* RegexCompiler.h */; };
-		242E929211BA4C330046A0D0 /* RegexInterpreter.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4900F93E8D1008EC948 /* RegexInterpreter.h */; };
-		242E929311BA4C330046A0D0 /* RegexJIT.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4920F93E8D1008EC948 /* RegexJIT.h */; };
-		242E929411BA4C330046A0D0 /* RegExp.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A87E0255597D01FF60F7 /* RegExp.h */; };
-		242E929511BA4C330046A0D0 /* RegexParser.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4930F93E8D1008EC948 /* RegexParser.h */; };
-		242E929611BA4C330046A0D0 /* RegexPattern.h in Headers */ = {isa = PBXBuildFile; fileRef = 86EAC4940F93E8D1008EC948 /* RegexPattern.h */; };
-		242E929711BA4C330046A0D0 /* RegExpConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202BE0E1706A7002C7E82 /* RegExpConstructor.h */; };
-		242E929811BA4C330046A0D0 /* RegExpConstructor.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202D50E170708002C7E82 /* RegExpConstructor.lut.h */; };
-		242E929911BA4C330046A0D0 /* RegExpObject.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A87C0255597D01FF60F7 /* RegExpObject.h */; };
-		242E929A11BA4C330046A0D0 /* RegExpObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C52B0E16FCD200B34460 /* RegExpObject.lut.h */; };
-		242E929B11BA4C330046A0D0 /* RegExpPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BCD202C00E1706A7002C7E82 /* RegExpPrototype.h */; };
-		242E929C11BA4C330046A0D0 /* Register.h in Headers */ = {isa = PBXBuildFile; fileRef = 149B24FF0D8AF6D1009CB8C7 /* Register.h */; };
-		242E929D11BA4C330046A0D0 /* RegisterFile.h in Headers */ = {isa = PBXBuildFile; fileRef = 14D792640DAA03FB001A9F05 /* RegisterFile.h */; };
-		242E929E11BA4C330046A0D0 /* RegisterID.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07280ED1CE6900F1F681 /* RegisterID.h */; };
-		242E929F11BA4C330046A0D0 /* RepatchBuffer.h in Headers */ = {isa = PBXBuildFile; fileRef = 86D3B3C210159D7F002865E7 /* RepatchBuffer.h */; };
-		242E92A011BA4C330046A0D0 /* ResultType.h in Headers */ = {isa = PBXBuildFile; fileRef = 869EBCB60E8C6D4A008722CC /* ResultType.h */; };
-		242E92A111BA4C330046A0D0 /* RetainPtr.h in Headers */ = {isa = PBXBuildFile; fileRef = 51F648D60BB4E2CA0033D760 /* RetainPtr.h */; };
-		242E92A211BA4C330046A0D0 /* SamplingTool.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429D8840ED21C3D00B89619 /* SamplingTool.h */; };
-		242E92A311BA4C330046A0D0 /* ScopeChain.h in Headers */ = {isa = PBXBuildFile; fileRef = 9374D3A7038D9D74008635CE /* ScopeChain.h */; };
-		242E92A411BA4C330046A0D0 /* SegmentedVector.h in Headers */ = {isa = PBXBuildFile; fileRef = 969A07290ED1CE6900F1F681 /* SegmentedVector.h */; };
-		242E92A511BA4C330046A0D0 /* SmallStrings.h in Headers */ = {isa = PBXBuildFile; fileRef = 93303FEA0E6A72C000786E6A /* SmallStrings.h */; };
-		242E92A611BA4C330046A0D0 /* SourceCode.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E866EE0DD59AFA00A2B2A1 /* SourceCode.h */; };
-		242E92A711BA4C330046A0D0 /* SourceProvider.h in Headers */ = {isa = PBXBuildFile; fileRef = 65E866ED0DD59AFA00A2B2A1 /* SourceProvider.h */; };
-		242E92A811BA4C330046A0D0 /* StdLibExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = FE1B44790ECCD73B004F4DD1 /* StdLibExtras.h */; };
-		242E92A911BA4C330046A0D0 /* StringConstructor.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C10E16EE3300B34460 /* StringConstructor.h */; };
-		242E92AA11BA4C330046A0D0 /* StringExtras.h in Headers */ = {isa = PBXBuildFile; fileRef = E11D51750B2E798D0056C188 /* StringExtras.h */; };
-		242E92AB11BA4C330046A0D0 /* StringObject.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C30E16EE3300B34460 /* StringObject.h */; };
-		242E92AC11BA4C330046A0D0 /* StringObjectThatMasqueradesAsUndefined.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C40E16EE3300B34460 /* StringObjectThatMasqueradesAsUndefined.h */; };
-		242E92AD11BA4C330046A0D0 /* StringPrototype.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C3C60E16EE3300B34460 /* StringPrototype.h */; };
-		242E92AE11BA4C330046A0D0 /* StringPrototype.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC18C5250E16FCA700B34460 /* StringPrototype.lut.h */; };
-		242E92AF11BA4C330046A0D0 /* Structure.h in Headers */ = {isa = PBXBuildFile; fileRef = BCDE3AB10E6C82CF001453A7 /* Structure.h */; };
-		242E92B011BA4C330046A0D0 /* StructureChain.h in Headers */ = {isa = PBXBuildFile; fileRef = 7E4EE7080EBB7963005934AA /* StructureChain.h */; };
-		242E92B111BA4C330046A0D0 /* StructureStubInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = BCCF0D070EF0AAB900413C8F /* StructureStubInfo.h */; };
-		242E92B211BA4C330046A0D0 /* StructureTransitionTable.h in Headers */ = {isa = PBXBuildFile; fileRef = BC9041470EB9250900FE26FA /* StructureTransitionTable.h */; };
-		242E92B311BA4C330046A0D0 /* SymbolTable.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A396A60CD2933100B5B4FF /* SymbolTable.h */; };
-		242E92B411BA4C330046A0D0 /* TCPackedCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DA479650CFBCF56009328A0 /* TCPackedCache.h */; };
-		242E92B511BA4C330046A0D0 /* TCPageMap.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD6E08E80A17002CBEE7 /* TCPageMap.h */; };
-		242E92B611BA4C330046A0D0 /* TCSpinLock.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD6F08E80A17002CBEE7 /* TCSpinLock.h */; };
-		242E92B711BA4C330046A0D0 /* TCSystemAlloc.h in Headers */ = {isa = PBXBuildFile; fileRef = 6541BD7108E80A17002CBEE7 /* TCSystemAlloc.h */; };
-		242E92B811BA4C330046A0D0 /* Threading.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EE79220D6C95CD00FEA3BA /* Threading.h */; };
-		242E92B911BA4C330046A0D0 /* ThreadSpecific.h in Headers */ = {isa = PBXBuildFile; fileRef = E1B7C8BD0DA3A3360074B0DC /* ThreadSpecific.h */; };
-		242E92BA11BA4C330046A0D0 /* TimeoutChecker.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A42E3E0F4F60EE00599099 /* TimeoutChecker.h */; };
-		242E92BB11BA4C330046A0D0 /* Tracing.h in Headers */ = {isa = PBXBuildFile; fileRef = 5D53726E0E1C54880021E549 /* Tracing.h */; };
-		242E92BC11BA4C330046A0D0 /* TiTypeInfo.h in Headers */ = {isa = PBXBuildFile; fileRef = 6507D2970E871E4A00D7D896 /* TiTypeInfo.h */; };
-		242E92BD11BA4C330046A0D0 /* TypeTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 0B4D7E620F319AC800AD7E58 /* TypeTraits.h */; };
-		242E92BE11BA4C330046A0D0 /* ucpinternal.h in Headers */ = {isa = PBXBuildFile; fileRef = 93E26BFC08B151D400F85226 /* ucpinternal.h */; };
-		242E92BF11BA4C330046A0D0 /* Unicode.h in Headers */ = {isa = PBXBuildFile; fileRef = E195679409E7CF1200B89D13 /* Unicode.h */; };
-		242E92C011BA4C330046A0D0 /* UnusedParam.h in Headers */ = {isa = PBXBuildFile; fileRef = 935AF46B09E9D9DB00ACD1D8 /* UnusedParam.h */; };
-		242E92C111BA4C330046A0D0 /* UString.h in Headers */ = {isa = PBXBuildFile; fileRef = F692A8860255597D01FF60F7 /* UString.h */; };
-		242E92C211BA4C330046A0D0 /* UTF8.h in Headers */ = {isa = PBXBuildFile; fileRef = E1EF79A90CE97BA60088D500 /* UTF8.h */; };
-		242E92C311BA4C330046A0D0 /* Vector.h in Headers */ = {isa = PBXBuildFile; fileRef = 6592C316098B7DE10003D4F6 /* Vector.h */; };
-		242E92C411BA4C330046A0D0 /* VectorTraits.h in Headers */ = {isa = PBXBuildFile; fileRef = 6592C317098B7DE10003D4F6 /* VectorTraits.h */; };
-		242E92C511BA4C330046A0D0 /* VMTags.h in Headers */ = {isa = PBXBuildFile; fileRef = 96DD73780F9DA3100027FBCC /* VMTags.h */; };
-		242E92C611BA4C330046A0D0 /* WebKitAvailability.h in Headers */ = {isa = PBXBuildFile; fileRef = 5DE3D0F40DD8DDFB00468714 /* WebKitAvailability.h */; };
-		242E92C711BA4C330046A0D0 /* WREC.h in Headers */ = {isa = PBXBuildFile; fileRef = 869083140E6518D7000D36ED /* WREC.h */; };
-		242E92C811BA4C330046A0D0 /* WRECFunctors.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DA810ED2482900B89619 /* WRECFunctors.h */; };
-		242E92C911BA4C330046A0D0 /* WRECGenerator.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DADE0ED2645B00B89619 /* WRECGenerator.h */; };
-		242E92CA11BA4C330046A0D0 /* WRECParser.h in Headers */ = {isa = PBXBuildFile; fileRef = 1429DABD0ED263E700B89619 /* WRECParser.h */; };
-		242E92CB11BA4C330046A0D0 /* X86Assembler.h in Headers */ = {isa = PBXBuildFile; fileRef = 9688CB140ED12B4E001D649F /* X86Assembler.h */; };
-		242E92CC11BA4C330046A0D0 /* MarkStack.h in Headers */ = {isa = PBXBuildFile; fileRef = A779558F101A74D500114E55 /* MarkStack.h */; };
-		242E92CD11BA4C330046A0D0 /* PossiblyNull.h in Headers */ = {isa = PBXBuildFile; fileRef = A7D649A91015224E009B2E1B /* PossiblyNull.h */; };
-		242E92CE11BA4C330046A0D0 /* Executable.h in Headers */ = {isa = PBXBuildFile; fileRef = 86CAFEE21035DDE60028A609 /* Executable.h */; };
-		242E92CF11BA4C330046A0D0 /* NumericStrings.h in Headers */ = {isa = PBXBuildFile; fileRef = 142D3938103E4560007DCB52 /* NumericStrings.h */; };
-		242E92D011BA4C330046A0D0 /* PropertyDescriptor.h in Headers */ = {isa = PBXBuildFile; fileRef = A7FB604B103F5EAB0017A286 /* PropertyDescriptor.h */; };
-		242E92D111BA4C330046A0D0 /* JSONObject.lut.h in Headers */ = {isa = PBXBuildFile; fileRef = BC87CDB810712ACA000614CF /* JSONObject.lut.h */; };
-		242E92D211BA4C330046A0D0 /* TiContextRefPrivate.h in Headers */ = {isa = PBXBuildFile; fileRef = 148CD1D7108CF902008163C6 /* TiContextRefPrivate.h */; };
-		242E92D311BA4C330046A0D0 /* DateInstanceCache.h in Headers */ = {isa = PBXBuildFile; fileRef = 14A1563010966365006FA260 /* DateInstanceCache.h */; };
-		242E92D411BA4C330046A0D0 /* WeakRandom.h in Headers */ = {isa = PBXBuildFile; fileRef = 1420BE7A10AA6DDB00F455D2 /* WeakRandom.h */; };
-		242E92D511BA4C330046A0D0 /* UnicodeFoundation.h in Headers */ = {isa = PBXBuildFile; fileRef = 24C379361152BBB5004BC328 /* UnicodeFoundation.h */; };
 		24C379381152BBB5004BC328 /* UnicodeFoundation.h in Headers */ = {isa = PBXBuildFile; fileRef = 24C379361152BBB5004BC328 /* UnicodeFoundation.h */; };
 		24C379391152BBB5004BC328 /* UnicodeFoundation.mm in Sources */ = {isa = PBXBuildFile; fileRef = 24C379371152BBB5004BC328 /* UnicodeFoundation.mm */; };
 		41359CF30FDD89AD00206180 /* DateConversion.h in Headers */ = {isa = PBXBuildFile; fileRef = D21202290AD4310C00ED79B6 /* DateConversion.h */; };
@@ -1442,20 +917,6 @@
 			remoteGlobalIDString = 65FB3F6609D11E9100F49DEB;
 			remoteInfo = "Derived Sources";
 		};
-		242E8E9311BA3BD30046A0D0 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 65FB3F6609D11E9100F49DEB;
-			remoteInfo = "Derived Sources";
-		};
-		242E91A411BA4BE70046A0D0 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = 65FB3F6609D11E9100F49DEB;
-			remoteInfo = "Derived Sources";
-		};
 		65FB3F7D09D11EF300F49DEB /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 0867D690FE84028FC02AAC07 /* Project object */;
@@ -1599,8 +1060,6 @@
 		1CAA8B4A0D32C39A0041BCFF /* Ti.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Ti.h; sourceTree = "<group>"; };
 		1CAA8B4B0D32C39A0041BCFF /* TiCore.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = TiCore.h; sourceTree = "<group>"; };
 		241585AC10CC8ECC00E212F2 /* libStatic.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libStatic.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		242E903511BA3BD30046A0D0 /* libStatic.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libStatic.a; sourceTree = BUILT_PRODUCTS_DIR; };
-		242E918711BA4B260046A0D0 /* libdebug.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libdebug.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		24C379361152BBB5004BC328 /* UnicodeFoundation.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = UnicodeFoundation.h; path = foundation/UnicodeFoundation.h; sourceTree = "<group>"; };
 		24C379371152BBB5004BC328 /* UnicodeFoundation.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; name = UnicodeFoundation.mm; path = foundation/UnicodeFoundation.mm; sourceTree = "<group>"; };
 		41359CF40FDD89CB00206180 /* DateMath.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = DateMath.cpp; sourceTree = "<group>"; };
@@ -1981,22 +1440,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		242E902E11BA3BD30046A0D0 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E902F11BA3BD30046A0D0 /* CoreFoundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		242E918511BA4B260046A0D0 /* Frameworks */ = {
-			isa = PBXFrameworksBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E91D211BA4BF20046A0D0 /* CoreFoundation.framework in Frameworks */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		932F5BD20822A1C700736975 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
@@ -2024,8 +1467,6 @@
 				141211200A48793C00480255 /* minidom */,
 				14BD59BF0A3E8F9000BAF59C /* testapi */,
 				241585AC10CC8ECC00E212F2 /* libStatic.a */,
-				242E903511BA3BD30046A0D0 /* libStatic.a */,
-				242E918711BA4B260046A0D0 /* libdebug.a */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -2972,530 +2413,6 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		242E8E9411BA3BD30046A0D0 /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E8E9511BA3BD30046A0D0 /* AbstractMacroAssembler.h in Headers */,
-				242E8E9611BA3BD30046A0D0 /* AlwaysInline.h in Headers */,
-				242E8E9711BA3BD30046A0D0 /* APICast.h in Headers */,
-				242E8E9811BA3BD30046A0D0 /* ArgList.h in Headers */,
-				242E8E9911BA3BD30046A0D0 /* Arguments.h in Headers */,
-				242E8E9A11BA3BD30046A0D0 /* ARMAssembler.h in Headers */,
-				242E8E9B11BA3BD30046A0D0 /* ARMv7Assembler.h in Headers */,
-				242E8E9C11BA3BD30046A0D0 /* ArrayConstructor.h in Headers */,
-				242E8E9D11BA3BD30046A0D0 /* ArrayPrototype.h in Headers */,
-				242E8E9E11BA3BD30046A0D0 /* ASCIICType.h in Headers */,
-				242E8E9F11BA3BD30046A0D0 /* AssemblerBuffer.h in Headers */,
-				242E8EA011BA3BD30046A0D0 /* AssemblerBufferWithConstantPool.h in Headers */,
-				242E8EA111BA3BD30046A0D0 /* Assertions.h in Headers */,
-				242E8EA211BA3BD30046A0D0 /* AVLTree.h in Headers */,
-				242E8EA311BA3BD30046A0D0 /* BatchedTransitionOptimizer.h in Headers */,
-				242E8EA411BA3BD30046A0D0 /* BooleanObject.h in Headers */,
-				242E8EA511BA3BD30046A0D0 /* ByteArray.h in Headers */,
-				242E8EA611BA3BD30046A0D0 /* BytecodeGenerator.h in Headers */,
-				242E8EA711BA3BD30046A0D0 /* CallData.h in Headers */,
-				242E8EA811BA3BD30046A0D0 /* CallFrame.h in Headers */,
-				242E8EA911BA3BD30046A0D0 /* CallIdentifier.h in Headers */,
-				242E8EAA11BA3BD30046A0D0 /* CharacterClass.h in Headers */,
-				242E8EAB11BA3BD30046A0D0 /* CharacterClassConstructor.h in Headers */,
-				242E8EAC11BA3BD30046A0D0 /* ClassInfo.h in Headers */,
-				242E8EAD11BA3BD30046A0D0 /* CodeBlock.h in Headers */,
-				242E8EAE11BA3BD30046A0D0 /* CodeLocation.h in Headers */,
-				242E8EAF11BA3BD30046A0D0 /* Collator.h in Headers */,
-				242E8EB011BA3BD30046A0D0 /* Collector.h in Headers */,
-				242E8EB111BA3BD30046A0D0 /* CollectorHeapIterator.h in Headers */,
-				242E8EB211BA3BD30046A0D0 /* CommonIdentifiers.h in Headers */,
-				242E8EB311BA3BD30046A0D0 /* Completion.h in Headers */,
-				242E8EB411BA3BD30046A0D0 /* config.h in Headers */,
-				242E8EB511BA3BD30046A0D0 /* ConstructData.h in Headers */,
-				242E8EB611BA3BD30046A0D0 /* create_hash_table in Headers */,
-				242E8EB711BA3BD30046A0D0 /* CrossThreadRefCounted.h in Headers */,
-				242E8EB811BA3BD30046A0D0 /* CurrentTime.h in Headers */,
-				242E8EB911BA3BD30046A0D0 /* DateConstructor.h in Headers */,
-				242E8EBA11BA3BD30046A0D0 /* DateConversion.h in Headers */,
-				242E8EBB11BA3BD30046A0D0 /* DateInstance.h in Headers */,
-				242E8EBC11BA3BD30046A0D0 /* DateMath.h in Headers */,
-				242E8EBD11BA3BD30046A0D0 /* DatePrototype.h in Headers */,
-				242E8EBE11BA3BD30046A0D0 /* Debugger.h in Headers */,
-				242E8EBF11BA3BD30046A0D0 /* DebuggerActivation.h in Headers */,
-				242E8EC011BA3BD30046A0D0 /* DebuggerCallFrame.h in Headers */,
-				242E8EC111BA3BD30046A0D0 /* Deque.h in Headers */,
-				242E8EC211BA3BD30046A0D0 /* DisallowCType.h in Headers */,
-				242E8EC311BA3BD30046A0D0 /* dtoa.h in Headers */,
-				242E8EC411BA3BD30046A0D0 /* Error.h in Headers */,
-				242E8EC511BA3BD30046A0D0 /* ErrorConstructor.h in Headers */,
-				242E8EC611BA3BD30046A0D0 /* ErrorInstance.h in Headers */,
-				242E8EC711BA3BD30046A0D0 /* ErrorPrototype.h in Headers */,
-				242E8EC811BA3BD30046A0D0 /* Escapes.h in Headers */,
-				242E8EC911BA3BD30046A0D0 /* EvalCodeCache.h in Headers */,
-				242E8ECA11BA3BD30046A0D0 /* ExceptionHelpers.h in Headers */,
-				242E8ECB11BA3BD30046A0D0 /* ExecutableAllocator.h in Headers */,
-				242E8ECC11BA3BD30046A0D0 /* FastAllocBase.h in Headers */,
-				242E8ECD11BA3BD30046A0D0 /* FastMalloc.h in Headers */,
-				242E8ECE11BA3BD30046A0D0 /* Forward.h in Headers */,
-				242E8ECF11BA3BD30046A0D0 /* FunctionConstructor.h in Headers */,
-				242E8ED011BA3BD30046A0D0 /* FunctionPrototype.h in Headers */,
-				242E8ED111BA3BD30046A0D0 /* GetPtr.h in Headers */,
-				242E8ED211BA3BD30046A0D0 /* GlobalEvalFunction.h in Headers */,
-				242E8ED311BA3BD30046A0D0 /* Grammar.h in Headers */,
-				242E8ED411BA3BD30046A0D0 /* HashCountedSet.h in Headers */,
-				242E8ED511BA3BD30046A0D0 /* HashFunctions.h in Headers */,
-				242E8ED611BA3BD30046A0D0 /* HashIterators.h in Headers */,
-				242E8ED711BA3BD30046A0D0 /* HashMap.h in Headers */,
-				242E8ED811BA3BD30046A0D0 /* HashSet.h in Headers */,
-				242E8ED911BA3BD30046A0D0 /* HashTable.h in Headers */,
-				242E8EDA11BA3BD30046A0D0 /* HashTraits.h in Headers */,
-				242E8EDB11BA3BD30046A0D0 /* Identifier.h in Headers */,
-				242E8EDC11BA3BD30046A0D0 /* InitializeThreading.h in Headers */,
-				242E8EDD11BA3BD30046A0D0 /* Instruction.h in Headers */,
-				242E8EDE11BA3BD30046A0D0 /* InternalFunction.h in Headers */,
-				242E8EDF11BA3BD30046A0D0 /* Interpreter.h in Headers */,
-				242E8EE011BA3BD30046A0D0 /* Ti.h in Headers */,
-				242E8EE111BA3BD30046A0D0 /* TiCore.h in Headers */,
-				242E8EE211BA3BD30046A0D0 /* TiCorePrefix.h in Headers */,
-				242E8EE311BA3BD30046A0D0 /* JIT.h in Headers */,
-				242E8EE411BA3BD30046A0D0 /* JITCode.h in Headers */,
-				242E8EE511BA3BD30046A0D0 /* JITInlineMethods.h in Headers */,
-				242E8EE611BA3BD30046A0D0 /* JITStubCall.h in Headers */,
-				242E8EE711BA3BD30046A0D0 /* JITStubs.h in Headers */,
-				242E8EE811BA3BD30046A0D0 /* JSActivation.h in Headers */,
-				242E8EE911BA3BD30046A0D0 /* TiAPIValueWrapper.h in Headers */,
-				242E8EEA11BA3BD30046A0D0 /* TiArray.h in Headers */,
-				242E8EEB11BA3BD30046A0D0 /* TiBase.h in Headers */,
-				242E8EEC11BA3BD30046A0D0 /* TiBasePrivate.h in Headers */,
-				242E8EED11BA3BD30046A0D0 /* TiArrayArray.h in Headers */,
-				242E8EEE11BA3BD30046A0D0 /* TiCallbackConstructor.h in Headers */,
-				242E8EEF11BA3BD30046A0D0 /* TiCallbackFunction.h in Headers */,
-				242E8EF011BA3BD30046A0D0 /* TiCallbackObject.h in Headers */,
-				242E8EF111BA3BD30046A0D0 /* TiCallbackObjectFunctions.h in Headers */,
-				242E8EF211BA3BD30046A0D0 /* TiCell.h in Headers */,
-				242E8EF311BA3BD30046A0D0 /* TiClassRef.h in Headers */,
-				242E8EF411BA3BD30046A0D0 /* TiContextRef.h in Headers */,
-				242E8EF511BA3BD30046A0D0 /* TiFunction.h in Headers */,
-				242E8EF611BA3BD30046A0D0 /* TiGlobalData.h in Headers */,
-				242E8EF711BA3BD30046A0D0 /* TiGlobalObject.h in Headers */,
-				242E8EF811BA3BD30046A0D0 /* TiGlobalObjectFunctions.h in Headers */,
-				242E8EF911BA3BD30046A0D0 /* JSImmediate.h in Headers */,
-				242E8EFA11BA3BD30046A0D0 /* TiLock.h in Headers */,
-				242E8EFB11BA3BD30046A0D0 /* JSNumberCell.h in Headers */,
-				242E8EFC11BA3BD30046A0D0 /* TiObject.h in Headers */,
-				242E8EFD11BA3BD30046A0D0 /* TiObjectRef.h in Headers */,
-				242E8EFE11BA3BD30046A0D0 /* JSONObject.h in Headers */,
-				242E8EFF11BA3BD30046A0D0 /* TiProfilerPrivate.h in Headers */,
-				242E8F0011BA3BD30046A0D0 /* TiRetainPtr.h in Headers */,
-				242E8F0111BA3BD30046A0D0 /* TiString.h in Headers */,
-				242E8F0211BA3BD30046A0D0 /* TiStringRef.h in Headers */,
-				242E8F0311BA3BD30046A0D0 /* TiStringRefCF.h in Headers */,
-				242E8F0411BA3BD30046A0D0 /* TiType.h in Headers */,
-				242E8F0511BA3BD30046A0D0 /* TiValue.h in Headers */,
-				242E8F0611BA3BD30046A0D0 /* TiValueRef.h in Headers */,
-				242E8F0711BA3BD30046A0D0 /* JSVariableObject.h in Headers */,
-				242E8F0811BA3BD30046A0D0 /* JSWrapperObject.h in Headers */,
-				242E8F0911BA3BD30046A0D0 /* JumpTable.h in Headers */,
-				242E8F0A11BA3BD30046A0D0 /* Label.h in Headers */,
-				242E8F0B11BA3BD30046A0D0 /* LabelScope.h in Headers */,
-				242E8F0C11BA3BD30046A0D0 /* Lexer.h in Headers */,
-				242E8F0D11BA3BD30046A0D0 /* Lexer.lut.h in Headers */,
-				242E8F0E11BA3BD30046A0D0 /* LinkBuffer.h in Headers */,
-				242E8F0F11BA3BD30046A0D0 /* ListHashSet.h in Headers */,
-				242E8F1011BA3BD30046A0D0 /* ListRefPtr.h in Headers */,
-				242E8F1111BA3BD30046A0D0 /* LiteralParser.h in Headers */,
-				242E8F1211BA3BD30046A0D0 /* Locker.h in Headers */,
-				242E8F1311BA3BD30046A0D0 /* Lookup.h in Headers */,
-				242E8F1411BA3BD30046A0D0 /* MacroAssembler.h in Headers */,
-				242E8F1511BA3BD30046A0D0 /* MacroAssemblerARM.h in Headers */,
-				242E8F1611BA3BD30046A0D0 /* MacroAssemblerARMv7.h in Headers */,
-				242E8F1711BA3BD30046A0D0 /* MacroAssemblerCodeRef.h in Headers */,
-				242E8F1811BA3BD30046A0D0 /* MacroAssemblerX86.h in Headers */,
-				242E8F1911BA3BD30046A0D0 /* MacroAssemblerX86_64.h in Headers */,
-				242E8F1A11BA3BD30046A0D0 /* MacroAssemblerX86Common.h in Headers */,
-				242E8F1B11BA3BD30046A0D0 /* MainThread.h in Headers */,
-				242E8F1C11BA3BD30046A0D0 /* MallocZoneSupport.h in Headers */,
-				242E8F1D11BA3BD30046A0D0 /* MathExtras.h in Headers */,
-				242E8F1E11BA3BD30046A0D0 /* MathObject.h in Headers */,
-				242E8F1F11BA3BD30046A0D0 /* MathObject.lut.h in Headers */,
-				242E8F2011BA3BD30046A0D0 /* MessageQueue.h in Headers */,
-				242E8F2111BA3BD30046A0D0 /* NativeErrorConstructor.h in Headers */,
-				242E8F2211BA3BD30046A0D0 /* NativeErrorPrototype.h in Headers */,
-				242E8F2311BA3BD30046A0D0 /* NativeFunctionWrapper.h in Headers */,
-				242E8F2411BA3BD30046A0D0 /* NodeInfo.h in Headers */,
-				242E8F2511BA3BD30046A0D0 /* Nodes.h in Headers */,
-				242E8F2611BA3BD30046A0D0 /* Noncopyable.h in Headers */,
-				242E8F2711BA3BD30046A0D0 /* NotFound.h in Headers */,
-				242E8F2811BA3BD30046A0D0 /* NumberConstructor.h in Headers */,
-				242E8F2911BA3BD30046A0D0 /* NumberConstructor.lut.h in Headers */,
-				242E8F2A11BA3BD30046A0D0 /* NumberObject.h in Headers */,
-				242E8F2B11BA3BD30046A0D0 /* NumberPrototype.h in Headers */,
-				242E8F2C11BA3BD30046A0D0 /* ObjectConstructor.h in Headers */,
-				242E8F2D11BA3BD30046A0D0 /* ObjectPrototype.h in Headers */,
-				242E8F2E11BA3BD30046A0D0 /* OpaqueTiString.h in Headers */,
-				242E8F2F11BA3BD30046A0D0 /* Opcode.h in Headers */,
-				242E8F3011BA3BD30046A0D0 /* Operations.h in Headers */,
-				242E8F3111BA3BD30046A0D0 /* OwnArrayPtr.h in Headers */,
-				242E8F3211BA3BD30046A0D0 /* OwnFastMallocPtr.h in Headers */,
-				242E8F3311BA3BD30046A0D0 /* OwnPtr.h in Headers */,
-				242E8F3411BA3BD30046A0D0 /* OwnPtrCommon.h in Headers */,
-				242E8F3511BA3BD30046A0D0 /* Parser.h in Headers */,
-				242E8F3611BA3BD30046A0D0 /* ParserArena.h in Headers */,
-				242E8F3711BA3BD30046A0D0 /* PassOwnPtr.h in Headers */,
-				242E8F3811BA3BD30046A0D0 /* PassRefPtr.h in Headers */,
-				242E8F3911BA3BD30046A0D0 /* pcre.h in Headers */,
-				242E8F3A11BA3BD30046A0D0 /* pcre_internal.h in Headers */,
-				242E8F3B11BA3BD30046A0D0 /* Platform.h in Headers */,
-				242E8F3C11BA3BD30046A0D0 /* Profile.h in Headers */,
-				242E8F3D11BA3BD30046A0D0 /* ProfileGenerator.h in Headers */,
-				242E8F3E11BA3BD30046A0D0 /* ProfileNode.h in Headers */,
-				242E8F3F11BA3BD30046A0D0 /* Profiler.h in Headers */,
-				242E8F4011BA3BD30046A0D0 /* ProfilerServer.h in Headers */,
-				242E8F4111BA3BD30046A0D0 /* PropertyMapHashTable.h in Headers */,
-				242E8F4211BA3BD30046A0D0 /* PropertyNameArray.h in Headers */,
-				242E8F4311BA3BD30046A0D0 /* PropertySlot.h in Headers */,
-				242E8F4411BA3BD30046A0D0 /* Protect.h in Headers */,
-				242E8F4511BA3BD30046A0D0 /* PrototypeFunction.h in Headers */,
-				242E8F4611BA3BD30046A0D0 /* PtrAndFlags.h in Headers */,
-				242E8F4711BA3BD30046A0D0 /* PutPropertySlot.h in Headers */,
-				242E8F4811BA3BD30046A0D0 /* Quantifier.h in Headers */,
-				242E8F4911BA3BD30046A0D0 /* RandomNumber.h in Headers */,
-				242E8F4A11BA3BD30046A0D0 /* RandomNumberSeed.h in Headers */,
-				242E8F4B11BA3BD30046A0D0 /* RefCounted.h in Headers */,
-				242E8F4C11BA3BD30046A0D0 /* RefCountedLeakCounter.h in Headers */,
-				242E8F4D11BA3BD30046A0D0 /* RefPtr.h in Headers */,
-				242E8F4E11BA3BD30046A0D0 /* RefPtrHashMap.h in Headers */,
-				242E8F4F11BA3BD30046A0D0 /* RegexCompiler.h in Headers */,
-				242E8F5011BA3BD30046A0D0 /* RegexInterpreter.h in Headers */,
-				242E8F5111BA3BD30046A0D0 /* RegexJIT.h in Headers */,
-				242E8F5211BA3BD30046A0D0 /* RegExp.h in Headers */,
-				242E8F5311BA3BD30046A0D0 /* RegexParser.h in Headers */,
-				242E8F5411BA3BD30046A0D0 /* RegexPattern.h in Headers */,
-				242E8F5511BA3BD30046A0D0 /* RegExpConstructor.h in Headers */,
-				242E8F5611BA3BD30046A0D0 /* RegExpConstructor.lut.h in Headers */,
-				242E8F5711BA3BD30046A0D0 /* RegExpObject.h in Headers */,
-				242E8F5811BA3BD30046A0D0 /* RegExpObject.lut.h in Headers */,
-				242E8F5911BA3BD30046A0D0 /* RegExpPrototype.h in Headers */,
-				242E8F5A11BA3BD30046A0D0 /* Register.h in Headers */,
-				242E8F5B11BA3BD30046A0D0 /* RegisterFile.h in Headers */,
-				242E8F5C11BA3BD30046A0D0 /* RegisterID.h in Headers */,
-				242E8F5D11BA3BD30046A0D0 /* RepatchBuffer.h in Headers */,
-				242E8F5E11BA3BD30046A0D0 /* ResultType.h in Headers */,
-				242E8F5F11BA3BD30046A0D0 /* RetainPtr.h in Headers */,
-				242E8F6011BA3BD30046A0D0 /* SamplingTool.h in Headers */,
-				242E8F6111BA3BD30046A0D0 /* ScopeChain.h in Headers */,
-				242E8F6211BA3BD30046A0D0 /* SegmentedVector.h in Headers */,
-				242E8F6311BA3BD30046A0D0 /* SmallStrings.h in Headers */,
-				242E8F6411BA3BD30046A0D0 /* SourceCode.h in Headers */,
-				242E8F6511BA3BD30046A0D0 /* SourceProvider.h in Headers */,
-				242E8F6611BA3BD30046A0D0 /* StdLibExtras.h in Headers */,
-				242E8F6711BA3BD30046A0D0 /* StringConstructor.h in Headers */,
-				242E8F6811BA3BD30046A0D0 /* StringExtras.h in Headers */,
-				242E8F6911BA3BD30046A0D0 /* StringObject.h in Headers */,
-				242E8F6A11BA3BD30046A0D0 /* StringObjectThatMasqueradesAsUndefined.h in Headers */,
-				242E8F6B11BA3BD30046A0D0 /* StringPrototype.h in Headers */,
-				242E8F6C11BA3BD30046A0D0 /* StringPrototype.lut.h in Headers */,
-				242E8F6D11BA3BD30046A0D0 /* Structure.h in Headers */,
-				242E8F6E11BA3BD30046A0D0 /* StructureChain.h in Headers */,
-				242E8F6F11BA3BD30046A0D0 /* StructureStubInfo.h in Headers */,
-				242E8F7011BA3BD30046A0D0 /* StructureTransitionTable.h in Headers */,
-				242E8F7111BA3BD30046A0D0 /* SymbolTable.h in Headers */,
-				242E8F7211BA3BD30046A0D0 /* TCPackedCache.h in Headers */,
-				242E8F7311BA3BD30046A0D0 /* TCPageMap.h in Headers */,
-				242E8F7411BA3BD30046A0D0 /* TCSpinLock.h in Headers */,
-				242E8F7511BA3BD30046A0D0 /* TCSystemAlloc.h in Headers */,
-				242E8F7611BA3BD30046A0D0 /* Threading.h in Headers */,
-				242E8F7711BA3BD30046A0D0 /* ThreadSpecific.h in Headers */,
-				242E8F7811BA3BD30046A0D0 /* TimeoutChecker.h in Headers */,
-				242E8F7911BA3BD30046A0D0 /* Tracing.h in Headers */,
-				242E8F7A11BA3BD30046A0D0 /* TiTypeInfo.h in Headers */,
-				242E8F7B11BA3BD30046A0D0 /* TypeTraits.h in Headers */,
-				242E8F7C11BA3BD30046A0D0 /* ucpinternal.h in Headers */,
-				242E8F7D11BA3BD30046A0D0 /* Unicode.h in Headers */,
-				242E8F7E11BA3BD30046A0D0 /* UnusedParam.h in Headers */,
-				242E8F7F11BA3BD30046A0D0 /* UString.h in Headers */,
-				242E8F8011BA3BD30046A0D0 /* UTF8.h in Headers */,
-				242E8F8111BA3BD30046A0D0 /* Vector.h in Headers */,
-				242E8F8211BA3BD30046A0D0 /* VectorTraits.h in Headers */,
-				242E8F8311BA3BD30046A0D0 /* VMTags.h in Headers */,
-				242E8F8411BA3BD30046A0D0 /* WebKitAvailability.h in Headers */,
-				242E8F8511BA3BD30046A0D0 /* WREC.h in Headers */,
-				242E8F8611BA3BD30046A0D0 /* WRECFunctors.h in Headers */,
-				242E8F8711BA3BD30046A0D0 /* WRECGenerator.h in Headers */,
-				242E8F8811BA3BD30046A0D0 /* WRECParser.h in Headers */,
-				242E8F8911BA3BD30046A0D0 /* X86Assembler.h in Headers */,
-				242E8F8A11BA3BD30046A0D0 /* MarkStack.h in Headers */,
-				242E8F8B11BA3BD30046A0D0 /* PossiblyNull.h in Headers */,
-				242E8F8C11BA3BD30046A0D0 /* Executable.h in Headers */,
-				242E8F8D11BA3BD30046A0D0 /* NumericStrings.h in Headers */,
-				242E8F8E11BA3BD30046A0D0 /* PropertyDescriptor.h in Headers */,
-				242E8F8F11BA3BD30046A0D0 /* JSONObject.lut.h in Headers */,
-				242E8F9011BA3BD30046A0D0 /* TiContextRefPrivate.h in Headers */,
-				242E8F9111BA3BD30046A0D0 /* DateInstanceCache.h in Headers */,
-				242E8F9211BA3BD30046A0D0 /* WeakRandom.h in Headers */,
-				242E8F9311BA3BD30046A0D0 /* UnicodeFoundation.h in Headers */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		242E918311BA4B260046A0D0 /* Headers */ = {
-			isa = PBXHeadersBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E91D711BA4C330046A0D0 /* AbstractMacroAssembler.h in Headers */,
-				242E91D811BA4C330046A0D0 /* AlwaysInline.h in Headers */,
-				242E91D911BA4C330046A0D0 /* APICast.h in Headers */,
-				242E91DA11BA4C330046A0D0 /* ArgList.h in Headers */,
-				242E91DB11BA4C330046A0D0 /* Arguments.h in Headers */,
-				242E91DC11BA4C330046A0D0 /* ARMAssembler.h in Headers */,
-				242E91DD11BA4C330046A0D0 /* ARMv7Assembler.h in Headers */,
-				242E91DE11BA4C330046A0D0 /* ArrayConstructor.h in Headers */,
-				242E91DF11BA4C330046A0D0 /* ArrayPrototype.h in Headers */,
-				242E91E011BA4C330046A0D0 /* ASCIICType.h in Headers */,
-				242E91E111BA4C330046A0D0 /* AssemblerBuffer.h in Headers */,
-				242E91E211BA4C330046A0D0 /* AssemblerBufferWithConstantPool.h in Headers */,
-				242E91E311BA4C330046A0D0 /* Assertions.h in Headers */,
-				242E91E411BA4C330046A0D0 /* AVLTree.h in Headers */,
-				242E91E511BA4C330046A0D0 /* BatchedTransitionOptimizer.h in Headers */,
-				242E91E611BA4C330046A0D0 /* BooleanObject.h in Headers */,
-				242E91E711BA4C330046A0D0 /* ByteArray.h in Headers */,
-				242E91E811BA4C330046A0D0 /* BytecodeGenerator.h in Headers */,
-				242E91E911BA4C330046A0D0 /* CallData.h in Headers */,
-				242E91EA11BA4C330046A0D0 /* CallFrame.h in Headers */,
-				242E91EB11BA4C330046A0D0 /* CallIdentifier.h in Headers */,
-				242E91EC11BA4C330046A0D0 /* CharacterClass.h in Headers */,
-				242E91ED11BA4C330046A0D0 /* CharacterClassConstructor.h in Headers */,
-				242E91EE11BA4C330046A0D0 /* ClassInfo.h in Headers */,
-				242E91EF11BA4C330046A0D0 /* CodeBlock.h in Headers */,
-				242E91F011BA4C330046A0D0 /* CodeLocation.h in Headers */,
-				242E91F111BA4C330046A0D0 /* Collator.h in Headers */,
-				242E91F211BA4C330046A0D0 /* Collector.h in Headers */,
-				242E91F311BA4C330046A0D0 /* CollectorHeapIterator.h in Headers */,
-				242E91F411BA4C330046A0D0 /* CommonIdentifiers.h in Headers */,
-				242E91F511BA4C330046A0D0 /* Completion.h in Headers */,
-				242E91F611BA4C330046A0D0 /* config.h in Headers */,
-				242E91F711BA4C330046A0D0 /* ConstructData.h in Headers */,
-				242E91F811BA4C330046A0D0 /* create_hash_table in Headers */,
-				242E91F911BA4C330046A0D0 /* CrossThreadRefCounted.h in Headers */,
-				242E91FA11BA4C330046A0D0 /* CurrentTime.h in Headers */,
-				242E91FB11BA4C330046A0D0 /* DateConstructor.h in Headers */,
-				242E91FC11BA4C330046A0D0 /* DateConversion.h in Headers */,
-				242E91FD11BA4C330046A0D0 /* DateInstance.h in Headers */,
-				242E91FE11BA4C330046A0D0 /* DateMath.h in Headers */,
-				242E91FF11BA4C330046A0D0 /* DatePrototype.h in Headers */,
-				242E920011BA4C330046A0D0 /* Debugger.h in Headers */,
-				242E920111BA4C330046A0D0 /* DebuggerActivation.h in Headers */,
-				242E920211BA4C330046A0D0 /* DebuggerCallFrame.h in Headers */,
-				242E920311BA4C330046A0D0 /* Deque.h in Headers */,
-				242E920411BA4C330046A0D0 /* DisallowCType.h in Headers */,
-				242E920511BA4C330046A0D0 /* dtoa.h in Headers */,
-				242E920611BA4C330046A0D0 /* Error.h in Headers */,
-				242E920711BA4C330046A0D0 /* ErrorConstructor.h in Headers */,
-				242E920811BA4C330046A0D0 /* ErrorInstance.h in Headers */,
-				242E920911BA4C330046A0D0 /* ErrorPrototype.h in Headers */,
-				242E920A11BA4C330046A0D0 /* Escapes.h in Headers */,
-				242E920B11BA4C330046A0D0 /* EvalCodeCache.h in Headers */,
-				242E920C11BA4C330046A0D0 /* ExceptionHelpers.h in Headers */,
-				242E920D11BA4C330046A0D0 /* ExecutableAllocator.h in Headers */,
-				242E920E11BA4C330046A0D0 /* FastAllocBase.h in Headers */,
-				242E920F11BA4C330046A0D0 /* FastMalloc.h in Headers */,
-				242E921011BA4C330046A0D0 /* Forward.h in Headers */,
-				242E921111BA4C330046A0D0 /* FunctionConstructor.h in Headers */,
-				242E921211BA4C330046A0D0 /* FunctionPrototype.h in Headers */,
-				242E921311BA4C330046A0D0 /* GetPtr.h in Headers */,
-				242E921411BA4C330046A0D0 /* GlobalEvalFunction.h in Headers */,
-				242E921511BA4C330046A0D0 /* Grammar.h in Headers */,
-				242E921611BA4C330046A0D0 /* HashCountedSet.h in Headers */,
-				242E921711BA4C330046A0D0 /* HashFunctions.h in Headers */,
-				242E921811BA4C330046A0D0 /* HashIterators.h in Headers */,
-				242E921911BA4C330046A0D0 /* HashMap.h in Headers */,
-				242E921A11BA4C330046A0D0 /* HashSet.h in Headers */,
-				242E921B11BA4C330046A0D0 /* HashTable.h in Headers */,
-				242E921C11BA4C330046A0D0 /* HashTraits.h in Headers */,
-				242E921D11BA4C330046A0D0 /* Identifier.h in Headers */,
-				242E921E11BA4C330046A0D0 /* InitializeThreading.h in Headers */,
-				242E921F11BA4C330046A0D0 /* Instruction.h in Headers */,
-				242E922011BA4C330046A0D0 /* InternalFunction.h in Headers */,
-				242E922111BA4C330046A0D0 /* Interpreter.h in Headers */,
-				242E922211BA4C330046A0D0 /* Ti.h in Headers */,
-				242E922311BA4C330046A0D0 /* TiCore.h in Headers */,
-				242E922411BA4C330046A0D0 /* TiCorePrefix.h in Headers */,
-				242E922511BA4C330046A0D0 /* JIT.h in Headers */,
-				242E922611BA4C330046A0D0 /* JITCode.h in Headers */,
-				242E922711BA4C330046A0D0 /* JITInlineMethods.h in Headers */,
-				242E922811BA4C330046A0D0 /* JITStubCall.h in Headers */,
-				242E922911BA4C330046A0D0 /* JITStubs.h in Headers */,
-				242E922A11BA4C330046A0D0 /* JSActivation.h in Headers */,
-				242E922B11BA4C330046A0D0 /* TiAPIValueWrapper.h in Headers */,
-				242E922C11BA4C330046A0D0 /* TiArray.h in Headers */,
-				242E922D11BA4C330046A0D0 /* TiBase.h in Headers */,
-				242E922E11BA4C330046A0D0 /* TiBasePrivate.h in Headers */,
-				242E922F11BA4C330046A0D0 /* TiArrayArray.h in Headers */,
-				242E923011BA4C330046A0D0 /* TiCallbackConstructor.h in Headers */,
-				242E923111BA4C330046A0D0 /* TiCallbackFunction.h in Headers */,
-				242E923211BA4C330046A0D0 /* TiCallbackObject.h in Headers */,
-				242E923311BA4C330046A0D0 /* TiCallbackObjectFunctions.h in Headers */,
-				242E923411BA4C330046A0D0 /* TiCell.h in Headers */,
-				242E923511BA4C330046A0D0 /* TiClassRef.h in Headers */,
-				242E923611BA4C330046A0D0 /* TiContextRef.h in Headers */,
-				242E923711BA4C330046A0D0 /* TiFunction.h in Headers */,
-				242E923811BA4C330046A0D0 /* TiGlobalData.h in Headers */,
-				242E923911BA4C330046A0D0 /* TiGlobalObject.h in Headers */,
-				242E923A11BA4C330046A0D0 /* TiGlobalObjectFunctions.h in Headers */,
-				242E923B11BA4C330046A0D0 /* JSImmediate.h in Headers */,
-				242E923C11BA4C330046A0D0 /* TiLock.h in Headers */,
-				242E923D11BA4C330046A0D0 /* JSNumberCell.h in Headers */,
-				242E923E11BA4C330046A0D0 /* TiObject.h in Headers */,
-				242E923F11BA4C330046A0D0 /* TiObjectRef.h in Headers */,
-				242E924011BA4C330046A0D0 /* JSONObject.h in Headers */,
-				242E924111BA4C330046A0D0 /* TiProfilerPrivate.h in Headers */,
-				242E924211BA4C330046A0D0 /* TiRetainPtr.h in Headers */,
-				242E924311BA4C330046A0D0 /* TiString.h in Headers */,
-				242E924411BA4C330046A0D0 /* TiStringRef.h in Headers */,
-				242E924511BA4C330046A0D0 /* TiStringRefCF.h in Headers */,
-				242E924611BA4C330046A0D0 /* TiType.h in Headers */,
-				242E924711BA4C330046A0D0 /* TiValue.h in Headers */,
-				242E924811BA4C330046A0D0 /* TiValueRef.h in Headers */,
-				242E924911BA4C330046A0D0 /* JSVariableObject.h in Headers */,
-				242E924A11BA4C330046A0D0 /* JSWrapperObject.h in Headers */,
-				242E924B11BA4C330046A0D0 /* JumpTable.h in Headers */,
-				242E924C11BA4C330046A0D0 /* Label.h in Headers */,
-				242E924D11BA4C330046A0D0 /* LabelScope.h in Headers */,
-				242E924E11BA4C330046A0D0 /* Lexer.h in Headers */,
-				242E924F11BA4C330046A0D0 /* Lexer.lut.h in Headers */,
-				242E925011BA4C330046A0D0 /* LinkBuffer.h in Headers */,
-				242E925111BA4C330046A0D0 /* ListHashSet.h in Headers */,
-				242E925211BA4C330046A0D0 /* ListRefPtr.h in Headers */,
-				242E925311BA4C330046A0D0 /* LiteralParser.h in Headers */,
-				242E925411BA4C330046A0D0 /* Locker.h in Headers */,
-				242E925511BA4C330046A0D0 /* Lookup.h in Headers */,
-				242E925611BA4C330046A0D0 /* MacroAssembler.h in Headers */,
-				242E925711BA4C330046A0D0 /* MacroAssemblerARM.h in Headers */,
-				242E925811BA4C330046A0D0 /* MacroAssemblerARMv7.h in Headers */,
-				242E925911BA4C330046A0D0 /* MacroAssemblerCodeRef.h in Headers */,
-				242E925A11BA4C330046A0D0 /* MacroAssemblerX86.h in Headers */,
-				242E925B11BA4C330046A0D0 /* MacroAssemblerX86_64.h in Headers */,
-				242E925C11BA4C330046A0D0 /* MacroAssemblerX86Common.h in Headers */,
-				242E925D11BA4C330046A0D0 /* MainThread.h in Headers */,
-				242E925E11BA4C330046A0D0 /* MallocZoneSupport.h in Headers */,
-				242E925F11BA4C330046A0D0 /* MathExtras.h in Headers */,
-				242E926011BA4C330046A0D0 /* MathObject.h in Headers */,
-				242E926111BA4C330046A0D0 /* MathObject.lut.h in Headers */,
-				242E926211BA4C330046A0D0 /* MessageQueue.h in Headers */,
-				242E926311BA4C330046A0D0 /* NativeErrorConstructor.h in Headers */,
-				242E926411BA4C330046A0D0 /* NativeErrorPrototype.h in Headers */,
-				242E926511BA4C330046A0D0 /* NativeFunctionWrapper.h in Headers */,
-				242E926611BA4C330046A0D0 /* NodeInfo.h in Headers */,
-				242E926711BA4C330046A0D0 /* Nodes.h in Headers */,
-				242E926811BA4C330046A0D0 /* Noncopyable.h in Headers */,
-				242E926911BA4C330046A0D0 /* NotFound.h in Headers */,
-				242E926A11BA4C330046A0D0 /* NumberConstructor.h in Headers */,
-				242E926B11BA4C330046A0D0 /* NumberConstructor.lut.h in Headers */,
-				242E926C11BA4C330046A0D0 /* NumberObject.h in Headers */,
-				242E926D11BA4C330046A0D0 /* NumberPrototype.h in Headers */,
-				242E926E11BA4C330046A0D0 /* ObjectConstructor.h in Headers */,
-				242E926F11BA4C330046A0D0 /* ObjectPrototype.h in Headers */,
-				242E927011BA4C330046A0D0 /* OpaqueTiString.h in Headers */,
-				242E927111BA4C330046A0D0 /* Opcode.h in Headers */,
-				242E927211BA4C330046A0D0 /* Operations.h in Headers */,
-				242E927311BA4C330046A0D0 /* OwnArrayPtr.h in Headers */,
-				242E927411BA4C330046A0D0 /* OwnFastMallocPtr.h in Headers */,
-				242E927511BA4C330046A0D0 /* OwnPtr.h in Headers */,
-				242E927611BA4C330046A0D0 /* OwnPtrCommon.h in Headers */,
-				242E927711BA4C330046A0D0 /* Parser.h in Headers */,
-				242E927811BA4C330046A0D0 /* ParserArena.h in Headers */,
-				242E927911BA4C330046A0D0 /* PassOwnPtr.h in Headers */,
-				242E927A11BA4C330046A0D0 /* PassRefPtr.h in Headers */,
-				242E927B11BA4C330046A0D0 /* pcre.h in Headers */,
-				242E927C11BA4C330046A0D0 /* pcre_internal.h in Headers */,
-				242E927D11BA4C330046A0D0 /* Platform.h in Headers */,
-				242E927E11BA4C330046A0D0 /* Profile.h in Headers */,
-				242E927F11BA4C330046A0D0 /* ProfileGenerator.h in Headers */,
-				242E928011BA4C330046A0D0 /* ProfileNode.h in Headers */,
-				242E928111BA4C330046A0D0 /* Profiler.h in Headers */,
-				242E928211BA4C330046A0D0 /* ProfilerServer.h in Headers */,
-				242E928311BA4C330046A0D0 /* PropertyMapHashTable.h in Headers */,
-				242E928411BA4C330046A0D0 /* PropertyNameArray.h in Headers */,
-				242E928511BA4C330046A0D0 /* PropertySlot.h in Headers */,
-				242E928611BA4C330046A0D0 /* Protect.h in Headers */,
-				242E928711BA4C330046A0D0 /* PrototypeFunction.h in Headers */,
-				242E928811BA4C330046A0D0 /* PtrAndFlags.h in Headers */,
-				242E928911BA4C330046A0D0 /* PutPropertySlot.h in Headers */,
-				242E928A11BA4C330046A0D0 /* Quantifier.h in Headers */,
-				242E928B11BA4C330046A0D0 /* RandomNumber.h in Headers */,
-				242E928C11BA4C330046A0D0 /* RandomNumberSeed.h in Headers */,
-				242E928D11BA4C330046A0D0 /* RefCounted.h in Headers */,
-				242E928E11BA4C330046A0D0 /* RefCountedLeakCounter.h in Headers */,
-				242E928F11BA4C330046A0D0 /* RefPtr.h in Headers */,
-				242E929011BA4C330046A0D0 /* RefPtrHashMap.h in Headers */,
-				242E929111BA4C330046A0D0 /* RegexCompiler.h in Headers */,
-				242E929211BA4C330046A0D0 /* RegexInterpreter.h in Headers */,
-				242E929311BA4C330046A0D0 /* RegexJIT.h in Headers */,
-				242E929411BA4C330046A0D0 /* RegExp.h in Headers */,
-				242E929511BA4C330046A0D0 /* RegexParser.h in Headers */,
-				242E929611BA4C330046A0D0 /* RegexPattern.h in Headers */,
-				242E929711BA4C330046A0D0 /* RegExpConstructor.h in Headers */,
-				242E929811BA4C330046A0D0 /* RegExpConstructor.lut.h in Headers */,
-				242E929911BA4C330046A0D0 /* RegExpObject.h in Headers */,
-				242E929A11BA4C330046A0D0 /* RegExpObject.lut.h in Headers */,
-				242E929B11BA4C330046A0D0 /* RegExpPrototype.h in Headers */,
-				242E929C11BA4C330046A0D0 /* Register.h in Headers */,
-				242E929D11BA4C330046A0D0 /* RegisterFile.h in Headers */,
-				242E929E11BA4C330046A0D0 /* RegisterID.h in Headers */,
-				242E929F11BA4C330046A0D0 /* RepatchBuffer.h in Headers */,
-				242E92A011BA4C330046A0D0 /* ResultType.h in Headers */,
-				242E92A111BA4C330046A0D0 /* RetainPtr.h in Headers */,
-				242E92A211BA4C330046A0D0 /* SamplingTool.h in Headers */,
-				242E92A311BA4C330046A0D0 /* ScopeChain.h in Headers */,
-				242E92A411BA4C330046A0D0 /* SegmentedVector.h in Headers */,
-				242E92A511BA4C330046A0D0 /* SmallStrings.h in Headers */,
-				242E92A611BA4C330046A0D0 /* SourceCode.h in Headers */,
-				242E92A711BA4C330046A0D0 /* SourceProvider.h in Headers */,
-				242E92A811BA4C330046A0D0 /* StdLibExtras.h in Headers */,
-				242E92A911BA4C330046A0D0 /* StringConstructor.h in Headers */,
-				242E92AA11BA4C330046A0D0 /* StringExtras.h in Headers */,
-				242E92AB11BA4C330046A0D0 /* StringObject.h in Headers */,
-				242E92AC11BA4C330046A0D0 /* StringObjectThatMasqueradesAsUndefined.h in Headers */,
-				242E92AD11BA4C330046A0D0 /* StringPrototype.h in Headers */,
-				242E92AE11BA4C330046A0D0 /* StringPrototype.lut.h in Headers */,
-				242E92AF11BA4C330046A0D0 /* Structure.h in Headers */,
-				242E92B011BA4C330046A0D0 /* StructureChain.h in Headers */,
-				242E92B111BA4C330046A0D0 /* StructureStubInfo.h in Headers */,
-				242E92B211BA4C330046A0D0 /* StructureTransitionTable.h in Headers */,
-				242E92B311BA4C330046A0D0 /* SymbolTable.h in Headers */,
-				242E92B411BA4C330046A0D0 /* TCPackedCache.h in Headers */,
-				242E92B511BA4C330046A0D0 /* TCPageMap.h in Headers */,
-				242E92B611BA4C330046A0D0 /* TCSpinLock.h in Headers */,
-				242E92B711BA4C330046A0D0 /* TCSystemAlloc.h in Headers */,
-				242E92B811BA4C330046A0D0 /* Threading.h in Headers */,
-				242E92B911BA4C330046A0D0 /* ThreadSpecific.h in Headers */,
-				242E92BA11BA4C330046A0D0 /* TimeoutChecker.h in Headers */,
-				242E92BB11BA4C330046A0D0 /* Tracing.h in Headers */,
-				242E92BC11BA4C330046A0D0 /* TiTypeInfo.h in Headers */,
-				242E92BD11BA4C330046A0D0 /* TypeTraits.h in Headers */,
-				242E92BE11BA4C330046A0D0 /* ucpinternal.h in Headers */,
-				242E92BF11BA4C330046A0D0 /* Unicode.h in Headers */,
-				242E92C011BA4C330046A0D0 /* UnusedParam.h in Headers */,
-				242E92C111BA4C330046A0D0 /* UString.h in Headers */,
-				242E92C211BA4C330046A0D0 /* UTF8.h in Headers */,
-				242E92C311BA4C330046A0D0 /* Vector.h in Headers */,
-				242E92C411BA4C330046A0D0 /* VectorTraits.h in Headers */,
-				242E92C511BA4C330046A0D0 /* VMTags.h in Headers */,
-				242E92C611BA4C330046A0D0 /* WebKitAvailability.h in Headers */,
-				242E92C711BA4C330046A0D0 /* WREC.h in Headers */,
-				242E92C811BA4C330046A0D0 /* WRECFunctors.h in Headers */,
-				242E92C911BA4C330046A0D0 /* WRECGenerator.h in Headers */,
-				242E92CA11BA4C330046A0D0 /* WRECParser.h in Headers */,
-				242E92CB11BA4C330046A0D0 /* X86Assembler.h in Headers */,
-				242E92CC11BA4C330046A0D0 /* MarkStack.h in Headers */,
-				242E92CD11BA4C330046A0D0 /* PossiblyNull.h in Headers */,
-				242E92CE11BA4C330046A0D0 /* Executable.h in Headers */,
-				242E92CF11BA4C330046A0D0 /* NumericStrings.h in Headers */,
-				242E92D011BA4C330046A0D0 /* PropertyDescriptor.h in Headers */,
-				242E92D111BA4C330046A0D0 /* JSONObject.lut.h in Headers */,
-				242E92D211BA4C330046A0D0 /* TiContextRefPrivate.h in Headers */,
-				242E92D311BA4C330046A0D0 /* DateInstanceCache.h in Headers */,
-				242E92D411BA4C330046A0D0 /* WeakRandom.h in Headers */,
-				242E92D511BA4C330046A0D0 /* UnicodeFoundation.h in Headers */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
 		932F5B3F0822A1C700736975 /* Headers */ = {
 			isa = PBXHeadersBuildPhase;
 			buildActionMask = 2147483647;
@@ -3817,42 +2734,6 @@
 			productReference = 241585AC10CC8ECC00E212F2 /* libStatic.a */;
 			productType = "com.apple.product-type.library.static";
 		};
-		242E8E9111BA3BD30046A0D0 /* JavascriptCore-Debug */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 242E903011BA3BD30046A0D0 /* Build configuration list for PBXNativeTarget "JavascriptCore-Debug" */;
-			buildPhases = (
-				242E8E9411BA3BD30046A0D0 /* Headers */,
-				242E8F9411BA3BD30046A0D0 /* Sources */,
-				242E902E11BA3BD30046A0D0 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				242E8E9211BA3BD30046A0D0 /* PBXTargetDependency */,
-			);
-			name = "JavascriptCore-Debug";
-			productName = Static;
-			productReference = 242E903511BA3BD30046A0D0 /* libStatic.a */;
-			productType = "com.apple.product-type.library.static";
-		};
-		242E918611BA4B260046A0D0 /* debug */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = 242E919711BA4B5D0046A0D0 /* Build configuration list for PBXNativeTarget "debug" */;
-			buildPhases = (
-				242E918311BA4B260046A0D0 /* Headers */,
-				242E918411BA4B260046A0D0 /* Sources */,
-				242E918511BA4B260046A0D0 /* Frameworks */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-				242E91A511BA4BE70046A0D0 /* PBXTargetDependency */,
-			);
-			name = debug;
-			productName = debug;
-			productReference = 242E918711BA4B260046A0D0 /* libdebug.a */;
-			productType = "com.apple.product-type.library.static";
-		};
 		932F5B3E0822A1C700736975 /* TiCore */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 149C275D08902AFE008A9EFC /* Build configuration list for PBXNativeTarget "TiCore" */;
@@ -3924,8 +2805,6 @@
 				14BD59BE0A3E8F9000BAF59C /* testapi */,
 				932F5BDA0822A1C700736975 /* jsc */,
 				241585AB10CC8ECC00E212F2 /* JavascriptCore-Static */,
-				242E8E9111BA3BD30046A0D0 /* JavascriptCore-Debug */,
-				242E918611BA4B260046A0D0 /* debug */,
 			);
 		};
 /* End PBXProject section */
@@ -4106,9 +2985,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				242E908711BA405A0046A0D0 /* Debugger.cpp in Sources */,
-				242E908811BA405A0046A0D0 /* DebuggerActivation.cpp in Sources */,
-				242E908911BA405A0046A0D0 /* DebuggerCallFrame.cpp in Sources */,
 				241585B510CC8EF000E212F2 /* ArgList.cpp in Sources */,
 				241585B610CC8EF000E212F2 /* Arguments.cpp in Sources */,
 				241585B710CC8EF000E212F2 /* ARMAssembler.cpp in Sources */,
@@ -4262,30 +3138,6 @@
 				2415864F10CC8EF000E212F2 /* WRECGenerator.cpp in Sources */,
 				2415865010CC8EF000E212F2 /* WRECParser.cpp in Sources */,
 				24C379391152BBB5004BC328 /* UnicodeFoundation.mm in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		242E8F9411BA3BD30046A0D0 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E905311BA3C680046A0D0 /* Profile.cpp in Sources */,
-				242E905411BA3C680046A0D0 /* ProfileGenerator.cpp in Sources */,
-				242E905511BA3C680046A0D0 /* ProfileNode.cpp in Sources */,
-				242E905611BA3C680046A0D0 /* Profiler.cpp in Sources */,
-				242E903611BA3BF70046A0D0 /* Debugger.cpp in Sources */,
-				242E903711BA3BF70046A0D0 /* DebuggerActivation.cpp in Sources */,
-				242E903811BA3BF70046A0D0 /* DebuggerCallFrame.cpp in Sources */,
-			);
-			runOnlyForDeploymentPostprocessing = 0;
-		};
-		242E918411BA4B260046A0D0 /* Sources */ = {
-			isa = PBXSourcesBuildPhase;
-			buildActionMask = 2147483647;
-			files = (
-				242E919011BA4B350046A0D0 /* Debugger.cpp in Sources */,
-				242E919111BA4B350046A0D0 /* DebuggerActivation.cpp in Sources */,
-				242E919211BA4B350046A0D0 /* DebuggerCallFrame.cpp in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -4492,16 +3344,6 @@
 			target = 65FB3F6609D11E9100F49DEB /* Derived Sources */;
 			targetProxy = 2415875D10CC8F8800E212F2 /* PBXContainerItemProxy */;
 		};
-		242E8E9211BA3BD30046A0D0 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 65FB3F6609D11E9100F49DEB /* Derived Sources */;
-			targetProxy = 242E8E9311BA3BD30046A0D0 /* PBXContainerItemProxy */;
-		};
-		242E91A511BA4BE70046A0D0 /* PBXTargetDependency */ = {
-			isa = PBXTargetDependency;
-			target = 65FB3F6609D11E9100F49DEB /* Derived Sources */;
-			targetProxy = 242E91A411BA4BE70046A0D0 /* PBXContainerItemProxy */;
-		};
 		65FB3F7E09D11EF300F49DEB /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 65FB3F6609D11E9100F49DEB /* Derived Sources */;
@@ -4546,7 +3388,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Debug;
 		};
@@ -4555,7 +3397,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Release;
 		};
@@ -4567,7 +3409,7 @@
 					normal,
 					debug,
 				);
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Production;
 		};
@@ -4620,12 +3462,11 @@
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
 				DEAD_CODE_STRIPPING = "$(DEAD_CODE_STRIPPING_debug)";
 				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
-				GCC_ENABLE_CPP_RTTI = YES;
 				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -4636,11 +3477,10 @@
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				GCC_ENABLE_CPP_RTTI = YES;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -4651,11 +3491,10 @@
 			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				GCC_ENABLE_CPP_RTTI = YES;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
+				SDKROOT = iphoneos4.1;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
 			name = Production;
@@ -4704,7 +3543,7 @@
 				OTHER_LDFLAGS = "$(OTHER_LDFLAGS_$(REAL_PLATFORM_NAME))";
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
+				SDKROOT = iphoneos4.1;
 				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
 			};
 			name = Debug;
@@ -4728,7 +3567,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
+				SDKROOT = iphoneos4.1;
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -4742,7 +3581,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Profiling;
 		};
@@ -4755,140 +3594,7 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				PREBINDING = NO;
 				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
-			};
-			name = Production;
-		};
-		242E903111BA3BD30046A0D0 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				COPY_PHASE_STRIP = NO;
-				DYLIB_COMPATIBILITY_VERSION = 1;
-				DYLIB_CURRENT_VERSION = 532.5;
-				EXPORTED_SYMBOLS_FILE = TiCore.exp;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PREFIX_HEADER = TiCorePrefix.h;
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"$(HEADER_SEARCH_PATHS)",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
-				);
-				HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1 = "\"${BUILT_PRODUCTS_DIR}/DerivedSources/TiCore\"";
-				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
-				OTHER_LDFLAGS = "$(OTHER_LDFLAGS_$(REAL_PLATFORM_NAME))";
-				PREBINDING = NO;
-				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
-				STANDARD_C_PLUS_PLUS_LIBRARY_TYPE = static;
-			};
-			name = Debug;
-		};
-		242E903211BA3BD30046A0D0 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				COPY_PHASE_STRIP = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				EXPORTED_SYMBOLS_FILE = TiCore.exp;
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"$(HEADER_SEARCH_PATHS)",
-					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/DerivedSources/TiCore",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
-				);
-				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
-				PREBINDING = NO;
-				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
-				ZERO_LINK = NO;
-			};
-			name = Release;
-		};
-		242E903311BA3BD30046A0D0 /* Profiling */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				EXPORTED_SYMBOLS_FILE = TiCore.exp;
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
-				PREBINDING = NO;
-				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
-			};
-			name = Profiling;
-		};
-		242E903411BA3BD30046A0D0 /* Production */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				EXPORTED_SYMBOLS_FILE = TiCore.exp;
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
-				PREBINDING = NO;
-				PRODUCT_NAME = Static;
-				SDKROOT = iphoneos4.0;
-			};
-			name = Production;
-		};
-		242E918811BA4B270046A0D0 /* Debug */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				COPY_PHASE_STRIP = NO;
-				GCC_DYNAMIC_NO_PIC = NO;
-				GCC_OPTIMIZATION_LEVEL = 0;
-				PREBINDING = NO;
-				PRODUCT_NAME = debug;
-			};
-			name = Debug;
-		};
-		242E918911BA4B270046A0D0 /* Release */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				COPY_PHASE_STRIP = YES;
-				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				GCC_ENABLE_CPP_RTTI = YES;
-				GCC_ENABLE_FIX_AND_CONTINUE = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"$(HEADER_SEARCH_PATHS)",
-					"$(BUILD_DIR)/$(CONFIGURATION)$(EFFECTIVE_PLATFORM_NAME)/DerivedSources/TiCore",
-					"$(HEADER_SEARCH_PATHS_QUOTED_FOR_TARGET_1)",
-				);
-				PREBINDING = NO;
-				PRODUCT_NAME = debug;
-				ZERO_LINK = NO;
-			};
-			name = Release;
-		};
-		242E918A11BA4B270046A0D0 /* Profiling */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				PREBINDING = NO;
-				PRODUCT_NAME = debug;
-			};
-			name = Profiling;
-		};
-		242E918B11BA4B270046A0D0 /* Production */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				ALWAYS_SEARCH_USER_PATHS = NO;
-				PREBINDING = NO;
-				PRODUCT_NAME = debug;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Production;
 		};
@@ -4918,11 +3624,10 @@
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
 				ARCHS = "$(NATIVE_ARCH_ACTUAL)";
-				GCC_ENABLE_CPP_RTTI = YES;
 				GCC_TREAT_WARNINGS_AS_ERRORS = YES;
 				IPHONEOS_DEPLOYMENT_TARGET = 3.1;
 				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
+				SDKROOT = iphoneos4.1;
 				STRIP_INSTALLED_PRODUCT = NO;
 				VALID_ARCHS = "i386 armv7 armv6";
 			};
@@ -4940,7 +3645,7 @@
 			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* TiCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
-				SDKROOT = iphoneos3.2;
+				SDKROOT = iphoneos4.1;
 			};
 			name = Profiling;
 		};
@@ -5048,28 +3753,6 @@
 				241585AF10CC8ECE00E212F2 /* Release */,
 				241585B010CC8ECE00E212F2 /* Profiling */,
 				241585B110CC8ECE00E212F2 /* Production */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Production;
-		};
-		242E903011BA3BD30046A0D0 /* Build configuration list for PBXNativeTarget "JavascriptCore-Debug" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				242E903111BA3BD30046A0D0 /* Debug */,
-				242E903211BA3BD30046A0D0 /* Release */,
-				242E903311BA3BD30046A0D0 /* Profiling */,
-				242E903411BA3BD30046A0D0 /* Production */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Production;
-		};
-		242E919711BA4B5D0046A0D0 /* Build configuration list for PBXNativeTarget "debug" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				242E918811BA4B270046A0D0 /* Debug */,
-				242E918911BA4B270046A0D0 /* Release */,
-				242E918A11BA4B270046A0D0 /* Profiling */,
-				242E918B11BA4B270046A0D0 /* Production */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Production;
