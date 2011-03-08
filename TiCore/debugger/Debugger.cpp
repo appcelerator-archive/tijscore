@@ -39,6 +39,9 @@
 
 namespace TI {
 
+Debugger::Debugger()
+{
+}
 Debugger::~Debugger()
 {
     HashSet<TiGlobalObject*>::iterator end = m_globalObjects.end();

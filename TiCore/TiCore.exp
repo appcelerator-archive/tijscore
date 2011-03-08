@@ -408,7 +408,7 @@ __ZTVN3JSC14TiGlobalObjectE
 __ZTVN3JSC15JSWrapperObjectE
 __ZTVN3JSC16InternalFunctionE
 __ZTVN3JSC16JSVariableObjectE
-__ZTVN3JSC8DebuggerE
+__ZTVN3TI8DebuggerE
 __ZTVN3JSC8TiObjectE
 __ZTVN3JSC8TiStringE
 _jscore_fastmalloc_introspection
