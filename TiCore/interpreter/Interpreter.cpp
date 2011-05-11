@@ -3879,7 +3879,7 @@ TiValue Interpreter::retrieveArguments(CallFrame* callFrame, TiFunction* functio
         callFrame->setCalleeArguments(arguments);
     }
 
-    return arguments;
+    return TiValue(arguments);
 }
 
 TiValue Interpreter::retrieveCaller(CallFrame* callFrame, InternalFunction* function) const

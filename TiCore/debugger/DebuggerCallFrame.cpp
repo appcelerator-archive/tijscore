@@ -40,6 +40,8 @@
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "Parser.h"
+#include "Arguments.h"
+#include "TiLock.h"
 
 namespace TI {
 
@@ -65,6 +67,38 @@ UString DebuggerCallFrame::calculatedFunctionName() const
     return function->calculatedDisplayName(&m_callFrame->globalData());
 }
 
+TiValue DebuggerCallFrame::functionArguments() const
+{
+    // CallFrame === TiExecState, so we can grab the interpreter and the argument information directly
+    if (!m_callFrame->codeBlock())
+        return jsNull();
+    
+    TiFunction* function = asFunction(m_callFrame->callee());
+    if (!function)
+        return jsNull();
+    
+    return m_callFrame->interpreter()->retrieveArguments(m_callFrame, function);
+}
+
+TiObject* DebuggerCallFrame::function() const
+{
+    if (!m_callFrame->codeBlock())
+        return 0;
+    
+    TiFunction* function = asFunction(m_callFrame->callee());
+    if (!function)
+        return 0;
+    
+    return function;
+}
+
+bool DebuggerCallFrame::usingArguments() const
+{
+    if (!m_callFrame->codeBlock())
+        return false;
+    return m_callFrame->codeBlock()->usesArguments();
+}
+    
 DebuggerCallFrame::Type DebuggerCallFrame::type() const
 {
     if (m_callFrame->callee())
