@@ -79,6 +79,19 @@ TiValue DebuggerCallFrame::functionArguments() const
     
     return m_callFrame->interpreter()->retrieveArguments(m_callFrame, function);
 }
+    
+UString DebuggerCallFrame::functionArgumentList() const
+{
+    if (!m_callFrame->codeBlock())
+        return UString("");
+    
+    TiFunction* function = asFunction(m_callFrame->callee());
+    if (!function || function->isHostFunction())
+        return UString("");
+    
+    FunctionExecutable* executable = function->jsExecutable();
+    return executable->paramString();
+}
 
 TiObject* DebuggerCallFrame::function() const
 {
