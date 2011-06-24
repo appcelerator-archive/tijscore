@@ -2453,8 +2453,11 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             vPC += OPCODE_LENGTH(op_get_by_pname);
             NEXT_INSTRUCTION();
         }
-        Identifier propertyName(callFrame, subscript.toString(callFrame));
-        result = baseValue.get(callFrame, propertyName);
+        // Scope to avoid LLVM error
+        {
+            Identifier propertyName(callFrame, subscript.toString(callFrame));
+            result = baseValue.get(callFrame, propertyName);
+        }
         CHECK_FOR_EXCEPTION();
         callFrame->r(dst) = result;
         vPC += OPCODE_LENGTH(op_get_by_pname);

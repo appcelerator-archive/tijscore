@@ -75,7 +75,7 @@ namespace WTI {
         PtrAndFlags(T* ptr)
         {
             PtrAndFlagsBase<T, FlagEnum>::m_ptrAndFlags = 0;
-            set(ptr);
+            this->set(ptr);
         }
     };
 } // namespace WTI
