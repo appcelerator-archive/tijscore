@@ -34,11 +34,13 @@
 #include "TiFunction.h"
 #include "TiObject.h"
 #include "TiString.h"
+#include "TiStringBuilder.h"
 #include "TiValue.h"
 #include "ObjectPrototype.h"
 #include "PrototypeFunction.h"
 #include "RegExpObject.h"
 #include "RegExp.h"
+#include "RegExpCache.h"
 
 namespace TI {
 
@@ -94,11 +96,11 @@ TiValue JSC_HOST_CALL regExpProtoFuncCompile(TiExcState* exec, TiObject*, TiValu
     } else {
         UString pattern = args.isEmpty() ? UString("") : arg0.toString(exec);
         UString flags = arg1.isUndefined() ? UString("") : arg1.toString(exec);
-        regExp = RegExp::create(&exec->globalData(), pattern, flags);
+        regExp = exec->globalData().regExpCache()->lookupOrCreate(pattern, flags);
     }
 
     if (!regExp->isValid())
-        return throwError(exec, SyntaxError, UString("Invalid regular expression: ").append(regExp->errorMessage()));
+        return throwError(exec, SyntaxError, makeString("Invalid regular expression: ", regExp->errorMessage()));
 
     asRegExpObject(thisValue)->setRegExp(regExp.release());
     asRegExpObject(thisValue)->setLastIndex(0);
@@ -113,15 +115,17 @@ TiValue JSC_HOST_CALL regExpProtoFuncToString(TiExcState* exec, TiObject*, TiVal
         return throwError(exec, TypeError);
     }
 
-    UString result = "/" + asRegExpObject(thisValue)->get(exec, exec->propertyNames().source).toString(exec);
-    result.append('/');
+    char postfix[5] = { '/', 0, 0, 0, 0 };
+    int index = 1;
     if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().global).toBoolean(exec))
-        result.append('g');
+        postfix[index++] = 'g';
     if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().ignoreCase).toBoolean(exec))
-        result.append('i');
+        postfix[index++] = 'i';
     if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().multiline).toBoolean(exec))
-        result.append('m');
-    return jsNontrivialString(exec, result);
+        postfix[index] = 'm';
+    UString source = asRegExpObject(thisValue)->get(exec, exec->propertyNames().source).toString(exec);
+    // If source is empty, use "/(?:)/" to avoid colliding with comment syntax
+    return jsMakeNontrivialString(exec, "/", source.size() ? source : UString("(?:)"), postfix);
 }
 
 } // namespace TI

@@ -42,6 +42,7 @@ namespace TI {
 Debugger::Debugger()
 {
 }
+
 Debugger::~Debugger()
 {
     HashSet<TiGlobalObject*>::iterator end = m_globalObjects.end();
@@ -77,8 +78,9 @@ void Debugger::recompileAllTiFunctions(TiGlobalData* globalData)
     FunctionExecutableSet functionExecutables;
     SourceProviderMap sourceProviders;
 
-    Heap::iterator heapEnd = globalData->heap.primaryHeapEnd();
-    for (Heap::iterator it = globalData->heap.primaryHeapBegin(); it != heapEnd; ++it) {
+    LiveObjectIterator it = globalData->heap.primaryHeapBegin();
+    LiveObjectIterator heapEnd = globalData->heap.primaryHeapEnd();
+    for ( ; it != heapEnd; ++it) {
         if (!(*it)->inherits(&TiFunction::info))
             continue;
 
@@ -94,7 +96,7 @@ void Debugger::recompileAllTiFunctions(TiGlobalData* globalData)
             continue;
 
         TiExcState* exec = function->scope().globalObject()->TiGlobalObject::globalExec();
-        executable->recompile(exec);
+        executable->recompile();
         if (function->scope().globalObject()->debugger() == this)
             sourceProviders.add(executable->source().provider(), exec);
     }
@@ -103,7 +105,7 @@ void Debugger::recompileAllTiFunctions(TiGlobalData* globalData)
     // Ti in the inspector.
     SourceProviderMap::const_iterator end = sourceProviders.end();
     for (SourceProviderMap::const_iterator iter = sourceProviders.begin(); iter != end; ++iter)
-        sourceParsed(iter->second, SourceCode(iter->first), -1, 0);
+        sourceParsed(iter->second, SourceCode(iter->first), -1, UString());
 }
 
 TiValue evaluateInGlobalCallFrame(const UString& script, TiValue& exception, TiGlobalObject* globalObject)

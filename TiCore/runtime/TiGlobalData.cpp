@@ -38,6 +38,7 @@
 
 #include "ArgList.h"
 #include "Collector.h"
+#include "CollectorHeapIterator.h"
 #include "CommonIdentifiers.h"
 #include "FunctionConstructor.h"
 #include "GetterSetter.h"
@@ -52,10 +53,12 @@
 #include "JSNotAnObject.h"
 #include "TiPropertyNameIterator.h"
 #include "TiStaticScopeObject.h"
-#include "Parser.h"
 #include "Lexer.h"
 #include "Lookup.h"
 #include "Nodes.h"
+#include "Parser.h"
+#include "RegExpCache.h"
+#include <wtf/WTFThreadData.h>
 
 #if ENABLE(JSC_MULTIPLE_THREADS)
 #include <wtf/Threading.h>
@@ -63,6 +66,7 @@
 
 #if PLATFORM(MAC)
 #include "ProfilerServer.h"
+#include <CoreFoundation/CoreFoundation.h>
 #endif
 
 using namespace WTI;
@@ -78,41 +82,39 @@ extern JSC_CONST_HASHTABLE HashTable regExpTable;
 extern JSC_CONST_HASHTABLE HashTable regExpConstructorTable;
 extern JSC_CONST_HASHTABLE HashTable stringTable;
 
-struct VPtrSet {
-    VPtrSet();
+void* TiGlobalData::jsArrayVPtr;
+void* TiGlobalData::jsByteArrayVPtr;
+void* TiGlobalData::jsStringVPtr;
+void* TiGlobalData::jsFunctionVPtr;
 
-    void* jsArrayVPtr;
-    void* jsByteArrayVPtr;
-    void* jsStringVPtr;
-    void* jsFunctionVPtr;
-};
-
-VPtrSet::VPtrSet()
+void TiGlobalData::storeVPtrs()
 {
-    // Bizarrely, calling fastMalloc here is faster than allocating space on the stack.
-    void* storage = fastMalloc(sizeof(CollectorBlock));
+    CollectorCell cell;
+    void* storage = &cell;
 
+    COMPILE_ASSERT(sizeof(TiArray) <= sizeof(CollectorCell), sizeof_TiArray_must_be_less_than_CollectorCell);
     TiCell* jsArray = new (storage) TiArray(TiArray::createStructure(jsNull()));
-    jsArrayVPtr = jsArray->vptr();
+    TiGlobalData::jsArrayVPtr = jsArray->vptr();
     jsArray->~TiCell();
 
+    COMPILE_ASSERT(sizeof(TiArrayArray) <= sizeof(CollectorCell), sizeof_TiArrayArray_must_be_less_than_CollectorCell);
     TiCell* jsByteArray = new (storage) TiArrayArray(TiArrayArray::VPtrStealingHack);
-    jsByteArrayVPtr = jsByteArray->vptr();
+    TiGlobalData::jsByteArrayVPtr = jsByteArray->vptr();
     jsByteArray->~TiCell();
 
+    COMPILE_ASSERT(sizeof(TiString) <= sizeof(CollectorCell), sizeof_TiString_must_be_less_than_CollectorCell);
     TiCell* jsString = new (storage) TiString(TiString::VPtrStealingHack);
-    jsStringVPtr = jsString->vptr();
+    TiGlobalData::jsStringVPtr = jsString->vptr();
     jsString->~TiCell();
 
+    COMPILE_ASSERT(sizeof(TiFunction) <= sizeof(CollectorCell), sizeof_TiFunction_must_be_less_than_CollectorCell);
     TiCell* jsFunction = new (storage) TiFunction(TiFunction::createStructure(jsNull()));
-    jsFunctionVPtr = jsFunction->vptr();
+    TiGlobalData::jsFunctionVPtr = jsFunction->vptr();
     jsFunction->~TiCell();
-
-    fastFree(storage);
 }
 
-TiGlobalData::TiGlobalData(bool isShared, const VPtrSet& vptrSet)
-    : isSharedInstance(isShared)
+TiGlobalData::TiGlobalData(GlobalDataType globalDataType, ThreadStackType threadStackType)
+    : globalDataType(globalDataType)
     , clientData(0)
     , arrayTable(fastNew<HashTable>(TI::arrayTable))
     , dateTable(fastNew<HashTable>(TI::dateTable))
@@ -124,6 +126,7 @@ TiGlobalData::TiGlobalData(bool isShared, const VPtrSet& vptrSet)
     , stringTable(fastNew<HashTable>(TI::stringTable))
     , activationStructure(JSActivation::createStructure(jsNull()))
     , interruptedExecutionErrorStructure(TiObject::createStructure(jsNull()))
+    , terminatedExecutionErrorStructure(TiObject::createStructure(jsNull()))
     , staticScopeStructure(TiStaticScopeObject::createStructure(jsNull()))
     , stringStructure(TiString::createStructure(jsNull()))
     , notAnObjectErrorStubStructure(JSNotAnObjectErrorStub::createStructure(jsNull()))
@@ -131,37 +134,55 @@ TiGlobalData::TiGlobalData(bool isShared, const VPtrSet& vptrSet)
     , propertyNameIteratorStructure(TiPropertyNameIterator::createStructure(jsNull()))
     , getterSetterStructure(GetterSetter::createStructure(jsNull()))
     , apiWrapperStructure(TiAPIValueWrapper::createStructure(jsNull()))
+    , dummyMarkableCellStructure(TiCell::createDummyStructure())
 #if USE(JSVALUE32)
     , numberStructure(JSNumberCell::createStructure(jsNull()))
 #endif
-    , jsArrayVPtr(vptrSet.jsArrayVPtr)
-    , jsByteArrayVPtr(vptrSet.jsByteArrayVPtr)
-    , jsStringVPtr(vptrSet.jsStringVPtr)
-    , jsFunctionVPtr(vptrSet.jsFunctionVPtr)
-    , identifierTable(createIdentifierTable())
+    , identifierTable(globalDataType == Default ? wtfThreadData().currentIdentifierTable() : createIdentifierTable())
     , propertyNames(new CommonIdentifiers(this))
     , emptyList(new MarkedArgumentBuffer)
     , lexer(new Lexer(this))
     , parser(new Parser)
     , interpreter(new Interpreter)
-#if ENABLE(JIT)
-    , jitStubs(this)
-#endif
     , heap(this)
     , initializingLazyNumericCompareFunction(false)
     , head(0)
     , dynamicGlobalObject(0)
     , functionCodeBlockBeingReparsed(0)
     , firstStringifierToMark(0)
-    , markStack(vptrSet.jsArrayVPtr)
+    , markStack(jsArrayVPtr)
     , cachedUTCOffset(NaN)
-    , weakRandom(static_cast<int>(currentTime()))
+    , maxReentryDepth(threadStackType == ThreadStackTypeSmall ? MaxSmallThreadReentryDepth : MaxLargeThreadReentryDepth)
+    , m_regExpCache(new RegExpCache(this))
 #ifndef NDEBUG
-    , mainThreadOnly(false)
+    , exclusiveThread(0)
 #endif
 {
 #if PLATFORM(MAC)
     startProfilerServerIfNeeded();
+#endif
+#if ENABLE(JIT) && ENABLE(INTERPRETER)
+#if PLATFORM(CF)
+    CFStringRef canUseJITKey = CFStringCreateWithCString(0 , "TiCoreUseJIT", kCFStringEncodingMacRoman);
+    CFBooleanRef canUseJIT = (CFBooleanRef)CFPreferencesCopyAppValue(canUseJITKey, kCFPreferencesCurrentApplication);
+    if (canUseJIT) {
+        m_canUseJIT = kCFBooleanTrue == canUseJIT;
+        CFRelease(canUseJIT);
+    } else
+        m_canUseJIT = !getenv("TiCoreUseJIT");
+    CFRelease(canUseJITKey);
+#elif OS(UNIX)
+    m_canUseJIT = !getenv("TiCoreUseJIT");
+#else
+    m_canUseJIT = true;
+#endif
+#endif
+#if ENABLE(JIT)
+#if ENABLE(INTERPRETER)
+    if (m_canUseJIT)
+        m_canUseJIT = executableAllocator.isValid();
+#endif
+    jitStubs.set(new JITThunks(this));
 #endif
 }
 
@@ -201,20 +222,27 @@ TiGlobalData::~TiGlobalData()
     delete emptyList;
 
     delete propertyNames;
-    deleteIdentifierTable(identifierTable);
+    if (globalDataType != Default)
+        deleteIdentifierTable(identifierTable);
 
     delete clientData;
+    delete m_regExpCache;
 }
 
-PassRefPtr<TiGlobalData> TiGlobalData::create(bool isShared)
+PassRefPtr<TiGlobalData> TiGlobalData::createContextGroup(ThreadStackType type)
 {
-    return adoptRef(new TiGlobalData(isShared, VPtrSet()));
+    return adoptRef(new TiGlobalData(APIContextGroup, type));
 }
 
-PassRefPtr<TiGlobalData> TiGlobalData::createLeaked()
+PassRefPtr<TiGlobalData> TiGlobalData::create(ThreadStackType type)
+{
+    return adoptRef(new TiGlobalData(Default, type));
+}
+
+PassRefPtr<TiGlobalData> TiGlobalData::createLeaked(ThreadStackType type)
 {
     Structure::startIgnoringLeaks();
-    RefPtr<TiGlobalData> data = create();
+    RefPtr<TiGlobalData> data = create(type);
     Structure::stopIgnoringLeaks();
     return data.release();
 }
@@ -228,7 +256,7 @@ TiGlobalData& TiGlobalData::sharedInstance()
 {
     TiGlobalData*& instance = sharedInstanceInternal();
     if (!instance) {
-        instance = create(true).releaseRef();
+        instance = new TiGlobalData(APIShared, ThreadStackTypeSmall);
 #if ENABLE(JSC_MULTIPLE_THREADS)
         instance->makeUsableFromMultipleThreads();
 #endif
@@ -281,6 +309,23 @@ void TiGlobalData::stopSampling()
 void TiGlobalData::dumpSampleData(TiExcState* exec)
 {
     interpreter->dumpSampleData(exec);
+}
+
+void TiGlobalData::recompileAllTiFunctions()
+{
+    // If Ti is running, it's not safe to recompile, since we'll end
+    // up throwing away code that is live on the stack.
+    ASSERT(!dynamicGlobalObject);
+
+    LiveObjectIterator it = heap.primaryHeapBegin();
+    LiveObjectIterator heapEnd = heap.primaryHeapEnd();
+    for ( ; it != heapEnd; ++it) {
+        if ((*it)->inherits(&TiFunction::info)) {
+            TiFunction* function = asFunction(*it);
+            if (!function->executable()->isHostFunction())
+                function->jsExecutable()->recompile();
+        }
+    }
 }
 
 } // namespace TI

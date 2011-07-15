@@ -32,9 +32,11 @@
 #include "Error.h"
 #include "TiFunction.h"
 #include "TiString.h"
-#include "PrototypeFunction.h"
-#include "dtoa.h"
+#include "TiStringBuilder.h"
 #include "Operations.h"
+#include "PrototypeFunction.h"
+#include "StringBuilder.h"
+#include "dtoa.h"
 #include <wtf/Assertions.h>
 #include <wtf/MathExtras.h>
 #include <wtf/Vector.h>
@@ -80,14 +82,16 @@ static UString integerPartNoExp(double d)
     bool resultIsInfOrNan = (decimalPoint == 9999);
     size_t length = strlen(result);
 
-    UString str = sign ? "-" : "";
+    StringBuilder builder;
+    builder.append(sign ? "-" : "");
     if (resultIsInfOrNan)
-        str += result;
+        builder.append((const char*)result);
     else if (decimalPoint <= 0)
-        str += "0";
+        builder.append("0");
     else {
         Vector<char, 1024> buf(decimalPoint + 1);
 
+        // FIXME: Remove use of strncpy()
         if (static_cast<int>(length) <= decimalPoint) {
             ASSERT(decimalPoint < 1024);
             memcpy(buf.data(), result, length);
@@ -96,10 +100,10 @@ static UString integerPartNoExp(double d)
             strncpy(buf.data(), result, decimalPoint);
         buf[decimalPoint] = '\0';
 
-        str.append(buf.data());
+        builder.append((const char*)(buf.data()));
     }
 
-    return str;
+    return builder.build();
 }
 
 static UString charSequence(char c, int count)
@@ -147,15 +151,34 @@ TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiVal
     if (!v)
         return throwError(exec, TypeError);
 
-    double radixAsDouble = args.at(0).toInteger(exec); // nan -> 0
-    if (radixAsDouble == 10 || args.at(0).isUndefined())
+    TiValue radixValue = args.at(0);
+    int radix;
+    if (radixValue.isInt32())
+        radix = radixValue.asInt32();
+    else if (radixValue.isUndefined())
+        radix = 10;
+    else
+        radix = static_cast<int>(radixValue.toInteger(exec)); // nan -> 0
+
+    if (radix == 10)
         return jsString(exec, v.toString(exec));
 
-    if (radixAsDouble < 2 || radixAsDouble > 36)
+    static const char* const digits = "0123456789abcdefghijklmnopqrstuvwxyz";
+
+    // Fast path for number to character conversion.
+    if (radix == 36) {
+        if (v.isInt32()) {
+            int x = v.asInt32();
+            if (static_cast<unsigned>(x) < 36) { // Exclude negatives
+                TiGlobalData* globalData = &exec->globalData();
+                return globalData->smallStrings.singleCharacterString(globalData, digits[x]);
+            }
+        }
+    }
+
+    if (radix < 2 || radix > 36)
         return throwError(exec, RangeError, "toString() radix argument must be between 2 and 36");
 
-    int radix = static_cast<int>(radixAsDouble);
-    const char digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
     // INT_MAX results in 1024 characters left of the dot with radix 2
     // give the same space on the right side. safety checks are in place
     // unless someone finds a precise rule.
@@ -243,13 +266,16 @@ TiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState* exec, TiObject*, TiValu
 
     UString s;
     if (x < 0) {
-        s.append('-');
+        s = "-";
         x = -x;
-    } else if (x == -0.0)
-        x = 0;
+    } else {
+        s = "";
+        if (x == -0.0)
+            x = 0;
+    }
 
     if (x >= pow(10.0, 21.0))
-        return jsString(exec, s + UString::from(x));
+        return jsString(exec, makeString(s, UString::from(x)));
 
     const double tenToTheF = pow(10.0, f);
     double n = floor(x * tenToTheF);
@@ -260,17 +286,19 @@ TiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState* exec, TiObject*, TiValu
 
     int k = m.size();
     if (k <= f) {
-        UString z;
+        StringBuilder z;
         for (int i = 0; i < f + 1 - k; i++)
             z.append('0');
-        m = z + m;
+        z.append(m);
+        m = z.build();
         k = f + 1;
-        ASSERT(k == m.size());
+        ASSERT(k == static_cast<int>(m.size()));
     }
     int kMinusf = k - f;
-    if (kMinusf < m.size())
-        return jsString(exec, s + m.substr(0, kMinusf) + "." + m.substr(kMinusf));
-    return jsString(exec, s + m.substr(0, kMinusf));
+
+    if (kMinusf < static_cast<int>(m.size()))
+        return jsString(exec, makeString(s, m.substr(0, kMinusf), ".", m.substr(kMinusf)));
+    return jsString(exec, makeString(s, m.substr(0, kMinusf)));
 }
 
 static void fractionalPartToString(char* buf, int& i, const char* result, int resultLength, int fractionalDigits)
@@ -398,7 +426,8 @@ TiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState* exec, TiObject*, Ti
     if (x < 0) {
         s = "-";
         x = -x;
-    }
+    } else
+        s = "";
 
     if (!(doublePrecision >= 1 && doublePrecision <= 21)) // true for NaN
         return throwError(exec, RangeError, "toPrecision() argument must be between 1 and 21");
@@ -429,10 +458,10 @@ TiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState* exec, TiObject*, Ti
         m = integerPartNoExp(n);
         if (e < -6 || e >= precision) {
             if (m.size() > 1)
-                m = m.substr(0, 1) + "." + m.substr(1);
+                m = makeString(m.substr(0, 1), ".", m.substr(1));
             if (e >= 0)
-                return jsNontrivialString(exec, s + m + "e+" + UString::from(e));
-            return jsNontrivialString(exec, s + m + "e-" + UString::from(-e));
+                return jsMakeNontrivialString(exec, s, m, "e+", UString::from(e));
+            return jsMakeNontrivialString(exec, s, m, "e-", UString::from(-e));
         }
     } else {
         m = charSequence('0', precision);
@@ -440,13 +469,13 @@ TiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState* exec, TiObject*, Ti
     }
 
     if (e == precision - 1)
-        return jsString(exec, s + m);
+        return jsString(exec, makeString(s, m));
     if (e >= 0) {
-        if (e + 1 < m.size())
-            return jsString(exec, s + m.substr(0, e + 1) + "." + m.substr(e + 1));
-        return jsString(exec, s + m);
+        if (e + 1 < static_cast<int>(m.size()))
+            return jsString(exec, makeString(s, m.substr(0, e + 1), ".", m.substr(e + 1)));
+        return jsString(exec, makeString(s, m));
     }
-    return jsNontrivialString(exec, s + "0." + charSequence('0', -(e + 1)) + m);
+    return jsMakeNontrivialString(exec, s, "0.", charSequence('0', -(e + 1)), m);
 }
 
 } // namespace TI

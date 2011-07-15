@@ -49,25 +49,15 @@ bool JSVariableObject::deleteProperty(TiExcState* exec, const Identifier& proper
     return TiObject::deleteProperty(exec, propertyName);
 }
 
-void JSVariableObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void JSVariableObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     SymbolTable::const_iterator end = symbolTable().end();
     for (SymbolTable::const_iterator it = symbolTable().begin(); it != end; ++it) {
-        if (!(it->second.getAttributes() & DontEnum))
+        if (!(it->second.getAttributes() & DontEnum) || (mode == IncludeDontEnumProperties))
             propertyNames.add(Identifier(exec, it->first.get()));
     }
     
-    TiObject::getOwnPropertyNames(exec, propertyNames);
-}
-
-bool JSVariableObject::getPropertyAttributes(TiExcState* exec, const Identifier& propertyName, unsigned& attributes) const
-{
-    SymbolTableEntry entry = symbolTable().get(propertyName.ustring().rep());
-    if (!entry.isNull()) {
-        attributes = entry.getAttributes() | DontDelete;
-        return true;
-    }
-    return TiObject::getPropertyAttributes(exec, propertyName, attributes);
+    TiObject::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
 bool JSVariableObject::isVariableObject() const

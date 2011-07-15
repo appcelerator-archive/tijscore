@@ -40,12 +40,11 @@
 
 namespace WTI {
 
-    // An interface to the embedding layer, which provides threading support.
-    class ChromiumThreading {
-    public:
-        static void initializeMainThread();
-        static void scheduleDispatchFunctionsOnMainThread();
-    };
+// An interface to the embedding layer, which provides threading support.
+class ChromiumThreading {
+public:
+    static void callOnMainThread(void (*func)(void*), void* context);
+};
 
 } // namespace WTI
 

@@ -8,6 +8,7 @@
 /*
  * Copyright (C) 2009 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Torch Mobile, Inc.
+ * Copyright (C) 2010 Company 100 Inc.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -44,6 +45,14 @@ typedef struct HPEN__* HPEN;
 typedef struct HRGN__* HRGN;
 #endif
 
+#if PLATFORM(BREWMP)
+// Forward delcarations at this point avoid the need to include BREW includes
+// in WTF headers.
+typedef struct _IFileMgr IFileMgr;
+typedef struct _IFile IFile;
+typedef struct IBitmap IBitmap;
+#endif
+
 namespace WTI {
 
     template <typename T> inline void deleteOwnedPtr(T* ptr)
@@ -61,6 +70,12 @@ namespace WTI {
     void deleteOwnedPtr(HPALETTE);
     void deleteOwnedPtr(HPEN);
     void deleteOwnedPtr(HRGN);
+#endif
+
+#if PLATFORM(BREWMP)
+    void deleteOwnedPtr(IFileMgr*);
+    void deleteOwnedPtr(IFile*);
+    void deleteOwnedPtr(IBitmap*);
 #endif
 
 } // namespace WTI

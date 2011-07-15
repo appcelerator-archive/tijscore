@@ -32,11 +32,13 @@
 #include "TiArray.h"
 #include "TiGlobalData.h"
 #include "JSVariableObject.h"
+#include "JSWeakObjectMapRefInternal.h"
 #include "NativeFunctionWrapper.h"
 #include "NumberPrototype.h"
 #include "StringPrototype.h"
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
+#include <wtf/RandomNumber.h>
 
 namespace TI {
 
@@ -63,6 +65,7 @@ namespace TI {
     class TiGlobalObject : public JSVariableObject {
     protected:
         using JSVariableObject::JSVariableObjectData;
+        typedef HashSet<RefPtr<OpaqueJSWeakObjectMap> > WeakMapSet;
 
         struct TiGlobalObjectData : public JSVariableObjectData {
             // We use an explicit destructor function pointer instead of a
@@ -97,6 +100,7 @@ namespace TI {
                 , datePrototype(0)
                 , regExpPrototype(0)
                 , methodCallDummy(0)
+                , weakRandom(static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
             {
             }
             
@@ -160,6 +164,8 @@ namespace TI {
             RefPtr<TiGlobalData> globalData;
 
             HashSet<GlobalCodeBlock*> codeBlocks;
+            WeakMapSet weakMaps;
+            WeakRandom weakRandom;
         };
 
     public:
@@ -256,11 +262,12 @@ namespace TI {
 
         virtual TiExcState* globalExec();
 
+        virtual bool shouldInterruptScriptBeforeTimeout() const { return false; }
         virtual bool shouldInterruptScript() const { return true; }
 
         virtual bool allowsAccessFrom(const TiGlobalObject*) const { return true; }
 
-        virtual bool isDynamicScope() const;
+        virtual bool isDynamicScope(bool& requiresDynamicChecks) const;
 
         HashSet<GlobalCodeBlock*>& codeBlocks() { return d()->codeBlocks; }
 
@@ -274,9 +281,20 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
+        void registerWeakMap(OpaqueJSWeakObjectMap* map)
+        {
+            d()->weakMaps.add(map);
+        }
+
+        void deregisterWeakMap(OpaqueJSWeakObjectMap* map)
+        {
+            d()->weakMaps.remove(map);
+        }
+
+        double weakRandomNumber() { return d()->weakRandom.get(); }
     protected:
 
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
@@ -420,10 +438,20 @@ namespace TI {
     {
         return new (exec) TiObject(exec->lexicalGlobalObject()->emptyObjectStructure());
     }
+    
+    inline TiObject* constructEmptyObject(TiExcState* exec, TiGlobalObject* globalObject)
+    {
+        return new (exec) TiObject(globalObject->emptyObjectStructure());
+    }
 
     inline TiArray* constructEmptyArray(TiExcState* exec)
     {
         return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure());
+    }
+    
+    inline TiArray* constructEmptyArray(TiExcState* exec, TiGlobalObject* globalObject)
+    {
+        return new (exec) TiArray(globalObject->arrayStructure());
     }
 
     inline TiArray* constructEmptyArray(TiExcState* exec, unsigned initialLength)
@@ -445,18 +473,7 @@ namespace TI {
 
     class DynamicGlobalObjectScope : public Noncopyable {
     public:
-        DynamicGlobalObjectScope(CallFrame* callFrame, TiGlobalObject* dynamicGlobalObject) 
-            : m_dynamicGlobalObjectSlot(callFrame->globalData().dynamicGlobalObject)
-            , m_savedDynamicGlobalObject(m_dynamicGlobalObjectSlot)
-        {
-            if (!m_dynamicGlobalObjectSlot) {
-                m_dynamicGlobalObjectSlot = dynamicGlobalObject;
-
-                // Reset the date cache between JS invocations to force the VM
-                // to observe time zone changes.
-                callFrame->globalData().resetDateCache();
-            }
-        }
+        DynamicGlobalObjectScope(CallFrame* callFrame, TiGlobalObject* dynamicGlobalObject);
 
         ~DynamicGlobalObjectScope()
         {

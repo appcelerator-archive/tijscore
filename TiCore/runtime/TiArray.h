@@ -38,7 +38,8 @@ namespace TI {
         unsigned m_length;
         unsigned m_numValuesInVector;
         SparseArrayValueMap* m_sparseValueMap;
-        void* lazyCreationData; // A TiArray subclass can use this to fill the vector lazily.
+        void* subclassData; // A TiArray subclass can use this to fill the vector lazily.
+        size_t reportedMapCapacity;
         TiValue m_vector[1];
     };
 
@@ -94,7 +95,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
         
         inline void markChildrenDirect(MarkStack& markStack);
@@ -104,11 +105,11 @@ namespace TI {
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
         virtual bool deleteProperty(TiExcState*, unsigned propertyName);
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         virtual void markChildren(MarkStack&);
 
-        void* lazyCreationData();
-        void setLazyCreationData(void*);
+        void* subclassData() const;
+        void setSubclassData(void*);
 
     private:
         virtual const ClassInfo* classInfo() const { return &info; }

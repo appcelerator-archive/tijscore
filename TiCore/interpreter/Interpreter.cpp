@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -47,6 +47,7 @@
 #include "DebuggerCallFrame.h"
 #include "EvalCodeCache.h"
 #include "ExceptionHelpers.h"
+#include "GetterSetter.h"
 #include "GlobalEvalFunction.h"
 #include "JSActivation.h"
 #include "TiArray.h"
@@ -73,19 +74,25 @@
 #include "JIT.h"
 #endif
 
+#define WTF_USE_GCC_COMPUTED_GOTO_WORKAROUND (ENABLE(COMPUTED_GOTO_INTERPRETER) && !defined(__llvm__))
+
 using namespace std;
 
 namespace TI {
-
-static ALWAYS_INLINE unsigned bytecodeOffsetForPC(CallFrame* callFrame, CodeBlock* codeBlock, void* pc)
-{
+    
 #if ENABLE(JIT)
-    return codeBlock->getBytecodeIndex(callFrame, ReturnAddressPtr(pc));
-#else
-    UNUSED_PARAM(callFrame);
-    return static_cast<Instruction*>(pc) - codeBlock->instructions().begin();
+    static ALWAYS_INLINE unsigned bytecodeOffsetForPC(CallFrame* callFrame, CodeBlock* codeBlock, ReturnAddressPtr pc)
+    {
+        return codeBlock->getBytecodeIndex(callFrame, ReturnAddressPtr(pc));
+    }
 #endif
-}
+#if ENABLE(INTERPRETER)
+    static ALWAYS_INLINE unsigned bytecodeOffsetForPC(CallFrame* callFrame, CodeBlock* codeBlock, Instruction* pc)
+    {
+        UNUSED_PARAM(callFrame);
+        return pc - codeBlock->instructions().begin();
+    }
+#endif
 
 // Returns the depth of the scope chain within a given call frame.
 static int depth(CodeBlock* codeBlock, ScopeChain& sc)
@@ -95,7 +102,12 @@ static int depth(CodeBlock* codeBlock, ScopeChain& sc)
     return sc.localDepth();
 }
 
-#if USE(INTERPRETER)
+#if ENABLE(INTERPRETER) 
+static NEVER_INLINE TiValue concatenateStrings(TiExcState* exec, Register* strings, unsigned count)
+{
+    return jsString(exec, strings, count);
+}
+
 NEVER_INLINE bool Interpreter::resolve(CallFrame* callFrame, Instruction* vPC, TiValue& exceptionValue)
 {
     int dst = vPC[1].u.operand;
@@ -176,7 +188,7 @@ NEVER_INLINE bool Interpreter::resolveGlobal(CallFrame* callFrame, Instruction* 
     PropertySlot slot(globalObject);
     if (globalObject->getPropertySlot(callFrame, ident, slot)) {
         TiValue result = slot.getValue(callFrame, ident);
-        if (slot.isCacheable() && !globalObject->structure()->isUncacheableDictionary() && slot.slotBase() == globalObject) {
+        if (slot.isCacheableValue() && !globalObject->structure()->isUncacheableDictionary() && slot.slotBase() == globalObject) {
             if (vPC[4].u.structure)
                 vPC[4].u.structure->deref();
             globalObject->structure()->ref();
@@ -193,6 +205,76 @@ NEVER_INLINE bool Interpreter::resolveGlobal(CallFrame* callFrame, Instruction* 
         return true;
     }
 
+    exceptionValue = createUndefinedVariableError(callFrame, ident, vPC - codeBlock->instructions().begin(), codeBlock);
+    return false;
+}
+
+NEVER_INLINE bool Interpreter::resolveGlobalDynamic(CallFrame* callFrame, Instruction* vPC, TiValue& exceptionValue)
+{
+    int dst = vPC[1].u.operand;
+    TiGlobalObject* globalObject = static_cast<TiGlobalObject*>(vPC[2].u.jsCell);
+    ASSERT(globalObject->isGlobalObject());
+    int property = vPC[3].u.operand;
+    Structure* structure = vPC[4].u.structure;
+    int offset = vPC[5].u.operand;
+    CodeBlock* codeBlock = callFrame->codeBlock();
+    int skip = vPC[6].u.operand + codeBlock->needsFullScopeChain();
+    
+    ScopeChainNode* scopeChain = callFrame->scopeChain();
+    ScopeChainIterator iter = scopeChain->begin();
+    ScopeChainIterator end = scopeChain->end();
+    ASSERT(iter != end);
+    while (skip--) {
+        TiObject* o = *iter;
+        if (o->hasCustomProperties()) {
+            Identifier& ident = codeBlock->identifier(property);
+            do {
+                PropertySlot slot(o);
+                if (o->getPropertySlot(callFrame, ident, slot)) {
+                    TiValue result = slot.getValue(callFrame, ident);
+                    exceptionValue = callFrame->globalData().exception;
+                    if (exceptionValue)
+                        return false;
+                    callFrame->r(dst) = TiValue(result);
+                    return true;
+                }
+                if (iter == end)
+                    break;
+                o = *iter;
+                ++iter;
+            } while (true);
+            exceptionValue = createUndefinedVariableError(callFrame, ident, vPC - codeBlock->instructions().begin(), codeBlock);
+            return false;
+        }
+        ++iter;
+    }
+    
+    if (structure == globalObject->structure()) {
+        callFrame->r(dst) = TiValue(globalObject->getDirectOffset(offset));
+        return true;
+    }
+
+    Identifier& ident = codeBlock->identifier(property);
+    PropertySlot slot(globalObject);
+    if (globalObject->getPropertySlot(callFrame, ident, slot)) {
+        TiValue result = slot.getValue(callFrame, ident);
+        if (slot.isCacheableValue() && !globalObject->structure()->isUncacheableDictionary() && slot.slotBase() == globalObject) {
+            if (vPC[4].u.structure)
+                vPC[4].u.structure->deref();
+            globalObject->structure()->ref();
+            vPC[4] = globalObject->structure();
+            vPC[5] = slot.cachedOffset();
+            callFrame->r(dst) = TiValue(result);
+            return true;
+        }
+        
+        exceptionValue = callFrame->globalData().exception;
+        if (exceptionValue)
+            return false;
+        callFrame->r(dst) = TiValue(result);
+        return true;
+    }
+    
     exceptionValue = createUndefinedVariableError(callFrame, ident, vPC - codeBlock->instructions().begin(), codeBlock);
     return false;
 }
@@ -240,7 +322,7 @@ NEVER_INLINE bool Interpreter::resolveBaseAndProperty(CallFrame* callFrame, Inst
     return false;
 }
 
-#endif // USE(INTERPRETER)
+#endif // ENABLE(INTERPRETER)
 
 ALWAYS_INLINE CallFrame* Interpreter::slideRegisterWindowForCall(CodeBlock* newCodeBlock, RegisterFile* registerFile, CallFrame* callFrame, size_t registerOffset, int argc)
 {
@@ -279,7 +361,7 @@ ALWAYS_INLINE CallFrame* Interpreter::slideRegisterWindowForCall(CodeBlock* newC
     return CallFrame::create(r);
 }
 
-#if USE(INTERPRETER)
+#if ENABLE(INTERPRETER)
 static NEVER_INLINE bool isInvalidParamForIn(CallFrame* callFrame, CodeBlock* codeBlock, const Instruction* vPC, TiValue value, TiValue& exceptionData)
 {
     if (value.isObject())
@@ -307,7 +389,9 @@ NEVER_INLINE TiValue Interpreter::callEval(CallFrame* callFrame, RegisterFile* r
     if (!program.isString())
         return program;
 
-    UString programSource = asString(program)->value();
+    UString programSource = asString(program)->value(callFrame);
+    if (callFrame->hadException())
+        return TiValue();
 
     LiteralParser preparser(callFrame, programSource, LiteralParser::NonStrictJSON);
     if (TiValue parsedObject = preparser.tryLiteralParse())
@@ -328,7 +412,13 @@ Interpreter::Interpreter()
     : m_sampleEntryDepth(0)
     , m_reentryDepth(0)
 {
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
     privateExecute(InitializeAndReturn, 0, 0, 0);
+
+    for (int i = 0; i < numOpcodeIDs; ++i)
+        m_opcodeIDTable.add(m_opcodeTable[i], static_cast<OpcodeID>(i));
+#endif // ENABLE(COMPUTED_GOTO_INTERPRETER)
+
 #if ENABLE(OPCODE_SAMPLING)
     enableSampler();
 #endif
@@ -437,7 +527,7 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
 
 bool Interpreter::isOpcode(Opcode opcode)
 {
-#if HAVE(COMPUTED_GOTO)
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
     return opcode != HashTraits<Opcode>::emptyValue()
         && !HashTraits<Opcode>::isDeletedValue(opcode)
         && m_opcodeIDTable.contains(opcode);
@@ -479,13 +569,24 @@ NEVER_INLINE bool Interpreter::unwindCallFrame(CallFrame*& callFrame, TiValue ex
     if (oldCodeBlock->needsFullScopeChain())
         scopeChain->deref();
 
-    void* returnPC = callFrame->returnPC();
-    callFrame = callFrame->callerFrame();
-    if (callFrame->hasHostCallFrameFlag())
+    TiExcState* callerFrame = callFrame->callerFrame();
+    if (callerFrame->hasHostCallFrameFlag())
         return false;
 
-    codeBlock = callFrame->codeBlock();
-    bytecodeOffset = bytecodeOffsetForPC(callFrame, codeBlock, returnPC);
+    codeBlock = callerFrame->codeBlock();
+#if ENABLE(JIT)
+#if ENABLE(INTERPRETER)
+    if (callerFrame->globalData().canUseJIT())
+#endif
+        bytecodeOffset = bytecodeOffsetForPC(callerFrame, codeBlock, callFrame->returnPC());
+#if ENABLE(INTERPRETER)
+    else
+        bytecodeOffset = bytecodeOffsetForPC(callerFrame, codeBlock, callFrame->returnVPC());
+#endif
+#else
+    bytecodeOffset = codeBlock->bytecodeOffset(callerFrame, callFrame->returnVPC());
+#endif
+    callFrame = callerFrame;
     return true;
 }
 
@@ -522,8 +623,9 @@ NEVER_INLINE HandlerInfo* Interpreter::throwException(CallFrame*& callFrame, TiV
                 exception->putWithAttributes(callFrame, Identifier(callFrame, "sourceId"), jsNumber(callFrame, codeBlock->ownerExecutable()->sourceID()), ReadOnly | DontDelete);
                 exception->putWithAttributes(callFrame, Identifier(callFrame, "sourceURL"), jsOwnedString(callFrame, codeBlock->ownerExecutable()->sourceURL()), ReadOnly | DontDelete);
             }
-            
-            if (exception->isWatchdogException()) {
+
+            ComplType exceptionType = exception->exceptionType();
+            if (exceptionType == Interrupted || exceptionType == Terminated) {
                 while (unwindCallFrame(callFrame, exceptionValue, bytecodeOffset, codeBlock)) {
                     // Don't need handler checks or anything, we just want to unroll all the JS callframes possible.
                 }
@@ -534,22 +636,32 @@ NEVER_INLINE HandlerInfo* Interpreter::throwException(CallFrame*& callFrame, TiV
 
     if (Debugger* debugger = callFrame->dynamicGlobalObject()->debugger()) {
         DebuggerCallFrame debuggerCallFrame(callFrame, exceptionValue);
-        debugger->exception(debuggerCallFrame, codeBlock->ownerExecutable()->sourceID(), codeBlock->lineNumberForBytecodeOffset(callFrame, bytecodeOffset));
+        bool hasHandler = codeBlock->handlerForBytecodeOffset(bytecodeOffset);
+        debugger->exception(debuggerCallFrame, codeBlock->ownerExecutable()->sourceID(), codeBlock->lineNumberForBytecodeOffset(callFrame, bytecodeOffset), hasHandler);
     }
 
     // If we throw in the middle of a call instruction, we need to notify
     // the profiler manually that the call instruction has returned, since
     // we'll never reach the relevant op_profile_did_call.
     if (Profiler* profiler = *Profiler::enabledProfilerReference()) {
-#if !ENABLE(JIT)
-        if (isCallBytecode(codeBlock->instructions()[bytecodeOffset].u.opcode))
-            profiler->didExecute(callFrame, callFrame->r(codeBlock->instructions()[bytecodeOffset + 2].u.operand).jsValue());
-        else if (codeBlock->instructions()[bytecodeOffset + 8].u.opcode == getOpcode(op_construct))
-            profiler->didExecute(callFrame, callFrame->r(codeBlock->instructions()[bytecodeOffset + 10].u.operand).jsValue());
-#else
-        int functionRegisterIndex;
-        if (codeBlock->functionRegisterForBytecodeOffset(bytecodeOffset, functionRegisterIndex))
-            profiler->didExecute(callFrame, callFrame->r(functionRegisterIndex).jsValue());
+#if ENABLE(INTERPRETER)
+        if (!callFrame->globalData().canUseJIT()) {
+            // FIXME: Why 8? - work out what this magic value is, replace the constant with something more helpful.
+            if (isCallBytecode(codeBlock->instructions()[bytecodeOffset].u.opcode))
+                profiler->didExecute(callFrame, callFrame->r(codeBlock->instructions()[bytecodeOffset + 1].u.operand).jsValue());
+            else if (codeBlock->instructions().size() > (bytecodeOffset + 8) && codeBlock->instructions()[bytecodeOffset + 8].u.opcode == getOpcode(op_construct))
+                profiler->didExecute(callFrame, callFrame->r(codeBlock->instructions()[bytecodeOffset + 9].u.operand).jsValue());
+        }
+#if ENABLE(JIT)
+        else
+#endif
+#endif
+#if ENABLE(JIT)
+        {
+            int functionRegisterIndex;
+            if (codeBlock->functionRegisterForBytecodeOffset(bytecodeOffset, functionRegisterIndex))
+                profiler->didExecute(callFrame, callFrame->r(functionRegisterIndex).jsValue());
+        }
 #endif
     }
 
@@ -578,8 +690,8 @@ TiValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, S
 {
     ASSERT(!scopeChain->globalData->exception);
 
-    if (m_reentryDepth >= MaxSecondaryThreadReentryDepth) {
-        if (!isMainThread() || m_reentryDepth >= MaxMainThreadReentryDepth) {
+    if (m_reentryDepth >= MaxSmallThreadReentryDepth) {
+        if (m_reentryDepth >= callFrame->globalData().maxReentryDepth) {
             *exception = createStackOverflowError(callFrame);
             return jsNull();
         }
@@ -615,12 +727,20 @@ TiValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, S
     {
         SamplingTool::CallRecord callRecord(m_sampler.get());
 
-        m_reentryDepth++;
+        m_reentryDepth++;  
 #if ENABLE(JIT)
-        result = program->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
-#else
-        result = privateExecute(Normal, &m_registerFile, newCallFrame, exception);
+#if ENABLE(INTERPRETER)
+        if (callFrame->globalData().canUseJIT())
 #endif
+            result = program->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
+#if ENABLE(INTERPRETER)
+        else
+#endif
+#endif
+#if ENABLE(INTERPRETER)
+            result = privateExecute(Normal, &m_registerFile, newCallFrame, exception);
+#endif
+
         m_reentryDepth--;
     }
 
@@ -639,8 +759,8 @@ TiValue Interpreter::execute(FunctionExecutable* functionExecutable, CallFrame* 
 {
     ASSERT(!scopeChain->globalData->exception);
 
-    if (m_reentryDepth >= MaxSecondaryThreadReentryDepth) {
-        if (!isMainThread() || m_reentryDepth >= MaxMainThreadReentryDepth) {
+    if (m_reentryDepth >= MaxSmallThreadReentryDepth) {
+        if (m_reentryDepth >= callFrame->globalData().maxReentryDepth) {
             *exception = createStackOverflowError(callFrame);
             return jsNull();
         }
@@ -683,8 +803,15 @@ TiValue Interpreter::execute(FunctionExecutable* functionExecutable, CallFrame* 
 
         m_reentryDepth++;
 #if ENABLE(JIT)
-        result = functionExecutable->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
-#else
+#if ENABLE(INTERPRETER)
+        if (scopeChain->globalData->canUseJIT())
+#endif
+            result = functionExecutable->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
+#if ENABLE(INTERPRETER)
+        else
+#endif
+#endif
+#if ENABLE(INTERPRETER)
         result = privateExecute(Normal, &m_registerFile, newCallFrame, exception);
 #endif
         m_reentryDepth--;
@@ -701,8 +828,8 @@ CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* FunctionE
 {
     ASSERT(!scopeChain->globalData->exception);
     
-    if (m_reentryDepth >= MaxSecondaryThreadReentryDepth) {
-        if (!isMainThread() || m_reentryDepth >= MaxMainThreadReentryDepth) {
+    if (m_reentryDepth >= MaxSmallThreadReentryDepth) {
+        if (m_reentryDepth >= callFrame->globalData().maxReentryDepth) {
             *exception = createStackOverflowError(callFrame);
             return CallFrameClosure();
         }
@@ -729,11 +856,13 @@ CallFrameClosure Interpreter::prepareForRepeatCall(FunctionExecutable* FunctionE
         return CallFrameClosure();
     }
     // a 0 codeBlock indicates a built-in caller
-    newCallFrame->init(codeBlock, 0, scopeChain, callFrame->addHostCallFrameFlag(), 0, argc, function);
+    newCallFrame->init(codeBlock, 0, scopeChain, callFrame->addHostCallFrameFlag(), 0, argc, function);  
 #if ENABLE(JIT)
-    FunctionExecutable->jitCode(newCallFrame, scopeChain);
+#if ENABLE(INTERPRETER)
+    if (callFrame->globalData().canUseJIT())
 #endif
-
+        FunctionExecutable->jitCode(newCallFrame, scopeChain);
+#endif
     CallFrameClosure result = { callFrame, newCallFrame, function, FunctionExecutable, scopeChain->globalData, oldEnd, scopeChain, codeBlock->m_numParameters, argc };
     return result;
 }
@@ -749,11 +878,18 @@ TiValue Interpreter::execute(CallFrameClosure& closure, TiValue* exception)
     {
         SamplingTool::CallRecord callRecord(m_sampler.get());
         
-        m_reentryDepth++;
+        m_reentryDepth++;  
 #if ENABLE(JIT)
-        result = closure.functionExecutable->generatedJITCode().execute(&m_registerFile, closure.newCallFrame, closure.globalData, exception);
-#else
-        result = privateExecute(Normal, &m_registerFile, closure.newCallFrame, exception);
+#if ENABLE(INTERPRETER)
+        if (closure.newCallFrame->globalData().canUseJIT())
+#endif
+            result = closure.functionExecutable->generatedJITCode().execute(&m_registerFile, closure.newCallFrame, closure.globalData, exception);
+#if ENABLE(INTERPRETER)
+        else
+#endif
+#endif
+#if ENABLE(INTERPRETER)
+            result = privateExecute(Normal, &m_registerFile, closure.newCallFrame, exception);
 #endif
         m_reentryDepth--;
     }
@@ -777,8 +913,8 @@ TiValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, TiObjec
 {
     ASSERT(!scopeChain->globalData->exception);
 
-    if (m_reentryDepth >= MaxSecondaryThreadReentryDepth) {
-        if (!isMainThread() || m_reentryDepth >= MaxMainThreadReentryDepth) {
+    if (m_reentryDepth >= MaxSmallThreadReentryDepth) {
+        if (m_reentryDepth >= callFrame->globalData().maxReentryDepth) {
             *exception = createStackOverflowError(callFrame);
             return jsNull();
         }
@@ -797,11 +933,12 @@ TiValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, TiObjec
         }
     }
 
-    { // Scope for BatchedTransitionOptimizer
-
+    unsigned numVariables = codeBlock->numVariables();
+    int numFunctions = codeBlock->numberOfFunctionDecls();
+    if (numVariables || numFunctions) {
+        // Scope for BatchedTransitionOptimizer
         BatchedTransitionOptimizer optimizer(variableObject);
 
-        unsigned numVariables = codeBlock->numVariables();
         for (unsigned i = 0; i < numVariables; ++i) {
             const Identifier& ident = codeBlock->variable(i);
             if (!variableObject->hasProperty(callFrame, ident)) {
@@ -810,13 +947,11 @@ TiValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, TiObjec
             }
         }
 
-        int numFunctions = codeBlock->numberOfFunctionDecls();
         for (int i = 0; i < numFunctions; ++i) {
             FunctionExecutable* function = codeBlock->functionDecl(i);
             PutPropertySlot slot;
             variableObject->put(callFrame, function->name(), function->make(callFrame, scopeChain), slot);
         }
-
     }
 
     Register* oldEnd = m_registerFile.end();
@@ -844,10 +979,18 @@ TiValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, TiObjec
         SamplingTool::CallRecord callRecord(m_sampler.get());
 
         m_reentryDepth++;
+        
 #if ENABLE(JIT)
-        result = eval->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
-#else
-        result = privateExecute(Normal, &m_registerFile, newCallFrame, exception);
+#if ENABLE(INTERPRETER)
+        if (callFrame->globalData().canUseJIT())
+#endif
+            result = eval->jitCode(newCallFrame, scopeChain).execute(&m_registerFile, newCallFrame, scopeChain->globalData, exception);
+#if ENABLE(INTERPRETER)
+        else
+#endif
+#endif
+#if ENABLE(INTERPRETER)
+            result = privateExecute(Normal, &m_registerFile, newCallFrame, exception);
 #endif
         m_reentryDepth--;
     }
@@ -887,7 +1030,7 @@ NEVER_INLINE void Interpreter::debug(CallFrame* callFrame, DebugHookID debugHook
     }
 }
     
-#if USE(INTERPRETER)
+#if ENABLE(INTERPRETER)
 NEVER_INLINE ScopeChainNode* Interpreter::createExceptionScope(CallFrame* callFrame, const Instruction* vPC)
 {
     int dst = vPC[1].u.operand;
@@ -1029,8 +1172,20 @@ NEVER_INLINE void Interpreter::tryCacheGetByID(CallFrame* callFrame, CodeBlock* 
     // Cache hit: Specialize instruction and ref Structures.
 
     if (slot.slotBase() == baseValue) {
-        vPC[0] = getOpcode(op_get_by_id_self);
-        vPC[5] = slot.cachedOffset();
+        switch (slot.cachedPropertyType()) {
+        case PropertySlot::Getter:
+            vPC[0] = getOpcode(op_get_by_id_getter_self);
+            vPC[5] = slot.cachedOffset();
+            break;
+        case PropertySlot::Custom:
+            vPC[0] = getOpcode(op_get_by_id_custom_self);
+            vPC[5] = slot.customGetter();
+            break;
+        default:
+            vPC[0] = getOpcode(op_get_by_id_self);
+            vPC[5] = slot.cachedOffset();
+            break;
+        }
 
         codeBlock->refStructures(vPC);
         return;
@@ -1045,33 +1200,62 @@ NEVER_INLINE void Interpreter::tryCacheGetByID(CallFrame* callFrame, CodeBlock* 
         ASSERT(slot.slotBase().isObject());
 
         TiObject* baseObject = asObject(slot.slotBase());
+        size_t offset = slot.cachedOffset();
 
         // Since we're accessing a prototype in a loop, it's a good bet that it
         // should not be treated as a dictionary.
-        if (baseObject->structure()->isDictionary())
+        if (baseObject->structure()->isDictionary()) {
             baseObject->flattenDictionaryObject();
+            offset = baseObject->structure()->get(propertyName);
+        }
 
         ASSERT(!baseObject->structure()->isUncacheableDictionary());
-
-        vPC[0] = getOpcode(op_get_by_id_proto);
+        
+        switch (slot.cachedPropertyType()) {
+        case PropertySlot::Getter:
+            vPC[0] = getOpcode(op_get_by_id_getter_proto);
+            vPC[6] = offset;
+            break;
+        case PropertySlot::Custom:
+            vPC[0] = getOpcode(op_get_by_id_custom_proto);
+            vPC[6] = slot.customGetter();
+            break;
+        default:
+            vPC[0] = getOpcode(op_get_by_id_proto);
+            vPC[6] = offset;
+            break;
+        }
         vPC[5] = baseObject->structure();
-        vPC[6] = slot.cachedOffset();
 
         codeBlock->refStructures(vPC);
         return;
     }
 
-    size_t count = normalizePrototypeChain(callFrame, baseValue, slot.slotBase());
+    size_t offset = slot.cachedOffset();
+    size_t count = normalizePrototypeChain(callFrame, baseValue, slot.slotBase(), propertyName, offset);
     if (!count) {
         vPC[0] = getOpcode(op_get_by_id_generic);
         return;
     }
 
-    vPC[0] = getOpcode(op_get_by_id_chain);
+    
+    switch (slot.cachedPropertyType()) {
+    case PropertySlot::Getter:
+        vPC[0] = getOpcode(op_get_by_id_getter_chain);
+        vPC[7] = offset;
+        break;
+    case PropertySlot::Custom:
+        vPC[0] = getOpcode(op_get_by_id_custom_chain);
+        vPC[7] = slot.customGetter();
+        break;
+    default:
+        vPC[0] = getOpcode(op_get_by_id_chain);
+        vPC[7] = offset;
+        break;
+    }
     vPC[4] = structure;
     vPC[5] = structure->prototypeChain(callFrame);
     vPC[6] = count;
-    vPC[7] = slot.cachedOffset();
     codeBlock->refStructures(vPC);
 }
 
@@ -1082,31 +1266,32 @@ NEVER_INLINE void Interpreter::uncacheGetByID(CodeBlock* codeBlock, Instruction*
     vPC[4] = 0;
 }
 
-#endif // USE(INTERPRETER)
+#endif // ENABLE(INTERPRETER)
 
 TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFile, CallFrame* callFrame, TiValue* exception)
 {
     // One-time initialization of our address tables. We have to put this code
     // here because our labels are only in scope inside this function.
-    if (flag == InitializeAndReturn) {
-        #if HAVE(COMPUTED_GOTO)
-            #define ADD_BYTECODE(id, length) m_opcodeTable[id] = &&id;
-                FOR_EACH_OPCODE_ID(ADD_BYTECODE);
-            #undef ADD_BYTECODE
-
-            #define ADD_OPCODE_ID(id, length) m_opcodeIDTable.add(&&id, id);
-                FOR_EACH_OPCODE_ID(ADD_OPCODE_ID);
-            #undef ADD_OPCODE_ID
-            ASSERT(m_opcodeIDTable.size() == numOpcodeIDs);
-        #endif // HAVE(COMPUTED_GOTO)
+    if (UNLIKELY(flag == InitializeAndReturn)) {
+        #if ENABLE(COMPUTED_GOTO_INTERPRETER)
+            #define LIST_OPCODE_LABEL(id, length) &&id,
+                static Opcode labels[] = { FOR_EACH_OPCODE_ID(LIST_OPCODE_LABEL) };
+                for (size_t i = 0; i < sizeof(labels) / sizeof(Opcode); ++i)
+                    m_opcodeTable[i] = labels[i];
+            #undef LIST_OPCODE_LABEL
+        #endif // ENABLE(COMPUTED_GOTO_INTERPRETER)
         return TiValue();
     }
-
+    
 #if ENABLE(JIT)
+#if ENABLE(INTERPRETER)
     // Mixing Interpreter + JIT is not supported.
-    ASSERT_NOT_REACHED();
+    if (callFrame->globalData().canUseJIT())
 #endif
-#if !USE(INTERPRETER)
+        ASSERT_NOT_REACHED();
+#endif
+
+#if !ENABLE(INTERPRETER)
     UNUSED_PARAM(registerFile);
     UNUSED_PARAM(callFrame);
     UNUSED_PARAM(exception);
@@ -1135,7 +1320,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
 
 #define CHECK_FOR_TIMEOUT() \
     if (!--tickCount) { \
-        if (globalData->timeoutChecker.didTimeOut(callFrame)) { \
+        if (globalData->terminator.shouldTerminate() || globalData->timeoutChecker.didTimeOut(callFrame)) { \
             exceptionValue = jsNull(); \
             goto vm_throw; \
         } \
@@ -1148,7 +1333,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
     #define SAMPLE(codeBlock, vPC)
 #endif
 
-#if HAVE(COMPUTED_GOTO)
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
     #define NEXT_INSTRUCTION() SAMPLE(callFrame->codeBlock(), vPC); goto *vPC->u.opcode
 #if ENABLE(OPCODE_STATS)
     #define DEFINE_OPCODE(opcode) opcode: OpcodeStats::recordInstruction(opcode);
@@ -1313,7 +1498,9 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int dst = vPC[1].u.operand;
         TiValue src1 = callFrame->r(vPC[2].u.operand).jsValue();
         TiValue src2 = callFrame->r(vPC[3].u.operand).jsValue();
-        callFrame->r(dst) = jsBoolean(TiValue::strictEqual(src1, src2));
+        bool result = TiValue::strictEqual(callFrame, src1, src2);
+        CHECK_FOR_EXCEPTION();
+        callFrame->r(dst) = jsBoolean(result);
 
         vPC += OPCODE_LENGTH(op_stricteq);
         NEXT_INSTRUCTION();
@@ -1328,7 +1515,9 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int dst = vPC[1].u.operand;
         TiValue src1 = callFrame->r(vPC[2].u.operand).jsValue();
         TiValue src2 = callFrame->r(vPC[3].u.operand).jsValue();
-        callFrame->r(dst) = jsBoolean(!TiValue::strictEqual(src1, src2));
+        bool result = !TiValue::strictEqual(callFrame, src1, src2);
+        CHECK_FOR_EXCEPTION();
+        callFrame->r(dst) = jsBoolean(result);
 
         vPC += OPCODE_LENGTH(op_nstricteq);
         NEXT_INSTRUCTION();
@@ -1481,7 +1670,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         */
         int dst = vPC[1].u.operand;
         TiValue src = callFrame->r(vPC[2].u.operand).jsValue();
-        if (src.isInt32() && src.asInt32())
+        if (src.isInt32() && (src.asInt32() & 0x7fffffff)) // non-zero and no overflow
             callFrame->r(dst) = jsNumber(callFrame, -src.asInt32());
         else {
             TiValue result = jsNumber(callFrame, -src.toNumber(callFrame));
@@ -1963,6 +2152,24 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         
         NEXT_INSTRUCTION();
     }
+    DEFINE_OPCODE(op_resolve_global_dynamic) {
+        /* resolve_skip dst(r) globalObject(c) property(id) structure(sID) offset(n), depth(n)
+         
+         Performs a dynamic property lookup for the given property, on the provided
+         global object.  If structure matches the Structure of the global then perform
+         a fast lookup using the case offset, otherwise fall back to a full resolve and
+         cache the new structure and offset.
+         
+         This walks through n levels of the scope chain to verify that none of those levels
+         in the scope chain include dynamically added properties.
+         */
+        if (UNLIKELY(!resolveGlobalDynamic(callFrame, vPC, exceptionValue)))
+            goto vm_throw;
+        
+        vPC += OPCODE_LENGTH(op_resolve_global_dynamic);
+        
+        NEXT_INSTRUCTION();
+    }
     DEFINE_OPCODE(op_get_global_var) {
         /* get_global_var dst(r) globalObject(c) index(n)
 
@@ -1990,7 +2197,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         scope->registerAt(index) = TiValue(callFrame->r(value).jsValue());
         vPC += OPCODE_LENGTH(op_put_global_var);
         NEXT_INSTRUCTION();
-    }            
+    }
     DEFINE_OPCODE(op_get_scoped_var) {
         /* get_scoped_var dst(r) index(n) skip(n)
 
@@ -2009,7 +2216,6 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             ++iter;
             ASSERT(iter != end);
         }
-
         ASSERT((*iter)->isVariableObject());
         JSVariableObject* scope = static_cast<JSVariableObject*>(*iter);
         callFrame->r(dst) = scope->registerAt(index);
@@ -2160,6 +2366,93 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         uncacheGetByID(callFrame->codeBlock(), vPC);
         NEXT_INSTRUCTION();
     }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_getter_proto);
+#endif
+    DEFINE_OPCODE(op_get_by_id_getter_proto) {
+        /* op_get_by_id_getter_proto dst(r) base(r) property(id) structure(sID) prototypeStructure(sID) offset(n) nop(n)
+         
+         Cached property access: Attempts to get a cached getter property from the
+         value base's prototype. If the cache misses, op_get_by_id_getter_proto
+         reverts to op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                ASSERT(structure->prototypeForLookup(callFrame).isObject());
+                TiObject* protoObject = asObject(structure->prototypeForLookup(callFrame));
+                Structure* prototypeStructure = vPC[5].u.structure;
+                
+                if (LIKELY(protoObject->structure() == prototypeStructure)) {
+                    int dst = vPC[1].u.operand;
+                    int offset = vPC[6].u.operand;
+                    if (GetterSetter* getterSetter = asGetterSetter(protoObject->getDirectOffset(offset).asCell())) {
+                        TiObject* getter = getterSetter->getter();
+                        CallData callData;
+                        CallType callType = getter->getCallData(callData);
+                        TiValue result = call(callFrame, getter, callType, callData, asObject(baseCell), ArgList());
+                        CHECK_FOR_EXCEPTION();
+                        callFrame->r(dst) = result;
+                    } else
+                        callFrame->r(dst) = jsUndefined();
+                    vPC += OPCODE_LENGTH(op_get_by_id_getter_proto);
+                    NEXT_INSTRUCTION();
+                }
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    skip_id_getter_proto:
+#endif
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_custom_proto);
+#endif
+    DEFINE_OPCODE(op_get_by_id_custom_proto) {
+        /* op_get_by_id_custom_proto dst(r) base(r) property(id) structure(sID) prototypeStructure(sID) offset(n) nop(n)
+         
+         Cached property access: Attempts to use a cached named property getter
+         from the value base's prototype. If the cache misses, op_get_by_id_custom_proto
+         reverts to op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                ASSERT(structure->prototypeForLookup(callFrame).isObject());
+                TiObject* protoObject = asObject(structure->prototypeForLookup(callFrame));
+                Structure* prototypeStructure = vPC[5].u.structure;
+                
+                if (LIKELY(protoObject->structure() == prototypeStructure)) {
+                    int dst = vPC[1].u.operand;
+                    int property = vPC[3].u.operand;
+                    Identifier& ident = callFrame->codeBlock()->identifier(property);
+                    
+                    PropertySlot::GetValueFunc getter = vPC[6].u.getterFunc;
+                    TiValue result = getter(callFrame, protoObject, ident);
+                    CHECK_FOR_EXCEPTION();
+                    callFrame->r(dst) = result;
+                    vPC += OPCODE_LENGTH(op_get_by_id_custom_proto);
+                    NEXT_INSTRUCTION();
+                }
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    skip_id_custom_proto:
+#endif
     DEFINE_OPCODE(op_get_by_id_self_list) {
         // Polymorphic self access caching currently only supported when JITting.
         ASSERT_NOT_REACHED();
@@ -2168,6 +2461,34 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_get_by_id_proto_list) {
+        // Polymorphic prototype access caching currently only supported when JITting.
+        ASSERT_NOT_REACHED();
+        // This case of the switch must not be empty, else (op_get_by_id_proto_list == op_get_by_id_chain)!
+        vPC += OPCODE_LENGTH(op_get_by_id_proto_list);
+        NEXT_INSTRUCTION();
+    }
+    DEFINE_OPCODE(op_get_by_id_getter_self_list) {
+        // Polymorphic self access caching currently only supported when JITting.
+        ASSERT_NOT_REACHED();
+        // This case of the switch must not be empty, else (op_get_by_id_self_list == op_get_by_id_chain)!
+        vPC += OPCODE_LENGTH(op_get_by_id_self_list);
+        NEXT_INSTRUCTION();
+    }
+    DEFINE_OPCODE(op_get_by_id_getter_proto_list) {
+        // Polymorphic prototype access caching currently only supported when JITting.
+        ASSERT_NOT_REACHED();
+        // This case of the switch must not be empty, else (op_get_by_id_proto_list == op_get_by_id_chain)!
+        vPC += OPCODE_LENGTH(op_get_by_id_proto_list);
+        NEXT_INSTRUCTION();
+    }
+    DEFINE_OPCODE(op_get_by_id_custom_self_list) {
+        // Polymorphic self access caching currently only supported when JITting.
+        ASSERT_NOT_REACHED();
+        // This case of the switch must not be empty, else (op_get_by_id_self_list == op_get_by_id_chain)!
+        vPC += OPCODE_LENGTH(op_get_by_id_custom_self_list);
+        NEXT_INSTRUCTION();
+    }
+    DEFINE_OPCODE(op_get_by_id_custom_proto_list) {
         // Polymorphic prototype access caching currently only supported when JITting.
         ASSERT_NOT_REACHED();
         // This case of the switch must not be empty, else (op_get_by_id_proto_list == op_get_by_id_chain)!
@@ -2220,6 +2541,86 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         uncacheGetByID(callFrame->codeBlock(), vPC);
         NEXT_INSTRUCTION();
     }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_getter_self);
+#endif
+    DEFINE_OPCODE(op_get_by_id_getter_self) {
+        /* op_get_by_id_self dst(r) base(r) property(id) structure(sID) offset(n) nop(n) nop(n)
+         
+         Cached property access: Attempts to get a cached property from the
+         value base. If the cache misses, op_get_by_id_getter_self reverts to
+         op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                ASSERT(baseCell->isObject());
+                TiObject* baseObject = asObject(baseCell);
+                int dst = vPC[1].u.operand;
+                int offset = vPC[5].u.operand;
+
+                if (GetterSetter* getterSetter = asGetterSetter(baseObject->getDirectOffset(offset).asCell())) {
+                    TiObject* getter = getterSetter->getter();
+                    CallData callData;
+                    CallType callType = getter->getCallData(callData);
+                    TiValue result = call(callFrame, getter, callType, callData, baseObject, ArgList());
+                    CHECK_FOR_EXCEPTION();
+                    callFrame->r(dst) = result;
+                } else
+                    callFrame->r(dst) = jsUndefined();
+
+                vPC += OPCODE_LENGTH(op_get_by_id_getter_self);
+                NEXT_INSTRUCTION();
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    skip_id_getter_self:
+#endif
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_custom_self);
+#endif
+    DEFINE_OPCODE(op_get_by_id_custom_self) {
+        /* op_get_by_id_custom_self dst(r) base(r) property(id) structure(sID) offset(n) nop(n) nop(n)
+         
+         Cached property access: Attempts to use a cached named property getter
+         from the value base. If the cache misses, op_get_by_id_custom_self reverts to
+         op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                ASSERT(baseCell->isObject());
+                int dst = vPC[1].u.operand;
+                int property = vPC[3].u.operand;
+                Identifier& ident = callFrame->codeBlock()->identifier(property);
+
+                PropertySlot::GetValueFunc getter = vPC[5].u.getterFunc;
+                TiValue result = getter(callFrame, baseValue, ident);
+                CHECK_FOR_EXCEPTION();
+                callFrame->r(dst) = result;
+                vPC += OPCODE_LENGTH(op_get_by_id_custom_self);
+                NEXT_INSTRUCTION();
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+skip_id_custom_self:
+#endif
     DEFINE_OPCODE(op_get_by_id_generic) {
         /* op_get_by_id_generic dst(r) base(r) property(id) nop(sID) nop(n) nop(n) nop(n)
 
@@ -2240,6 +2641,113 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_get_by_id_generic);
         NEXT_INSTRUCTION();
     }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_getter_chain);
+#endif
+    DEFINE_OPCODE(op_get_by_id_getter_chain) {
+        /* op_get_by_id_getter_chain dst(r) base(r) property(id) structure(sID) structureChain(chain) count(n) offset(n)
+         
+         Cached property access: Attempts to get a cached property from the
+         value base's prototype chain. If the cache misses, op_get_by_id_getter_chain
+         reverts to op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                RefPtr<Structure>* it = vPC[5].u.structureChain->head();
+                size_t count = vPC[6].u.operand;
+                RefPtr<Structure>* end = it + count;
+                
+                while (true) {
+                    TiObject* baseObject = asObject(baseCell->structure()->prototypeForLookup(callFrame));
+                    
+                    if (UNLIKELY(baseObject->structure() != (*it).get()))
+                        break;
+                    
+                    if (++it == end) {
+                        int dst = vPC[1].u.operand;
+                        int offset = vPC[7].u.operand;
+                        if (GetterSetter* getterSetter = asGetterSetter(baseObject->getDirectOffset(offset).asCell())) {
+                            TiObject* getter = getterSetter->getter();
+                            CallData callData;
+                            CallType callType = getter->getCallData(callData);
+                            TiValue result = call(callFrame, getter, callType, callData, baseValue, ArgList());
+                            CHECK_FOR_EXCEPTION();
+                            callFrame->r(dst) = result;
+                        } else
+                            callFrame->r(dst) = jsUndefined();
+                        vPC += OPCODE_LENGTH(op_get_by_id_getter_chain);
+                        NEXT_INSTRUCTION();
+                    }
+                    
+                    // Update baseCell, so that next time around the loop we'll pick up the prototype's prototype.
+                    baseCell = baseObject;
+                }
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    skip_id_getter_chain:
+#endif
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    goto *(&&skip_id_custom_chain);
+#endif
+    DEFINE_OPCODE(op_get_by_id_custom_chain) {
+        /* op_get_by_id_custom_chain dst(r) base(r) property(id) structure(sID) structureChain(chain) count(n) offset(n)
+         
+         Cached property access: Attempts to use a cached named property getter on the
+         value base's prototype chain. If the cache misses, op_get_by_id_custom_chain
+         reverts to op_get_by_id.
+         */
+        int base = vPC[2].u.operand;
+        TiValue baseValue = callFrame->r(base).jsValue();
+        
+        if (LIKELY(baseValue.isCell())) {
+            TiCell* baseCell = asCell(baseValue);
+            Structure* structure = vPC[4].u.structure;
+            
+            if (LIKELY(baseCell->structure() == structure)) {
+                RefPtr<Structure>* it = vPC[5].u.structureChain->head();
+                size_t count = vPC[6].u.operand;
+                RefPtr<Structure>* end = it + count;
+                
+                while (true) {
+                    TiObject* baseObject = asObject(baseCell->structure()->prototypeForLookup(callFrame));
+                    
+                    if (UNLIKELY(baseObject->structure() != (*it).get()))
+                        break;
+                    
+                    if (++it == end) {
+                        int dst = vPC[1].u.operand;
+                        int property = vPC[3].u.operand;
+                        Identifier& ident = callFrame->codeBlock()->identifier(property);
+                        
+                        PropertySlot::GetValueFunc getter = vPC[7].u.getterFunc;
+                        TiValue result = getter(callFrame, baseObject, ident);
+                        CHECK_FOR_EXCEPTION();
+                        callFrame->r(dst) = result;
+                        vPC += OPCODE_LENGTH(op_get_by_id_custom_chain);
+                        NEXT_INSTRUCTION();
+                    }
+                    
+                    // Update baseCell, so that next time around the loop we'll pick up the prototype's prototype.
+                    baseCell = baseObject;
+                }
+            }
+        }
+        uncacheGetByID(callFrame->codeBlock(), vPC);
+        NEXT_INSTRUCTION();
+    }
+#if USE(GCC_COMPUTED_GOTO_WORKAROUND)
+    skip_id_custom_chain:
+#endif
     DEFINE_OPCODE(op_get_array_length) {
         /* op_get_array_length dst(r) base(r) property(id) nop(sID) nop(n) nop(n) nop(n)
 
@@ -2272,7 +2780,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         TiValue baseValue = callFrame->r(base).jsValue();
         if (LIKELY(isTiString(globalData, baseValue))) {
             int dst = vPC[1].u.operand;
-            callFrame->r(dst) = jsNumber(callFrame, asString(baseValue)->value().size());
+            callFrame->r(dst) = jsNumber(callFrame, asString(baseValue)->length());
             vPC += OPCODE_LENGTH(op_get_string_length);
             NEXT_INSTRUCTION();
         }
@@ -2281,24 +2789,32 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_put_by_id) {
-        /* put_by_id base(r) property(id) value(r) nop(n) nop(n) nop(n) nop(n)
+        /* put_by_id base(r) property(id) value(r) nop(n) nop(n) nop(n) nop(n) direct(b)
 
            Generic property access: Sets the property named by identifier
            property, belonging to register base, to register value.
 
            Unlike many opcodes, this one does not write any output to
            the register file.
+ 
+           The "direct" flag should only be set this put_by_id is to initialize
+           an object literal.
         */
 
         int base = vPC[1].u.operand;
         int property = vPC[2].u.operand;
         int value = vPC[3].u.operand;
+        int direct = vPC[8].u.operand;
 
         CodeBlock* codeBlock = callFrame->codeBlock();
         TiValue baseValue = callFrame->r(base).jsValue();
         Identifier& ident = codeBlock->identifier(property);
         PutPropertySlot slot;
-        baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
+        if (direct) {
+            baseValue.putDirect(callFrame, ident, callFrame->r(value).jsValue(), slot);
+            ASSERT(slot.base() == baseValue);
+        } else
+            baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
         CHECK_FOR_EXCEPTION();
 
         tryCachePutByID(callFrame, codeBlock, vPC, baseValue, slot);
@@ -2307,7 +2823,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_put_by_id_transition) {
-        /* op_put_by_id_transition base(r) property(id) value(r) oldStructure(sID) newStructure(sID) structureChain(chain) offset(n)
+        /* op_put_by_id_transition base(r) property(id) value(r) oldStructure(sID) newStructure(sID) structureChain(chain) offset(n) direct(b)
          
            Cached property access: Attempts to set a new property with a cached transition
            property named by identifier property, belonging to register base,
@@ -2328,19 +2844,21 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             if (LIKELY(baseCell->structure() == oldStructure)) {
                 ASSERT(baseCell->isObject());
                 TiObject* baseObject = asObject(baseCell);
+                int direct = vPC[8].u.operand;
 
-                RefPtr<Structure>* it = vPC[6].u.structureChain->head();
+                if (!direct) {
+                    RefPtr<Structure>* it = vPC[6].u.structureChain->head();
 
-                TiValue proto = baseObject->structure()->prototypeForLookup(callFrame);
-                while (!proto.isNull()) {
-                    if (UNLIKELY(asObject(proto)->structure() != (*it).get())) {
-                        uncachePutByID(callFrame->codeBlock(), vPC);
-                        NEXT_INSTRUCTION();
+                    TiValue proto = baseObject->structure()->prototypeForLookup(callFrame);
+                    while (!proto.isNull()) {
+                        if (UNLIKELY(asObject(proto)->structure() != (*it).get())) {
+                            uncachePutByID(callFrame->codeBlock(), vPC);
+                            NEXT_INSTRUCTION();
+                        }
+                        ++it;
+                        proto = asObject(proto)->structure()->prototypeForLookup(callFrame);
                     }
-                    ++it;
-                    proto = asObject(proto)->structure()->prototypeForLookup(callFrame);
                 }
-
                 baseObject->transitionTo(newStructure);
 
                 int value = vPC[3].u.operand;
@@ -2357,7 +2875,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_put_by_id_replace) {
-        /* op_put_by_id_replace base(r) property(id) value(r) structure(sID) offset(n) nop(n) nop(n)
+        /* op_put_by_id_replace base(r) property(id) value(r) structure(sID) offset(n) nop(n) nop(n) direct(b)
 
            Cached property access: Attempts to set a pre-existing, cached
            property named by identifier property, belonging to register base,
@@ -2392,7 +2910,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_put_by_id_generic) {
-        /* op_put_by_id_generic base(r) property(id) value(r) nop(n) nop(n) nop(n) nop(n)
+        /* op_put_by_id_generic base(r) property(id) value(r) nop(n) nop(n) nop(n) nop(n) direct(b)
 
            Generic property access: Sets the property named by identifier
            property, belonging to register base, to register value.
@@ -2403,11 +2921,16 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int base = vPC[1].u.operand;
         int property = vPC[2].u.operand;
         int value = vPC[3].u.operand;
+        int direct = vPC[8].u.operand;
 
         TiValue baseValue = callFrame->r(base).jsValue();
         Identifier& ident = callFrame->codeBlock()->identifier(property);
         PutPropertySlot slot;
-        baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
+        if (direct) {
+            baseValue.putDirect(callFrame, ident, callFrame->r(value).jsValue(), slot);
+            ASSERT(slot.base() == baseValue);
+        } else
+            baseValue.put(callFrame, ident, callFrame->r(value).jsValue(), slot);
         CHECK_FOR_EXCEPTION();
 
         vPC += OPCODE_LENGTH(op_put_by_id_generic);
@@ -2489,7 +3012,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
                 else
                     result = jsArray->TiArray::get(callFrame, i);
             } else if (isTiString(globalData, baseValue) && asString(baseValue)->canGetIndex(i))
-                result = asString(baseValue)->getIndex(&callFrame->globalData(), i);
+                result = asString(baseValue)->getIndex(callFrame, i);
             else if (isTiArrayArray(globalData, baseValue) && asByteArray(baseValue)->canAccessIndex(i))
                 result = asByteArray(baseValue)->getIndex(callFrame, i);
             else
@@ -2657,6 +3180,26 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_loop_if_true);
         NEXT_INSTRUCTION();
     }
+    DEFINE_OPCODE(op_loop_if_false) {
+        /* loop_if_true cond(r) target(offset)
+         
+           Jumps to offset target from the current instruction, if and
+           only if register cond converts to boolean as false.
+
+           Additionally this loop instruction may terminate JS execution is
+           the JS timeout is reached.
+         */
+        int cond = vPC[1].u.operand;
+        int target = vPC[2].u.operand;
+        if (!callFrame->r(cond).jsValue().toBoolean(callFrame)) {
+            vPC += target;
+            CHECK_FOR_TIMEOUT();
+            NEXT_INSTRUCTION();
+        }
+        
+        vPC += OPCODE_LENGTH(op_loop_if_true);
+        NEXT_INSTRUCTION();
+    }
     DEFINE_OPCODE(op_jtrue) {
         /* jtrue cond(r) target(offset)
 
@@ -2717,7 +3260,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int target = vPC[2].u.operand;
         TiValue srcValue = callFrame->r(src).jsValue();
 
-        if (!srcValue.isUndefinedOrNull() || (srcValue.isCell() && !srcValue.asCell()->structure()->typeInfo().masqueradesAsUndefined())) {
+        if (!srcValue.isUndefinedOrNull() && (!srcValue.isCell() || !srcValue.asCell()->structure()->typeInfo().masqueradesAsUndefined())) {
             vPC += target;
             NEXT_INSTRUCTION();
         }
@@ -2820,6 +3363,29 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_jnless);
         NEXT_INSTRUCTION();
     }
+    DEFINE_OPCODE(op_jless) {
+        /* jless src1(r) src2(r) target(offset)
+
+           Checks whether register src1 is less than register src2, as
+           with the ECMAScript '<' operator, and then jumps to offset
+           target from the current instruction, if and only if the 
+           result of the comparison is true.
+        */
+        TiValue src1 = callFrame->r(vPC[1].u.operand).jsValue();
+        TiValue src2 = callFrame->r(vPC[2].u.operand).jsValue();
+        int target = vPC[3].u.operand;
+
+        bool result = jsLess(callFrame, src1, src2);
+        CHECK_FOR_EXCEPTION();
+        
+        if (result) {
+            vPC += target;
+            NEXT_INSTRUCTION();
+        }
+
+        vPC += OPCODE_LENGTH(op_jless);
+        NEXT_INSTRUCTION();
+    }
     DEFINE_OPCODE(op_jnlesseq) {
         /* jnlesseq src1(r) src2(r) target(offset)
 
@@ -2841,6 +3407,29 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         }
 
         vPC += OPCODE_LENGTH(op_jnlesseq);
+        NEXT_INSTRUCTION();
+    }
+    DEFINE_OPCODE(op_jlesseq) {
+        /* jlesseq src1(r) src2(r) target(offset)
+         
+         Checks whether register src1 is less than or equal to
+         register src2, as with the ECMAScript '<=' operator,
+         and then jumps to offset target from the current instruction,
+         if and only if the result of the comparison is true.
+         */
+        TiValue src1 = callFrame->r(vPC[1].u.operand).jsValue();
+        TiValue src2 = callFrame->r(vPC[2].u.operand).jsValue();
+        int target = vPC[3].u.operand;
+        
+        bool result = jsLessEq(callFrame, src1, src2);
+        CHECK_FOR_EXCEPTION();
+        
+        if (result) {
+            vPC += target;
+            NEXT_INSTRUCTION();
+        }
+        
+        vPC += OPCODE_LENGTH(op_jlesseq);
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_switch_imm) {
@@ -2882,11 +3471,11 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         if (!scrutinee.isString())
             vPC += defaultOffset;
         else {
-            UString::Rep* value = asString(scrutinee)->value().rep();
-            if (value->size() != 1)
+            UString::Rep* value = asString(scrutinee)->value(callFrame).rep();
+            if (value->length() != 1)
                 vPC += defaultOffset;
             else
-                vPC += callFrame->codeBlock()->characterSwitchJumpTable(tableIndex).offsetForValue(value->data()[0], defaultOffset);
+                vPC += callFrame->codeBlock()->characterSwitchJumpTable(tableIndex).offsetForValue(value->characters()[0], defaultOffset);
         }
         NEXT_INSTRUCTION();
     }
@@ -2905,7 +3494,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         if (!scrutinee.isString())
             vPC += defaultOffset;
         else 
-            vPC += callFrame->codeBlock()->stringSwitchJumpTable(tableIndex).offsetForValue(asString(scrutinee)->value().rep(), defaultOffset);
+            vPC += callFrame->codeBlock()->stringSwitchJumpTable(tableIndex).offsetForValue(asString(scrutinee)->value(callFrame).rep(), defaultOffset);
         NEXT_INSTRUCTION();
     }
     DEFINE_OPCODE(op_new_func) {
@@ -3073,9 +3662,10 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int argsOffset = vPC[2].u.operand;
         
         TiValue arguments = callFrame->r(argsOffset).jsValue();
-        int32_t argCount = 0;
+        uint32_t argCount = 0;
         if (!arguments) {
             argCount = (uint32_t)(callFrame->argumentCount()) - 1;
+            argCount = min<uint32_t>(argCount, Arguments::MaxArguments);
             int32_t sizeDelta = argsOffset + argCount + RegisterFile::CallFrameHeaderSize;
             Register* newEnd = callFrame->registers() + sizeDelta;
             if (!registerFile->grow(newEnd) || ((newEnd - callFrame->registers()) != sizeDelta)) {
@@ -3083,9 +3673,9 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
                 goto vm_throw;
             }
             ASSERT(!callFrame->callee()->isHostFunction());
-            int32_t expectedParams = callFrame->callee()->jsExecutable()->parameterCount();
-            int32_t inplaceArgs = min(argCount, expectedParams);
-            int32_t i = 0;
+            uint32_t expectedParams = callFrame->callee()->jsExecutable()->parameterCount();
+            uint32_t inplaceArgs = min(argCount, expectedParams);
+            uint32_t i = 0;
             Register* argStore = callFrame->registers() + argsOffset;
 
             // First step is to copy the "expected" parameters from their normal location relative to the callframe
@@ -3102,6 +3692,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             if (asObject(arguments)->classInfo() == &Arguments::info) {
                 Arguments* args = asArguments(arguments);
                 argCount = args->numProvidedArguments(callFrame);
+                argCount = min<uint32_t>(argCount, Arguments::MaxArguments);
                 int32_t sizeDelta = argsOffset + argCount + RegisterFile::CallFrameHeaderSize;
                 Register* newEnd = callFrame->registers() + sizeDelta;
                 if (!registerFile->grow(newEnd) || ((newEnd - callFrame->registers()) != sizeDelta)) {
@@ -3112,6 +3703,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             } else if (isTiArray(&callFrame->globalData(), arguments)) {
                 TiArray* array = asArray(arguments);
                 argCount = array->length();
+                argCount = min<uint32_t>(argCount, Arguments::MaxArguments);
                 int32_t sizeDelta = argsOffset + argCount + RegisterFile::CallFrameHeaderSize;
                 Register* newEnd = callFrame->registers() + sizeDelta;
                 if (!registerFile->grow(newEnd) || ((newEnd - callFrame->registers()) != sizeDelta)) {
@@ -3122,6 +3714,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
             } else if (asObject(arguments)->inherits(&TiArray::info)) {
                 TiObject* argObject = asObject(arguments);
                 argCount = argObject->get(callFrame, callFrame->propertyNames().length).toUInt32(callFrame);
+                argCount = min<uint32_t>(argCount, Arguments::MaxArguments);
                 int32_t sizeDelta = argsOffset + argCount + RegisterFile::CallFrameHeaderSize;
                 Register* newEnd = callFrame->registers() + sizeDelta;
                 if (!registerFile->grow(newEnd) || ((newEnd - callFrame->registers()) != sizeDelta)) {
@@ -3129,15 +3722,13 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
                     goto vm_throw;
                 }
                 Register* argsBuffer = callFrame->registers() + argsOffset;
-                for (int32_t i = 0; i < argCount; ++i) {
+                for (uint32_t i = 0; i < argCount; ++i) {
                     argsBuffer[i] = asObject(arguments)->get(callFrame, i);
                     CHECK_FOR_EXCEPTION();
                 }
             } else {
-                if (!arguments.isObject()) {
-                    exceptionValue = createInvalidParamError(callFrame, "Function.prototype.apply", arguments, vPC - callFrame->codeBlock()->instructions().begin(), callFrame->codeBlock());
-                    goto vm_throw;
-                }
+                exceptionValue = createInvalidParamError(callFrame, "Function.prototype.apply", arguments, vPC - callFrame->codeBlock()->instructions().begin(), callFrame->codeBlock());
+                goto vm_throw;
             }
         }
         CHECK_FOR_EXCEPTION();
@@ -3281,7 +3872,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
 
         TiValue returnValue = callFrame->r(result).jsValue();
 
-        vPC = callFrame->returnPC();
+        vPC = callFrame->returnVPC();
         int dst = callFrame->returnValueRegister();
         callFrame = callFrame->callerFrame();
         
@@ -3441,7 +4032,6 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
 
             callFrame->init(newCodeBlock, vPC + 7, callDataScopeChain, previousCallFrame, dst, argCount, asFunction(v));
             vPC = newCodeBlock->instructions().begin();
-
 #if ENABLE(OPCODE_STATS)
             OpcodeStats::resetLastInstruction();
 #endif
@@ -3498,6 +4088,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int count = vPC[3].u.operand;
 
         callFrame->r(dst) = concatenateStrings(callFrame, &callFrame->registers()[src], count);
+        CHECK_FOR_EXCEPTION();
         vPC += OPCODE_LENGTH(op_strcat);
 
         NEXT_INSTRUCTION();
@@ -3619,7 +4210,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += target;
         NEXT_INSTRUCTION();
     }
-#if HAVE(COMPUTED_GOTO)
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
     // Appease GCC
     goto *(&&skip_new_scope);
 #endif
@@ -3635,7 +4226,7 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         vPC += OPCODE_LENGTH(op_push_new_scope);
         NEXT_INSTRUCTION();
     }
-#if HAVE(COMPUTED_GOTO)
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
     skip_new_scope:
 #endif
     DEFINE_OPCODE(op_catch) {
@@ -3846,14 +4437,14 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         NEXT_INSTRUCTION();
     }
     }
-#if !HAVE(COMPUTED_GOTO)
+#if !ENABLE(COMPUTED_GOTO_INTERPRETER)
     } // iterator loop ends
 #endif
-#endif // USE(INTERPRETER)
     #undef NEXT_INSTRUCTION
     #undef DEFINE_OPCODE
     #undef CHECK_FOR_EXCEPTION
     #undef CHECK_FOR_TIMEOUT
+#endif // ENABLE(INTERPRETER)
 }
 
 TiValue Interpreter::retrieveArguments(CallFrame* callFrame, TiFunction* function) const
@@ -3882,7 +4473,7 @@ TiValue Interpreter::retrieveArguments(CallFrame* callFrame, TiFunction* functio
         callFrame->setCalleeArguments(arguments);
     }
 
-    return TiValue(arguments);
+    return arguments;
 }
 
 TiValue Interpreter::retrieveCaller(CallFrame* callFrame, InternalFunction* function) const
@@ -3915,8 +4506,17 @@ void Interpreter::retrieveLastCaller(CallFrame* callFrame, int& lineNumber, intp
     CodeBlock* callerCodeBlock = callerFrame->codeBlock();
     if (!callerCodeBlock)
         return;
-
-    unsigned bytecodeOffset = bytecodeOffsetForPC(callerFrame, callerCodeBlock, callFrame->returnPC());
+    unsigned bytecodeOffset = 0;
+#if ENABLE(INTERPRETER)
+    if (!callerFrame->globalData().canUseJIT())
+        bytecodeOffset = bytecodeOffsetForPC(callerFrame, callerCodeBlock, callFrame->returnVPC());
+#if ENABLE(JIT)
+    else
+        bytecodeOffset = bytecodeOffsetForPC(callerFrame, callerCodeBlock, callFrame->returnPC());
+#endif
+#else
+    bytecodeOffset = bytecodeOffsetForPC(callerFrame, callerCodeBlock, callFrame->returnPC());
+#endif
     lineNumber = callerCodeBlock->lineNumberForBytecodeOffset(callerFrame, bytecodeOffset - 1);
     sourceID = callerCodeBlock->ownerExecutable()->sourceID();
     sourceURL = callerCodeBlock->ownerExecutable()->sourceURL();

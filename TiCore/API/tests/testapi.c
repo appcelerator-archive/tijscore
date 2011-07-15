@@ -33,6 +33,7 @@
 #include "TiCore.h"
 #include "TiBasePrivate.h"
 #include "TiContextRefPrivate.h"
+#include "TiObjectRefPrivate.h"
 #include <math.h>
 #define ASSERT_DISABLED 0
 #include <wtf/Assertions.h>
@@ -173,6 +174,10 @@ static TiValueRef MyObject_getProperty(TiContextRef context, TiObjectRef object,
     if (TiStringIsEqualToUTF8CString(propertyName, "cantFind")) {
         return TiValueMakeUndefined(context);
     }
+    
+    if (TiStringIsEqualToUTF8CString(propertyName, "hasPropertyLie")) {
+        return 0;
+    }
 
     if (TiStringIsEqualToUTF8CString(propertyName, "throwOnGet")) {
         return TiEvalScript(context, TiStringCreateWithUTF8CString("throw 'an exception'"), object, TiStringCreateWithUTF8CString("test script"), 1, exception);
@@ -183,7 +188,7 @@ static TiValueRef MyObject_getProperty(TiContextRef context, TiObjectRef object,
         return TiValueMakeNumber(context, 1);
     }
     
-    return NULL;
+    return TiValueMakeNull(context);
 }
 
 static bool MyObject_setProperty(TiContextRef context, TiObjectRef object, TiStringRef propertyName, TiValueRef value, TiValueRef* exception)
@@ -306,7 +311,7 @@ static TiValueRef MyObject_convertToType(TiContextRef context, TiObjectRef objec
     }
 
     // string conversion -- forward to default object class
-    return NULL;
+    return TiValueMakeNull(context);
 }
 
 static TiStaticValue evilStaticValues[] = {
@@ -381,7 +386,7 @@ static TiValueRef EvilExceptionObject_convertToType(TiContextRef context, TiObje
         funcName = TiStringCreateWithUTF8CString("toStringExplicit");
         break;
     default:
-        return NULL;
+        return TiValueMakeNull(context);
         break;
     }
     
@@ -389,7 +394,7 @@ static TiValueRef EvilExceptionObject_convertToType(TiContextRef context, TiObje
     TiStringRelease(funcName);    
     TiObjectRef function = TiValueToObject(context, func, exception);
     if (!function)
-        return NULL;
+        return TiValueMakeNull(context);
     TiValueRef value = TiObjectCallAsFunction(context, function, object, 0, NULL, exception);
     if (!value) {
         TiStringRef errorString = TiStringCreateWithUTF8CString("convertToType failed"); 
@@ -626,6 +631,17 @@ static TiClassRef Derived_class(TiContextRef context)
     return jsClass;
 }
 
+static TiClassRef Derived2_class(TiContextRef context)
+{
+    static TiClassRef jsClass;
+    if (!jsClass) {
+        TiClassDefinition definition = kTiClassDefinitionEmpty;
+        definition.parentClass = Derived_class(context);
+        jsClass = TiClassCreate(&definition);
+    }
+    return jsClass;
+}
+
 static TiValueRef print_callAsFunction(TiContextRef ctx, TiObjectRef functionObject, TiObjectRef thisObject, size_t argumentCount, const TiValueRef arguments[], TiValueRef* exception)
 {
     UNUSED_PARAM(functionObject);
@@ -744,6 +760,17 @@ static void testInitializeFinalize()
     ASSERT(TiObjectGetPrivate(o) == (void*)3);
 }
 
+static TiValueRef jsNumberValue =  NULL;
+
+static TiObjectRef aHeapRef = NULL;
+
+static void makeGlobalNumberValue(TiContextRef context) {
+    TiValueRef v = TiValueMakeNumber(context, 420);
+    TiValueProtect(context, v);
+    jsNumberValue = v;
+    v = NULL;
+}
+
 int main(int argc, char* argv[])
 {
     const char *scriptPath = "testapi.js";
@@ -853,8 +880,107 @@ int main(int argc, char* argv[])
     TiObjectSetProperty(context, globalObject, EmptyObjectIString, EmptyObject, kTiPropertyAttributeNone, NULL);
     TiStringRelease(EmptyObjectIString);
     
-    TiValueRef exception;
+    TiStringRef lengthStr = TiStringCreateWithUTF8CString("length");
+    aHeapRef = TiObjectMakeArray(context, 0, 0, 0);
+    TiObjectSetProperty(context, aHeapRef, lengthStr, TiValueMakeNumber(context, 10), 0, 0);
+    TiStringRef privatePropertyName = TiStringCreateWithUTF8CString("privateProperty");
+    if (!TiObjectSetPrivateProperty(context, myObject, privatePropertyName, aHeapRef)) {
+        printf("FAIL: Could not set private property.\n");
+        failed = 1;        
+    } else {
+        printf("PASS: Set private property.\n");
+    }
+    if (TiObjectSetPrivateProperty(context, aHeapRef, privatePropertyName, aHeapRef)) {
+        printf("FAIL: TiObjectSetPrivateProperty should fail on non-API objects.\n");
+        failed = 1;        
+    } else {
+        printf("PASS: Did not allow TiObjectSetPrivateProperty on a non-API object.\n");
+    }
+    if (TiObjectGetPrivateProperty(context, myObject, privatePropertyName) != aHeapRef) {
+        printf("FAIL: Could not retrieve private property.\n");
+        failed = 1;
+    } else
+        printf("PASS: Retrieved private property.\n");
+    if (TiObjectGetPrivateProperty(context, aHeapRef, privatePropertyName)) {
+        printf("FAIL: TiObjectGetPrivateProperty should return NULL when called on a non-API object.\n");
+        failed = 1;
+    } else
+        printf("PASS: TiObjectGetPrivateProperty return NULL.\n");
+    
+    if (TiObjectGetProperty(context, myObject, privatePropertyName, 0) == aHeapRef) {
+        printf("FAIL: Accessed private property through ordinary property lookup.\n");
+        failed = 1;
+    } else
+        printf("PASS: Cannot access private property through ordinary property lookup.\n");
+    
+    TiGarbageCollect(context);
+    
+    for (int i = 0; i < 10000; i++)
+        TiObjectMake(context, 0, 0);
 
+    if (TiValueToNumber(context, TiObjectGetProperty(context, aHeapRef, lengthStr, 0), 0) != 10) {
+        printf("FAIL: Private property has been collected.\n");
+        failed = 1;
+    } else
+        printf("PASS: Private property does not appear to have been collected.\n");
+    TiStringRelease(lengthStr);
+    
+    TiStringRef validJSON = TiStringCreateWithUTF8CString("{\"aProperty\":true}");
+    TiValueRef jsonObject = TiValueMakeFromJSONString(context, validJSON);
+    TiStringRelease(validJSON);
+    if (!TiValueIsObject(context, jsonObject)) {
+        printf("FAIL: Did not parse valid JSON correctly\n");
+        failed = 1;
+    } else
+        printf("PASS: Parsed valid JSON string.\n");
+    TiStringRef propertyName = TiStringCreateWithUTF8CString("aProperty");
+    assertEqualsAsBoolean(TiObjectGetProperty(context, TiValueToObject(context, jsonObject, 0), propertyName, 0), true);
+    TiStringRelease(propertyName);
+    TiStringRef invalidJSON = TiStringCreateWithUTF8CString("fail!");
+    if (TiValueMakeFromJSONString(context, invalidJSON)) {
+        printf("FAIL: Should return null for invalid JSON data\n");
+        failed = 1;
+    } else
+        printf("PASS: Correctly returned null for invalid JSON data.\n");
+    TiValueRef exception;
+    TiStringRef str = TiValueCreateJSONString(context, jsonObject, 0, 0);
+    if (!TiStringIsEqualToUTF8CString(str, "{\"aProperty\":true}")) {
+        printf("FAIL: Did not correctly serialise with indent of 0.\n");
+        failed = 1;
+    } else
+        printf("PASS: Correctly serialised with indent of 0.\n");
+    TiStringRelease(str);
+
+    str = TiValueCreateJSONString(context, jsonObject, 4, 0);
+    if (!TiStringIsEqualToUTF8CString(str, "{\n    \"aProperty\": true\n}")) {
+        printf("FAIL: Did not correctly serialise with indent of 4.\n");
+        failed = 1;
+    } else
+        printf("PASS: Correctly serialised with indent of 4.\n");
+    TiStringRelease(str);
+    TiStringRef src = TiStringCreateWithUTF8CString("({get a(){ throw '';}})");
+    TiValueRef unstringifiableObj = TiEvalScript(context, src, NULL, NULL, 1, NULL);
+    
+    str = TiValueCreateJSONString(context, unstringifiableObj, 4, 0);
+    if (str) {
+        printf("FAIL: Didn't return null when attempting to serialize unserializable value.\n");
+        TiStringRelease(str);
+        failed = 1;
+    } else
+        printf("PASS: returned null when attempting to serialize unserializable value.\n");
+    
+    str = TiValueCreateJSONString(context, unstringifiableObj, 4, &exception);
+    if (str) {
+        printf("FAIL: Didn't return null when attempting to serialize unserializable value.\n");
+        TiStringRelease(str);
+        failed = 1;
+    } else
+        printf("PASS: returned null when attempting to serialize unserializable value.\n");
+    if (!exception) {
+        printf("FAIL: Did not set exception on serialisation error\n");
+        failed = 1;
+    } else
+        printf("PASS: set exception on serialisation error\n");
     // Conversions that throw exceptions
     exception = NULL;
     ASSERT(NULL == TiValueToObject(context, jsNull, &exception));
@@ -955,10 +1081,12 @@ int main(int argc, char* argv[])
     CFRelease(cfEmptyString);
     
     jsGlobalValue = TiObjectMake(context, NULL, NULL);
+    makeGlobalNumberValue(context);
     TiValueProtect(context, jsGlobalValue);
     TiGarbageCollect(context);
     ASSERT(TiValueIsObject(context, jsGlobalValue));
     TiValueUnprotect(context, jsGlobalValue);
+    TiValueUnprotect(context, jsNumberValue);
 
     TiStringRef goodSyntax = TiStringCreateWithUTF8CString("x = 1;");
     TiStringRef badSyntax = TiStringCreateWithUTF8CString("x := 1;");
@@ -1062,11 +1190,21 @@ int main(int argc, char* argv[])
     ASSERT(!TiObjectSetPrivate(myConstructor, (void*)1));
     ASSERT(!TiObjectGetPrivate(myConstructor));
     
+    string = TiStringCreateWithUTF8CString("Base");
+    TiObjectRef baseConstructor = TiObjectMakeConstructor(context, Base_class(context), NULL);
+    TiObjectSetProperty(context, globalObject, string, baseConstructor, kTiPropertyAttributeNone, NULL);
+    TiStringRelease(string);
+    
     string = TiStringCreateWithUTF8CString("Derived");
     TiObjectRef derivedConstructor = TiObjectMakeConstructor(context, Derived_class(context), NULL);
     TiObjectSetProperty(context, globalObject, string, derivedConstructor, kTiPropertyAttributeNone, NULL);
     TiStringRelease(string);
     
+    string = TiStringCreateWithUTF8CString("Derived2");
+    TiObjectRef derived2Constructor = TiObjectMakeConstructor(context, Derived2_class(context), NULL);
+    TiObjectSetProperty(context, globalObject, string, derived2Constructor, kTiPropertyAttributeNone, NULL);
+    TiStringRelease(string);
+
     o = TiObjectMake(context, NULL, NULL);
     TiObjectSetProperty(context, o, jsOneIString, TiValueMakeNumber(context, 1), kTiPropertyAttributeNone, NULL);
     TiObjectSetProperty(context, o, jsCFIString,  TiValueMakeNumber(context, 1), kTiPropertyAttributeDontEnum, NULL);
@@ -1165,7 +1303,7 @@ int main(int argc, char* argv[])
     } else {
         script = TiStringCreateWithUTF8CString(scriptUTF8);
         result = TiEvalScript(context, script, NULL, NULL, 1, &exception);
-        if (TiValueIsUndefined(context, result))
+        if (result && TiValueIsUndefined(context, result))
             printf("PASS: Test script executed successfully.\n");
         else {
             printf("FAIL: Test script returned unexpected value:\n");

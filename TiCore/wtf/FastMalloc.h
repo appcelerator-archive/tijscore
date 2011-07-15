@@ -40,6 +40,8 @@ namespace WTI {
     void* fastZeroedMalloc(size_t);
     void* fastCalloc(size_t numElements, size_t elementSize);
     void* fastRealloc(void*, size_t);
+    char* fastStrDup(const char*);
+    size_t fastMallocSize(const void*);
 
     struct TryMallocReturnValue {
         TryMallocReturnValue(void* data)
@@ -88,10 +90,9 @@ namespace WTI {
     void releaseFastMallocFreeMemory();
     
     struct FastMallocStatistics {
-        size_t heapSize;
-        size_t freeSizeInHeap;
-        size_t freeSizeInCaches;
-        size_t returnedSize;
+        size_t reservedVMBytes;
+        size_t committedVMBytes;
+        size_t freeListBytes;
     };
     FastMallocStatistics fastMallocStatistics();
 
@@ -186,26 +187,28 @@ namespace WTI {
 
 } // namespace WTI
 
-using WTI::fastMalloc;
-using WTI::fastZeroedMalloc;
 using WTI::fastCalloc;
-using WTI::fastRealloc;
-using WTI::tryFastMalloc;
-using WTI::tryFastZeroedMalloc;
-using WTI::tryFastCalloc;
-using WTI::tryFastRealloc;
 using WTI::fastFree;
+using WTI::fastMalloc;
+using WTI::fastMallocSize;
+using WTI::fastRealloc;
+using WTI::fastStrDup;
+using WTI::fastZeroedMalloc;
+using WTI::tryFastCalloc;
+using WTI::tryFastMalloc;
+using WTI::tryFastRealloc;
+using WTI::tryFastZeroedMalloc;
 
 #ifndef NDEBUG    
 using WTI::fastMallocForbid;
 using WTI::fastMallocAllow;
 #endif
 
-#if COMPILER(GCC) && PLATFORM(DARWIN)
+#if COMPILER(GCC) && OS(DARWIN)
 #define WTF_PRIVATE_INLINE __private_extern__ inline __attribute__((always_inline))
 #elif COMPILER(GCC)
 #define WTF_PRIVATE_INLINE inline __attribute__((always_inline))
-#elif COMPILER(MSVC)
+#elif COMPILER(MSVC) || COMPILER(RVCT)
 #define WTF_PRIVATE_INLINE __forceinline
 #else
 #define WTF_PRIVATE_INLINE inline
@@ -220,17 +223,23 @@ using WTI::fastMallocAllow;
 // debug-only code to make sure we don't use the system malloc via the default operator
 // new by accident.
 
-// We musn't customize the global operator new and delete for the Qt port.
-#if !PLATFORM(QT)
+#if ENABLE(GLOBAL_FASTMALLOC_NEW)
 
-WTF_PRIVATE_INLINE void* operator new(size_t size) { return fastMalloc(size); }
+#if COMPILER(MSVC)
+#pragma warning(push)
+#pragma warning(disable: 4290) // Disable the C++ exception specification ignored warning.
+#endif
+WTF_PRIVATE_INLINE void* operator new(size_t size) throw (std::bad_alloc) { return fastMalloc(size); }
 WTF_PRIVATE_INLINE void* operator new(size_t size, const std::nothrow_t&) throw() { return fastMalloc(size); }
-WTF_PRIVATE_INLINE void operator delete(void* p) { fastFree(p); }
+WTF_PRIVATE_INLINE void operator delete(void* p) throw() { fastFree(p); }
 WTF_PRIVATE_INLINE void operator delete(void* p, const std::nothrow_t&) throw() { fastFree(p); }
-WTF_PRIVATE_INLINE void* operator new[](size_t size) { return fastMalloc(size); }
+WTF_PRIVATE_INLINE void* operator new[](size_t size) throw (std::bad_alloc) { return fastMalloc(size); }
 WTF_PRIVATE_INLINE void* operator new[](size_t size, const std::nothrow_t&) throw() { return fastMalloc(size); }
-WTF_PRIVATE_INLINE void operator delete[](void* p) { fastFree(p); }
+WTF_PRIVATE_INLINE void operator delete[](void* p) throw() { fastFree(p); }
 WTF_PRIVATE_INLINE void operator delete[](void* p, const std::nothrow_t&) throw() { fastFree(p); }
+#if COMPILER(MSVC)
+#pragma warning(pop)
+#endif
 
 #endif
 

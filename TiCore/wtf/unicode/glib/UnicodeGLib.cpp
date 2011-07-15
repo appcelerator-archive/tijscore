@@ -26,6 +26,7 @@
  *
  */
 
+#include "config.h"
 #include "UnicodeGLib.h"
 
 namespace WTI {

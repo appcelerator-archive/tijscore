@@ -43,19 +43,22 @@
 #include "UString.h"
 #include <wtf/DateMath.h>
 #include <wtf/Threading.h>
+#include <wtf/WTFThreadData.h>
 
 using namespace WTI;
 
 namespace TI {
 
-#if PLATFORM(DARWIN) && ENABLE(JSC_MULTIPLE_THREADS)
+#if OS(DARWIN) && ENABLE(JSC_MULTIPLE_THREADS)
 static pthread_once_t initializeThreadingKeyOnce = PTHREAD_ONCE_INIT;
 #endif
 
 static void initializeThreadingOnce()
 {
     WTI::initializeThreading();
+    wtfThreadData();
     initializeUString();
+    TiGlobalData::storeVPtrs();
 #if ENABLE(JSC_MULTIPLE_THREADS)
     s_dtoaP5Mutex = new Mutex;
     initializeDates();
@@ -64,7 +67,7 @@ static void initializeThreadingOnce()
 
 void initializeThreading()
 {
-#if PLATFORM(DARWIN) && ENABLE(JSC_MULTIPLE_THREADS)
+#if OS(DARWIN) && ENABLE(JSC_MULTIPLE_THREADS)
     pthread_once(&initializeThreadingKeyOnce, initializeThreadingOnce);
 #else
     static bool initializedThreading = false;

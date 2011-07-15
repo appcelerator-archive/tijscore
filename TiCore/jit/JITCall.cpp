@@ -121,7 +121,7 @@ void JIT::compileOpCallVarargs(Instruction* instruction)
 
     move(regT2, regT1); // argCount
 
-    emitNakedCall(m_globalData->jitStubs.ctiVirtualCall());
+    emitNakedCall(m_globalData->jitStubs->ctiVirtualCall());
 
     emitStore(dst, regT1, regT0);
     
@@ -166,7 +166,7 @@ void JIT::emit_op_construct_verify(Instruction* currentInstruction)
     emitLoad(dst, regT1, regT0);
     addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
     loadPtr(Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)), regT2);
-    addSlowCase(branch32(NotEqual, Address(regT2, OBJECT_OFFSETOF(Structure, m_typeInfo) + OBJECT_OFFSETOF(TypeInfo, m_type)), Imm32(ObjectType)));
+    addSlowCase(branch8(NotEqual, Address(regT2, OBJECT_OFFSETOF(Structure, m_typeInfo) + OBJECT_OFFSETOF(TypeInfo, m_type)), Imm32(ObjectType)));
 }
 
 void JIT::emitSlow_op_construct_verify(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -322,7 +322,13 @@ void JIT::compileOpCall(OpcodeID opcodeID, Instruction* instruction, unsigned ca
     emitLoad(callee, regT1, regT0);
 
     DataLabelPtr addressOfLinkedFunctionCheck;
+
+    BEGIN_UNINTERRUPTED_SEQUENCE(sequenceOpCall);
+
     Jump jumpToSlow = branchPtrWithPatch(NotEqual, regT0, addressOfLinkedFunctionCheck, ImmPtr(0));
+
+    END_UNINTERRUPTED_SEQUENCE(sequenceOpCall);
+
     addSlowCase(jumpToSlow);
     ASSERT(differenceBetween(addressOfLinkedFunctionCheck, jumpToSlow) == patchOffsetOpCallCompareToJump);
     m_callStructureStubCompilationInfo[callLinkInfoIndex].hotPathBegin = addressOfLinkedFunctionCheck;
@@ -401,7 +407,7 @@ void JIT::compileOpCallSlowCase(Instruction* instruction, Vector<SlowCaseEntry>:
     addPtr(Imm32(registerOffset * static_cast<int>(sizeof(Register))), callFrameRegister);
     move(Imm32(argCount), regT1);
 
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_globalData->jitStubs.ctiVirtualCallLink());
+    m_callStructureStubCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_globalData->jitStubs->ctiVirtualCallLink());
 
     // Put the return value in dst.
     emitStore(dst, regT1, regT0);;
@@ -500,7 +506,7 @@ void JIT::compileOpCallVarargs(Instruction* instruction)
     addPtr(callFrameRegister, regT3);
     storePtr(callFrameRegister, regT3);
     addPtr(regT2, callFrameRegister);
-    emitNakedCall(m_globalData->jitStubs.ctiVirtualCall());
+    emitNakedCall(m_globalData->jitStubs->ctiVirtualCall());
 
     // Put the return value in dst. In the interpreter, op_ret does this.
     emitPutVirtualRegister(dst);
@@ -692,7 +698,7 @@ void JIT::compileOpCallSlowCase(Instruction* instruction, Vector<SlowCaseEntry>:
 
     move(regT0, regT2);
 
-    m_callStructureStubCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_globalData->jitStubs.ctiVirtualCallLink());
+    m_callStructureStubCompilationInfo[callLinkInfoIndex].callReturnLocation = emitNakedCall(m_globalData->jitStubs->ctiVirtualCallLink());
 
     // Put the return value in dst.
     emitPutVirtualRegister(dst);

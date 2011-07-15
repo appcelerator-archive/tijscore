@@ -46,10 +46,7 @@ using namespace Unicode;
 // We can't specify the namespace in yacc's C output, so do it here instead.
 using namespace TI;
 
-#ifndef KDE_USE_FINAL
 #include "Grammar.h"
-#endif
-
 #include "Lookup.h"
 #include "Lexer.lut.h"
 
@@ -62,8 +59,6 @@ Lexer::Lexer(TiGlobalData* globalData)
     , m_globalData(globalData)
     , m_keywordTable(TI::mainTable)
 {
-    m_buffer8.reserveInitialCapacity(initialReadBufferCapacity);
-    m_buffer16.reserveInitialCapacity(initialReadBufferCapacity);
 }
 
 Lexer::~Lexer()
@@ -158,6 +153,9 @@ void Lexer::setCode(const SourceCode& source, ParserArena& arena)
     m_codeEnd = data + source.endOffset();
     m_error = false;
     m_atLineStart = true;
+
+    m_buffer8.reserveInitialCapacity(initialReadBufferCapacity);
+    m_buffer16.reserveInitialCapacity((m_codeEnd - m_code) / 2);
 
     // ECMA-262 calls for stripping all Cf characters, but we only strip BOM characters.
     // See <https://bugs.webkit.org/show_bug.cgi?id=4931> for details.
@@ -649,6 +647,8 @@ inStringEscapeSequence:
         shiftLineTerminator();
         goto inString;
     }
+    if (m_current == -1)
+        goto returnError;
     record16(singleEscape(m_current));
     shift1();
     goto inString;
@@ -1017,11 +1017,9 @@ void Lexer::clear()
     m_codeWithoutBOMs.clear();
 
     Vector<char> newBuffer8;
-    newBuffer8.reserveInitialCapacity(initialReadBufferCapacity);
     m_buffer8.swap(newBuffer8);
 
     Vector<UChar> newBuffer16;
-    newBuffer16.reserveInitialCapacity(initialReadBufferCapacity);
     m_buffer16.swap(newBuffer16);
 
     m_isReparsing = false;
@@ -1033,20 +1031,23 @@ SourceCode Lexer::sourceCode(int openBrace, int closeBrace, int firstLine)
         return SourceCode(m_source->provider(), openBrace, closeBrace + 1, firstLine);
 
     const UChar* data = m_source->provider()->data();
+    
+    ASSERT(openBrace < closeBrace);
+    int i;
+    for (i = m_source->startOffset(); i < openBrace; ++i) {
+        if (data[i] == byteOrderMark) {
+            openBrace++;
+            closeBrace++;
+        }
+    }
+    for (; i < closeBrace; ++i) {
+        if (data[i] == byteOrderMark)
+            closeBrace++;
+    }
 
     ASSERT(openBrace < closeBrace);
 
-    int numBOMsBeforeOpenBrace = 0;
-    int numBOMsBetweenBraces = 0;
-
-    int i;
-    for (i = m_source->startOffset(); i < openBrace; ++i)
-        numBOMsBeforeOpenBrace += data[i] == byteOrderMark;
-    for (; i < closeBrace; ++i)
-        numBOMsBetweenBraces += data[i] == byteOrderMark;
-
-    return SourceCode(m_source->provider(), openBrace + numBOMsBeforeOpenBrace,
-        closeBrace + numBOMsBeforeOpenBrace + numBOMsBetweenBraces + 1, firstLine);
+    return SourceCode(m_source->provider(), openBrace, closeBrace + 1, firstLine);
 }
 
 } // namespace TI

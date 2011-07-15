@@ -35,6 +35,7 @@
 #include "TiFunction.h"
 #include "TiGlobalObject.h"
 #include "TiString.h"
+#include "TiStringBuilder.h"
 #include "ObjectPrototype.h"
 #include "PrototypeFunction.h"
 #include <math.h>
@@ -42,7 +43,7 @@
 #include <wtf/DateMath.h>
 #include <wtf/MathExtras.h>
 
-#if PLATFORM(WINCE) && !PLATFORM(QT)
+#if OS(WINCE) && !PLATFORM(QT)
 extern "C" time_t time(time_t* timer); // Provided by libce.
 #endif
 
@@ -91,7 +92,7 @@ TiObject* constructDate(TiExcState* exec, const ArgList& args)
         else {
             TiValue primitive = args.at(0).toPrimitive(exec);
             if (primitive.isString())
-                value = parseDate(exec, primitive.getString());
+                value = parseDate(exec, primitive.getString(exec));
             else
                 value = primitive.toNumber(exec);
         }
@@ -140,7 +141,11 @@ static TiValue JSC_HOST_CALL callDate(TiExcState* exec, TiObject*, TiValue, cons
     tm localTM;
     getLocalTime(&localTime, &localTM);
     GregorianDateTime ts(exec, localTM);
-    return jsNontrivialString(exec, formatDate(ts) + " " + formatTime(ts));
+    DateConversionBuffer date;
+    DateConversionBuffer time;
+    formatDate(ts, date);
+    formatTime(ts, time);
+    return jsMakeNontrivialString(exec, date, " ", time);
 }
 
 CallType DateConstructor::getCallData(CallData& callData)
@@ -180,7 +185,7 @@ static TiValue JSC_HOST_CALL dateUTC(TiExcState* exec, TiObject*, TiValue, const
     t.minute = args.at(4).toInt32(exec);
     t.second = args.at(5).toInt32(exec);
     double ms = (n >= 7) ? args.at(6).toNumber(exec) : 0;
-    return jsNumber(exec, gregorianDateTimeToMS(exec, t, ms, true));
+    return jsNumber(exec, timeClip(gregorianDateTimeToMS(exec, t, ms, true)));
 }
 
 } // namespace TI

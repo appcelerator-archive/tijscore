@@ -36,10 +36,6 @@
 #include <stdio.h>
 #include <wtf/MathExtras.h>
 
-#if HAVE(FLOAT_H)
-#include <float.h>
-#endif
-
 namespace TI {
 
 bool TiValue::equalSlowCase(TiExcState* exec, TiValue v1, TiValue v2)
@@ -47,16 +43,9 @@ bool TiValue::equalSlowCase(TiExcState* exec, TiValue v1, TiValue v2)
     return equalSlowCaseInline(exec, v1, v2);
 }
 
-bool TiValue::strictEqualSlowCase(TiValue v1, TiValue v2)
+bool TiValue::strictEqualSlowCase(TiExcState* exec, TiValue v1, TiValue v2)
 {
-    return strictEqualSlowCaseInline(v1, v2);
-}
-
-NEVER_INLINE TiValue throwOutOfMemoryError(TiExcState* exec)
-{
-    TiObject* error = Error::create(exec, GeneralError, "Out of memory");
-    exec->setException(error);
-    return error;
+    return strictEqualSlowCaseInline(exec, v1, v2);
 }
 
 NEVER_INLINE TiValue jsAddSlowCase(CallFrame* callFrame, TiValue v1, TiValue v2)
@@ -65,12 +54,13 @@ NEVER_INLINE TiValue jsAddSlowCase(CallFrame* callFrame, TiValue v1, TiValue v2)
     TiValue p1 = v1.toPrimitive(callFrame);
     TiValue p2 = v2.toPrimitive(callFrame);
 
-    if (p1.isString() || p2.isString()) {
-        RefPtr<UString::Rep> value = concatenate(p1.toString(callFrame).rep(), p2.toString(callFrame).rep());
-        if (!value)
-            return throwOutOfMemoryError(callFrame);
-        return jsString(callFrame, value.release());
+    if (p1.isString()) {
+        return p2.isString()
+            ? jsString(callFrame, asString(p1), asString(p2))
+            : jsString(callFrame, asString(p1), p2.toString(callFrame));
     }
+    if (p2.isString())
+        return jsString(callFrame, p1.toString(callFrame), asString(p2));
 
     return jsNumber(callFrame, p1.toNumber(callFrame) + p2.toNumber(callFrame));
 }

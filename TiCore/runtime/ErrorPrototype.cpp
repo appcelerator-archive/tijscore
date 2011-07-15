@@ -30,6 +30,7 @@
 
 #include "TiFunction.h"
 #include "TiString.h"
+#include "TiStringBuilder.h"
 #include "ObjectPrototype.h"
 #include "PrototypeFunction.h"
 #include "UString.h"
@@ -55,21 +56,19 @@ ErrorPrototype::ErrorPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> st
 TiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
 {
     TiObject* thisObj = thisValue.toThisObject(exec);
+    TiValue name = thisObj->get(exec, exec->propertyNames().name);
+    TiValue message = thisObj->get(exec, exec->propertyNames().message);
 
-    UString s = "Error";
+    // Mozilla-compatible format.
 
-    TiValue v = thisObj->get(exec, exec->propertyNames().name);
-    if (!v.isUndefined())
-        s = v.toString(exec);
-
-    v = thisObj->get(exec, exec->propertyNames().message);
-    if (!v.isUndefined()) {
-        // Mozilla-compatible format.
-        s += ": ";
-        s += v.toString(exec);
+    if (!name.isUndefined()) {
+        if (!message.isUndefined())
+            return jsMakeNontrivialString(exec, name.toString(exec), ": ", message.toString(exec));
+        return jsNontrivialString(exec, name.toString(exec));
     }
-
-    return jsNontrivialString(exec, s);
+    if (!message.isUndefined())
+        return jsMakeNontrivialString(exec, "Error: ", message.toString(exec));
+    return jsNontrivialString(exec, "Error");
 }
 
 } // namespace TI

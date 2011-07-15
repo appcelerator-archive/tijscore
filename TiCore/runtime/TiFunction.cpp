@@ -63,10 +63,27 @@ TiFunction::TiFunction(NonNullPassRefPtr<Structure> structure)
 {
 }
 
+TiFunction::TiFunction(TiExcState* exec, NonNullPassRefPtr<Structure> structure, int length, const Identifier& name, NativeExecutable* thunk, NativeFunction func)
+    : Base(&exec->globalData(), structure, name)
+#if ENABLE(JIT)
+    , m_executable(thunk)
+#endif
+{
+#if ENABLE(JIT)
+    setNativeFunction(func);
+    putDirect(exec->propertyNames().length, jsNumber(exec, length), DontDelete | ReadOnly | DontEnum);
+#else
+    UNUSED_PARAM(thunk);
+    UNUSED_PARAM(length);
+    UNUSED_PARAM(func);
+    ASSERT_NOT_REACHED();
+#endif
+}
+
 TiFunction::TiFunction(TiExcState* exec, NonNullPassRefPtr<Structure> structure, int length, const Identifier& name, NativeFunction func)
     : Base(&exec->globalData(), structure, name)
 #if ENABLE(JIT)
-    , m_executable(adoptRef(new NativeExecutable(exec)))
+    , m_executable(exec->globalData().jitStubs->ctiNativeCallThunk())
 #endif
 {
 #if ENABLE(JIT)
@@ -88,6 +105,8 @@ TiFunction::TiFunction(TiExcState* exec, NonNullPassRefPtr<FunctionExecutable> e
 
 TiFunction::~TiFunction()
 {
+    ASSERT(vptr() == TiGlobalData::jsFunctionVPtr);
+
     // JIT code for other functions may have had calls linked directly to the code for this function; these links
     // are based on a check for the this pointer value for this TiFunction - which will no longer be valid once
     // this memory is freed and may be reused (potentially for another, different TiFunction).
@@ -127,23 +146,23 @@ TiValue TiFunction::call(TiExcState* exec, TiValue thisValue, const ArgList& arg
     return exec->interpreter()->execute(jsExecutable(), exec, this, thisValue.toThisObject(exec), args, scopeChain().node(), exec->exceptionSlot());
 }
 
-TiValue TiFunction::argumentsGetter(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue TiFunction::argumentsGetter(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    TiFunction* thisObj = asFunction(slot.slotBase());
+    TiFunction* thisObj = asFunction(slotBase);
     ASSERT(!thisObj->isHostFunction());
     return exec->interpreter()->retrieveArguments(exec, thisObj);
 }
 
-TiValue TiFunction::callerGetter(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue TiFunction::callerGetter(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    TiFunction* thisObj = asFunction(slot.slotBase());
+    TiFunction* thisObj = asFunction(slotBase);
     ASSERT(!thisObj->isHostFunction());
     return exec->interpreter()->retrieveCaller(exec, thisObj);
 }
 
-TiValue TiFunction::lengthGetter(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue TiFunction::lengthGetter(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    TiFunction* thisObj = asFunction(slot.slotBase());
+    TiFunction* thisObj = asFunction(slotBase);
     ASSERT(!thisObj->isHostFunction());
     return jsNumber(exec, thisObj->jsExecutable()->parameterCount());
 }
@@ -167,17 +186,17 @@ bool TiFunction::getOwnPropertySlot(TiExcState* exec, const Identifier& property
     }
 
     if (propertyName == exec->propertyNames().arguments) {
-        slot.setCustom(this, argumentsGetter);
+        slot.setCacheableCustom(this, argumentsGetter);
         return true;
     }
 
     if (propertyName == exec->propertyNames().length) {
-        slot.setCustom(this, lengthGetter);
+        slot.setCacheableCustom(this, lengthGetter);
         return true;
     }
 
     if (propertyName == exec->propertyNames().caller) {
-        slot.setCustom(this, callerGetter);
+        slot.setCacheableCustom(this, callerGetter);
         return true;
     }
 
@@ -213,6 +232,17 @@ bool TiFunction::getOwnPropertySlot(TiExcState* exec, const Identifier& property
         return Base::getOwnPropertyDescriptor(exec, propertyName, descriptor);
     }
     
+void TiFunction::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+{
+    if (!isHostFunction() && (mode == IncludeDontEnumProperties)) {
+        propertyNames.add(exec->propertyNames().arguments);
+        propertyNames.add(exec->propertyNames().callee);
+        propertyNames.add(exec->propertyNames().caller);
+        propertyNames.add(exec->propertyNames().length);
+    }
+    Base::getOwnPropertyNames(exec, propertyNames, mode);
+}
+
 void TiFunction::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
     if (isHostFunction()) {

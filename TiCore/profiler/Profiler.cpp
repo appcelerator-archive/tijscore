@@ -53,7 +53,7 @@ static const char* GlobalCodeExecution = "(program)";
 static const char* AnonymousFunction = "(anonymous function)";
 static unsigned ProfilesUID = 0;
 
-static CallIdentifier createCallIdentifierFromFunctionImp(TiGlobalData*, TiFunction*);
+static CallIdentifier createCallIdentifierFromFunctionImp(TiExcState*, TiFunction*);
 
 Profiler* Profiler::s_sharedProfiler = 0;
 Profiler* Profiler::s_sharedEnabledProfilerReference = 0;
@@ -116,14 +116,14 @@ void Profiler::willExecute(TiExcState* exec, TiValue function)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::willExecute, createCallIdentifier(&exec->globalData(), function, "", 0), exec->lexicalGlobalObject()->profileGroup());
+    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::willExecute, createCallIdentifier(exec, function, "", 0), exec->lexicalGlobalObject()->profileGroup());
 }
 
 void Profiler::willExecute(TiExcState* exec, const UString& sourceURL, int startingLineNumber)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    CallIdentifier callIdentifier = createCallIdentifier(&exec->globalData(), TiValue(), sourceURL, startingLineNumber);
+    CallIdentifier callIdentifier = createCallIdentifier(exec, TiValue(), sourceURL, startingLineNumber);
 
     dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::willExecute, callIdentifier, exec->lexicalGlobalObject()->profileGroup());
 }
@@ -132,17 +132,17 @@ void Profiler::didExecute(TiExcState* exec, TiValue function)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(&exec->globalData(), function, "", 0), exec->lexicalGlobalObject()->profileGroup());
+    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(exec, function, "", 0), exec->lexicalGlobalObject()->profileGroup());
 }
 
 void Profiler::didExecute(TiExcState* exec, const UString& sourceURL, int startingLineNumber)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(&exec->globalData(), TiValue(), sourceURL, startingLineNumber), exec->lexicalGlobalObject()->profileGroup());
+    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(exec, TiValue(), sourceURL, startingLineNumber), exec->lexicalGlobalObject()->profileGroup());
 }
 
-CallIdentifier Profiler::createCallIdentifier(TiGlobalData* globalData, TiValue functionValue, const UString& defaultSourceURL, int defaultLineNumber)
+CallIdentifier Profiler::createCallIdentifier(TiExcState* exec, TiValue functionValue, const UString& defaultSourceURL, int defaultLineNumber)
 {
     if (!functionValue)
         return CallIdentifier(GlobalCodeExecution, defaultSourceURL, defaultLineNumber);
@@ -151,17 +151,17 @@ CallIdentifier Profiler::createCallIdentifier(TiGlobalData* globalData, TiValue 
     if (asObject(functionValue)->inherits(&TiFunction::info)) {
         TiFunction* function = asFunction(functionValue);
         if (!function->executable()->isHostFunction())
-            return createCallIdentifierFromFunctionImp(globalData, function);
+            return createCallIdentifierFromFunctionImp(exec, function);
     }
     if (asObject(functionValue)->inherits(&InternalFunction::info))
-        return CallIdentifier(static_cast<InternalFunction*>(asObject(functionValue))->name(globalData), defaultSourceURL, defaultLineNumber);
-    return CallIdentifier("(" + asObject(functionValue)->className() + " object)", defaultSourceURL, defaultLineNumber);
+        return CallIdentifier(static_cast<InternalFunction*>(asObject(functionValue))->name(exec), defaultSourceURL, defaultLineNumber);
+    return CallIdentifier(makeString("(", asObject(functionValue)->className(), " object)"), defaultSourceURL, defaultLineNumber);
 }
 
-CallIdentifier createCallIdentifierFromFunctionImp(TiGlobalData* globalData, TiFunction* function)
+CallIdentifier createCallIdentifierFromFunctionImp(TiExcState* exec, TiFunction* function)
 {
     ASSERT(!function->isHostFunction());
-    const UString& name = function->calculatedDisplayName(globalData);
+    const UString& name = function->calculatedDisplayName(exec);
     return CallIdentifier(name.isEmpty() ? AnonymousFunction : name, function->jsExecutable()->sourceURL(), function->jsExecutable()->lineNo());
 }
 

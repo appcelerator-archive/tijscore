@@ -29,8 +29,6 @@
 #ifndef JSImmediate_h
 #define JSImmediate_h
 
-#include <wtf/Platform.h>
-
 #if !USE(JSVALUE32_64)
 
 #include <wtf/Assertions.h>
@@ -145,6 +143,8 @@ namespace TI {
         friend class JIT;
         friend class TiValue;
         friend class JSFastMath;
+        friend class JSInterfaceJIT;
+        friend class SpecializedThunkJIT;
         friend TiValue jsNumber(TiExcState* exec, double d);
         friend TiValue jsNumber(TiExcState*, char i);
         friend TiValue jsNumber(TiExcState*, unsigned char i);
@@ -173,7 +173,7 @@ namespace TI {
         // This value is 2^48, used to encode doubles such that the encoded value will begin
         // with a 16-bit pattern within the range 0x0001..0xFFFE.
         static const intptr_t DoubleEncodeOffset = 0x1000000000000ll;
-#else
+#elif USE(JSVALUE32)
         static const intptr_t TagTypeNumber = 0x1; // bottom bit set indicates integer, this dominates the following bit
 #endif
         static const intptr_t TagBitTypeOther   = 0x2; // second bit set indicates immediate other than an integer

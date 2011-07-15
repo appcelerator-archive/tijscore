@@ -46,7 +46,7 @@ namespace TI {
 
         virtual void put(TiExcState* exec, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
         virtual const ClassInfo* classInfo() const { return &info; }
         static const JS_EXPORTDATA ClassInfo info;
@@ -55,7 +55,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
     protected:

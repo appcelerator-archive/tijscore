@@ -49,7 +49,7 @@ PassRefPtr<OpaqueTiString> OpaqueTiString::create(const UString& ustring)
 UString OpaqueTiString::ustring() const
 {
     if (this && m_characters)
-        return UString(m_characters, m_length, true);
+        return UString(m_characters, m_length);
     return UString::null();
 }
 

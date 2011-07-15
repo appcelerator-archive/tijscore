@@ -42,6 +42,24 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(TiPropertyNameIterator);
 
+inline TiPropertyNameIterator::TiPropertyNameIterator(TiExcState* exec, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlots)
+    : TiCell(exec->globalData().propertyNameIteratorStructure.get())
+    , m_cachedStructure(0)
+    , m_numCacheableSlots(numCacheableSlots)
+    , m_jsStringsSize(propertyNameArrayData->propertyNameVector().size())
+    , m_jsStrings(new TiValue[m_jsStringsSize])
+{
+    PropertyNameArrayData::PropertyNameVector& propertyNameVector = propertyNameArrayData->propertyNameVector();
+    for (size_t i = 0; i < m_jsStringsSize; ++i)
+        m_jsStrings[i] = jsOwnedString(exec, propertyNameVector[i].ustring());
+}
+
+TiPropertyNameIterator::~TiPropertyNameIterator()
+{
+    if (m_cachedStructure)
+        m_cachedStructure->clearEnumerationCache(this);
+}
+
 TiPropertyNameIterator* TiPropertyNameIterator::create(TiExcState* exec, TiObject* o)
 {
     ASSERT(!o->structure()->enumerationCache() ||
@@ -84,7 +102,7 @@ TiValue TiPropertyNameIterator::get(TiExcState* exec, TiObject* base, size_t i)
     if (m_cachedStructure == base->structure() && m_cachedPrototypeChain == base->structure()->prototypeChain(exec))
         return identifier;
 
-    if (!base->hasProperty(exec, Identifier(exec, asString(identifier)->value())))
+    if (!base->hasProperty(exec, Identifier(exec, asString(identifier)->value(exec))))
         return TiValue();
     return identifier;
 }

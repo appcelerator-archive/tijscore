@@ -49,10 +49,18 @@ TiArrayArray::TiArrayArray(TiExcState* exec, NonNullPassRefPtr<Structure> struct
 {
     putDirect(exec->globalData().propertyNames->length, jsNumber(exec, m_storage->length()), ReadOnly | DontDelete);
 }
-    
+
+#if !ASSERT_DISABLED
+TiArrayArray::~TiArrayArray()
+{
+    ASSERT(vptr() == TiGlobalData::jsByteArrayVPtr);
+}
+#endif
+
+
 PassRefPtr<Structure> TiArrayArray::createStructure(TiValue prototype)
 {
-    PassRefPtr<Structure> result = Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+    PassRefPtr<Structure> result = Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
     return result;
 }
 
@@ -103,12 +111,12 @@ void TiArrayArray::put(TiExcState* exec, unsigned propertyName, TiValue value)
     setIndex(exec, propertyName, value);
 }
 
-void TiArrayArray::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void TiArrayArray::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     unsigned length = m_storage->length();
     for (unsigned i = 0; i < length; ++i)
         propertyNames.add(Identifier::from(exec, i));
-    TiObject::getOwnPropertyNames(exec, propertyNames);
+    TiObject::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
 }

@@ -160,7 +160,7 @@ namespace TI {
                 ASSERT(0 == (size % MarkStack::pageSize()));
                 if (size == m_allocated)
                     return;
-#if PLATFORM(WIN) || PLATFORM(SYMBIAN)
+#if OS(WINDOWS) || OS(SYMBIAN) || PLATFORM(BREWMP)
                 // We cannot release a part of a region with VirtualFree.  To get around this,
                 // we'll release the entire region and reallocate the size that we want.
                 releaseStack(m_data, m_allocated);

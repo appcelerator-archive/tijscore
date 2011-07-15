@@ -56,9 +56,9 @@ namespace TI {
 static UString escapeQuotes(const UString& str)
 {
     UString result = str;
-    int pos = 0;
-    while ((pos = result.find('\"', pos)) >= 0) {
-        result = result.substr(0, pos) + "\"\\\"\"" + result.substr(pos + 1);
+    unsigned pos = 0;
+    while ((pos = result.find('\"', pos)) != UString::NotFound) {
+        result = makeString(result.substr(0, pos), "\"\\\"\"", result.substr(pos + 1));
         pos += 4;
     }
     return result;
@@ -69,23 +69,20 @@ static UString valueToSourceString(TiExcState* exec, TiValue val)
     if (!val)
         return "0";
 
-    if (val.isString()) {
-        UString result("\"");
-        result += escapeQuotes(val.toString(exec)) + "\"";
-        return result;
-    } 
+    if (val.isString())
+        return makeString("\"", escapeQuotes(val.toString(exec)), "\"");
 
     return val.toString(exec);
 }
 
 static CString constantName(TiExcState* exec, int k, TiValue value)
 {
-    return (valueToSourceString(exec, value) + "(@k" + UString::from(k - FirstConstantRegisterIndex) + ")").UTF8String();
+    return makeString(valueToSourceString(exec, value), "(@k", UString::from(k - FirstConstantRegisterIndex), ")").UTF8String();
 }
 
 static CString idName(int id0, const Identifier& ident)
 {
-    return (ident.ustring() + "(@id" + UString::from(id0) +")").UTF8String();
+    return makeString(ident.ustring(), "(@id", UString::from(id0), ")").UTF8String();
 }
 
 CString CodeBlock::registerName(TiExcState* exec, int r) const
@@ -96,25 +93,26 @@ CString CodeBlock::registerName(TiExcState* exec, int r) const
     if (isConstantRegisterIndex(r))
         return constantName(exec, r, getConstant(r));
 
-    return (UString("r") + UString::from(r)).UTF8String();
+    return makeString("r", UString::from(r)).UTF8String();
 }
 
 static UString regexpToSourceString(RegExp* regExp)
 {
-    UString pattern = UString("/") + regExp->pattern() + "/";
+    char postfix[5] = { '/', 0, 0, 0, 0 };
+    int index = 1;
     if (regExp->global())
-        pattern += "g";
+        postfix[index++] = 'g';
     if (regExp->ignoreCase())
-        pattern += "i";
+        postfix[index++] = 'i';
     if (regExp->multiline())
-        pattern += "m";
+        postfix[index] = 'm';
 
-    return pattern;
+    return makeString("/", regExp->pattern(), postfix);
 }
 
 static CString regexpName(int re, RegExp* regexp)
 {
-    return (regexpToSourceString(regexp) + "(@re" + UString::from(re) + ")").UTF8String();
+    return makeString(regexpToSourceString(regexp), "(@re", UString::from(re), ")").UTF8String();
 }
 
 static UString pointerToSourceString(void* p)
@@ -150,7 +148,7 @@ void CodeBlock::printUnaryOp(TiExcState* exec, int location, Vector<Instruction>
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
 
-    printf("[%4d] %s\t\t %s, %s\n", location, op, registerName(exec, r0).c_str(), registerName(exec, r1).c_str());
+    printf("[%4d] %s\t\t %s, %s\n", location, op, registerName(exec, r0).data(), registerName(exec, r1).data());
 }
 
 void CodeBlock::printBinaryOp(TiExcState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
@@ -158,14 +156,14 @@ void CodeBlock::printBinaryOp(TiExcState* exec, int location, Vector<Instruction
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
     int r2 = (++it)->u.operand;
-    printf("[%4d] %s\t\t %s, %s, %s\n", location, op, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str());
+    printf("[%4d] %s\t\t %s, %s, %s\n", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
 }
 
 void CodeBlock::printConditionalJump(TiExcState* exec, const Vector<Instruction>::const_iterator&, Vector<Instruction>::const_iterator& it, int location, const char* op) const
 {
     int r0 = (++it)->u.operand;
     int offset = (++it)->u.operand;
-    printf("[%4d] %s\t\t %s, %d(->%d)\n", location, op, registerName(exec, r0).c_str(), offset, location + offset);
+    printf("[%4d] %s\t\t %s, %d(->%d)\n", location, op, registerName(exec, r0).data(), offset, location + offset);
 }
 
 void CodeBlock::printGetByIdOp(TiExcState* exec, int location, Vector<Instruction>::const_iterator& it, const char* op) const
@@ -173,7 +171,7 @@ void CodeBlock::printGetByIdOp(TiExcState* exec, int location, Vector<Instructio
     int r0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
     int id0 = (++it)->u.operand;
-    printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), idName(id0, m_identifiers[id0]).c_str());
+    printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
     it += 4;
 }
 
@@ -182,14 +180,14 @@ void CodeBlock::printPutByIdOp(TiExcState* exec, int location, Vector<Instructio
     int r0 = (++it)->u.operand;
     int id0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
-    printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str(), registerName(exec, r1).c_str());
+    printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
     it += 4;
 }
 
 #if ENABLE(JIT)
 static bool isGlobalResolve(OpcodeID opcodeID)
 {
-    return opcodeID == op_resolve_global;
+    return opcodeID == op_resolve_global || opcodeID == op_resolve_global_dynamic;
 }
 
 static bool isPropertyAccess(OpcodeID opcodeID)
@@ -232,32 +230,32 @@ static unsigned instructionOffsetForNth(TiExcState* exec, const Vector<Instructi
 
 static void printGlobalResolveInfo(const GlobalResolveInfo& resolveInfo, unsigned instructionOffset)
 {
-    printf("  [%4d] %s: %s\n", instructionOffset, "resolve_global", pointerToSourceString(resolveInfo.structure).UTF8String().c_str());
+    printf("  [%4d] %s: %s\n", instructionOffset, "resolve_global", pointerToSourceString(resolveInfo.structure).UTF8String().data());
 }
 
 static void printStructureStubInfo(const StructureStubInfo& stubInfo, unsigned instructionOffset)
 {
     switch (stubInfo.accessType) {
     case access_get_by_id_self:
-        printf("  [%4d] %s: %s\n", instructionOffset, "get_by_id_self", pointerToSourceString(stubInfo.u.getByIdSelf.baseObjectStructure).UTF8String().c_str());
+        printf("  [%4d] %s: %s\n", instructionOffset, "get_by_id_self", pointerToSourceString(stubInfo.u.getByIdSelf.baseObjectStructure).UTF8String().data());
         return;
     case access_get_by_id_proto:
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(stubInfo.u.getByIdProto.baseObjectStructure).UTF8String().c_str(), pointerToSourceString(stubInfo.u.getByIdProto.prototypeStructure).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(stubInfo.u.getByIdProto.baseObjectStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.getByIdProto.prototypeStructure).UTF8String().data());
         return;
     case access_get_by_id_chain:
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(stubInfo.u.getByIdChain.baseObjectStructure).UTF8String().c_str(), pointerToSourceString(stubInfo.u.getByIdChain.chain).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(stubInfo.u.getByIdChain.baseObjectStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.getByIdChain.chain).UTF8String().data());
         return;
     case access_get_by_id_self_list:
-        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_self_list", pointerToSourceString(stubInfo.u.getByIdSelfList.structureList).UTF8String().c_str(), stubInfo.u.getByIdSelfList.listSize);
+        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_self_list", pointerToSourceString(stubInfo.u.getByIdSelfList.structureList).UTF8String().data(), stubInfo.u.getByIdSelfList.listSize);
         return;
     case access_get_by_id_proto_list:
-        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_proto_list", pointerToSourceString(stubInfo.u.getByIdProtoList.structureList).UTF8String().c_str(), stubInfo.u.getByIdProtoList.listSize);
+        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_proto_list", pointerToSourceString(stubInfo.u.getByIdProtoList.structureList).UTF8String().data(), stubInfo.u.getByIdProtoList.listSize);
         return;
     case access_put_by_id_transition:
-        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(stubInfo.u.putByIdTransition.previousStructure).UTF8String().c_str(), pointerToSourceString(stubInfo.u.putByIdTransition.structure).UTF8String().c_str(), pointerToSourceString(stubInfo.u.putByIdTransition.chain).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(stubInfo.u.putByIdTransition.previousStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.putByIdTransition.structure).UTF8String().data(), pointerToSourceString(stubInfo.u.putByIdTransition.chain).UTF8String().data());
         return;
     case access_put_by_id_replace:
-        printf("  [%4d] %s: %s\n", instructionOffset, "put_by_id_replace", pointerToSourceString(stubInfo.u.putByIdReplace.baseObjectStructure).UTF8String().c_str());
+        printf("  [%4d] %s: %s\n", instructionOffset, "put_by_id_replace", pointerToSourceString(stubInfo.u.putByIdReplace.baseObjectStructure).UTF8String().data());
         return;
     case access_get_by_id:
         printf("  [%4d] %s\n", instructionOffset, "get_by_id");
@@ -286,7 +284,7 @@ static void printStructureStubInfo(const StructureStubInfo& stubInfo, unsigned i
 void CodeBlock::printStructure(const char* name, const Instruction* vPC, int operand) const
 {
     unsigned instructionOffset = vPC - m_instructions.begin();
-    printf("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).UTF8String().c_str());
+    printf("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).UTF8String().data());
 }
 
 void CodeBlock::printStructures(const Instruction* vPC) const
@@ -303,15 +301,15 @@ void CodeBlock::printStructures(const Instruction* vPC) const
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto)) {
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).UTF8String().c_str(), pointerToSourceString(vPC[5].u.structure).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structure).UTF8String().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
-        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).UTF8String().c_str(), pointerToSourceString(vPC[5].u.structure).UTF8String().c_str(), pointerToSourceString(vPC[6].u.structureChain).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structure).UTF8String().data(), pointerToSourceString(vPC[6].u.structureChain).UTF8String().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain)) {
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).UTF8String().c_str(), pointerToSourceString(vPC[5].u.structureChain).UTF8String().c_str());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structureChain).UTF8String().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id)) {
@@ -324,6 +322,10 @@ void CodeBlock::printStructures(const Instruction* vPC) const
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global)) {
         printStructure("resolve_global", vPC, 4);
+        return;
+    }
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global_dynamic)) {
+        printStructure("resolve_global_dynamic", vPC, 4);
         return;
     }
 
@@ -491,7 +493,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_enter_with_activation: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] enter_with_activation %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] enter_with_activation %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_create_arguments: {
@@ -504,31 +506,31 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_convert_this: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] convert_this %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] convert_this %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_object: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] new_object\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] new_object\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_array: {
             int dst = (++it)->u.operand;
             int argv = (++it)->u.operand;
             int argc = (++it)->u.operand;
-            printf("[%4d] new_array\t %s, %s, %d\n", location, registerName(exec, dst).c_str(), registerName(exec, argv).c_str(), argc);
+            printf("[%4d] new_array\t %s, %s, %d\n", location, registerName(exec, dst).data(), registerName(exec, argv).data(), argc);
             break;
         }
         case op_new_regexp: {
             int r0 = (++it)->u.operand;
             int re0 = (++it)->u.operand;
-            printf("[%4d] new_regexp\t %s, %s\n", location, registerName(exec, r0).c_str(), regexpName(re0, regexp(re0)).c_str());
+            printf("[%4d] new_regexp\t %s, %s\n", location, registerName(exec, r0).data(), regexpName(re0, regexp(re0)).data());
             break;
         }
         case op_mov: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] mov\t\t %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] mov\t\t %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_not: {
@@ -569,12 +571,12 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_pre_inc: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] pre_inc\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] pre_inc\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_pre_dec: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] pre_dec\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] pre_dec\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_post_inc: {
@@ -653,7 +655,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
             int r3 = (++it)->u.operand;
-            printf("[%4d] instanceof\t\t %s, %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str(), registerName(exec, r3).c_str());
+            printf("[%4d] instanceof\t\t %s, %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data());
             break;
         }
         case op_typeof: {
@@ -691,63 +693,72 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         case op_resolve: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve\t\t %s, %s\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str());
+            printf("[%4d] resolve\t\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_resolve_skip: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int skipLevels = (++it)->u.operand;
-            printf("[%4d] resolve_skip\t %s, %s, %d\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str(), skipLevels);
+            printf("[%4d] resolve_skip\t %s, %s, %d\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), skipLevels);
             break;
         }
         case op_resolve_global: {
             int r0 = (++it)->u.operand;
             TiValue scope = TiValue((++it)->u.jsCell);
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve_global\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), valueToSourceString(exec, scope).ascii(), idName(id0, m_identifiers[id0]).c_str());
+            printf("[%4d] resolve_global\t %s, %s, %s\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), idName(id0, m_identifiers[id0]).data());
             it += 2;
+            break;
+        }
+        case op_resolve_global_dynamic: {
+            int r0 = (++it)->u.operand;
+            TiValue scope = TiValue((++it)->u.jsCell);
+            int id0 = (++it)->u.operand;
+            int depth = it[2].u.operand;
+            printf("[%4d] resolve_global_dynamic\t %s, %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), idName(id0, m_identifiers[id0]).data(), depth);
+            it += 3;
             break;
         }
         case op_get_scoped_var: {
             int r0 = (++it)->u.operand;
             int index = (++it)->u.operand;
             int skipLevels = (++it)->u.operand;
-            printf("[%4d] get_scoped_var\t %s, %d, %d\n", location, registerName(exec, r0).c_str(), index, skipLevels);
+            printf("[%4d] get_scoped_var\t %s, %d, %d\n", location, registerName(exec, r0).data(), index, skipLevels);
             break;
         }
         case op_put_scoped_var: {
             int index = (++it)->u.operand;
             int skipLevels = (++it)->u.operand;
             int r0 = (++it)->u.operand;
-            printf("[%4d] put_scoped_var\t %d, %d, %s\n", location, index, skipLevels, registerName(exec, r0).c_str());
+            printf("[%4d] put_scoped_var\t %d, %d, %s\n", location, index, skipLevels, registerName(exec, r0).data());
             break;
         }
         case op_get_global_var: {
             int r0 = (++it)->u.operand;
             TiValue scope = TiValue((++it)->u.jsCell);
             int index = (++it)->u.operand;
-            printf("[%4d] get_global_var\t %s, %s, %d\n", location, registerName(exec, r0).c_str(), valueToSourceString(exec, scope).ascii(), index);
+            printf("[%4d] get_global_var\t %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), index);
             break;
         }
         case op_put_global_var: {
             TiValue scope = TiValue((++it)->u.jsCell);
             int index = (++it)->u.operand;
             int r0 = (++it)->u.operand;
-            printf("[%4d] put_global_var\t %s, %d, %s\n", location, valueToSourceString(exec, scope).ascii(), index, registerName(exec, r0).c_str());
+            printf("[%4d] put_global_var\t %s, %d, %s\n", location, valueToSourceString(exec, scope).ascii(), index, registerName(exec, r0).data());
             break;
         }
         case op_resolve_base: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve_base\t %s, %s\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str());
+            printf("[%4d] resolve_base\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_resolve_with_base: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve_with_base %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), idName(id0, m_identifiers[id0]).c_str());
+            printf("[%4d] resolve_with_base %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_get_by_id: {
@@ -772,6 +783,46 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_get_by_id_chain: {
             printGetByIdOp(exec, location, it, "get_by_id_chain");
+            break;
+        }
+        case op_get_by_id_getter_self: {
+            printGetByIdOp(exec, location, it, "get_by_id_getter_self");
+            break;
+        }
+        case op_get_by_id_getter_self_list: {
+            printGetByIdOp(exec, location, it, "get_by_id_getter_self_list");
+            break;
+        }
+        case op_get_by_id_getter_proto: {
+            printGetByIdOp(exec, location, it, "get_by_id_getter_proto");
+            break;
+        }
+        case op_get_by_id_getter_proto_list: {
+            printGetByIdOp(exec, location, it, "get_by_id_getter_proto_list");
+            break;
+        }
+        case op_get_by_id_getter_chain: {
+            printGetByIdOp(exec, location, it, "get_by_id_getter_chain");
+            break;
+        }
+        case op_get_by_id_custom_self: {
+            printGetByIdOp(exec, location, it, "get_by_id_custom_self");
+            break;
+        }
+        case op_get_by_id_custom_self_list: {
+            printGetByIdOp(exec, location, it, "get_by_id_custom_self_list");
+            break;
+        }
+        case op_get_by_id_custom_proto: {
+            printGetByIdOp(exec, location, it, "get_by_id_custom_proto");
+            break;
+        }
+        case op_get_by_id_custom_proto_list: {
+            printGetByIdOp(exec, location, it, "get_by_id_custom_proto_list");
+            break;
+        }
+        case op_get_by_id_custom_chain: {
+            printGetByIdOp(exec, location, it, "get_by_id_custom_chain");
             break;
         }
         case op_get_by_id_generic: {
@@ -806,14 +857,14 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] put_getter\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] put_getter\t %s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
             break;
         }
         case op_put_setter: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] put_setter\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] put_setter\t %s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
             break;
         }
         case op_method_check: {
@@ -824,14 +875,14 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            printf("[%4d] del_by_id\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), idName(id0, m_identifiers[id0]).c_str());
+            printf("[%4d] del_by_id\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_get_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            printf("[%4d] get_by_val\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str());
+            printf("[%4d] get_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_get_by_pname: {
@@ -841,28 +892,28 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r3 = (++it)->u.operand;
             int r4 = (++it)->u.operand;
             int r5 = (++it)->u.operand;
-            printf("[%4d] get_by_pname\t %s, %s, %s, %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str(), registerName(exec, r3).c_str(), registerName(exec, r4).c_str(), registerName(exec, r5).c_str());
+            printf("[%4d] get_by_pname\t %s, %s, %s, %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), registerName(exec, r4).data(), registerName(exec, r5).data());
             break;
         }
         case op_put_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            printf("[%4d] put_by_val\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str());
+            printf("[%4d] put_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_del_by_val: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
-            printf("[%4d] del_by_val\t %s, %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str());
+            printf("[%4d] del_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_put_by_index: {
             int r0 = (++it)->u.operand;
             unsigned n0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] put_by_index\t %s, %u, %s\n", location, registerName(exec, r0).c_str(), n0, registerName(exec, r1).c_str());
+            printf("[%4d] put_by_index\t %s, %u, %s\n", location, registerName(exec, r0).data(), n0, registerName(exec, r1).data());
             break;
         }
         case op_jmp: {
@@ -883,6 +934,10 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printConditionalJump(exec, begin, it, location, "loop_if_true");
             break;
         }
+        case op_loop_if_false: {
+            printConditionalJump(exec, begin, it, location, "loop_if_false");
+            break;
+        }
         case op_jfalse: {
             printConditionalJump(exec, begin, it, location, "jfalse");
             break;
@@ -899,68 +954,82 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] jneq_ptr\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), offset, location + offset);
+            printf("[%4d] jneq_ptr\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jnless: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] jnless\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), offset, location + offset);
+            printf("[%4d] jnless\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_jnlesseq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] jnlesseq\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), offset, location + offset);
+            printf("[%4d] jnlesseq\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_loop_if_less: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] loop_if_less\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), offset, location + offset);
+            printf("[%4d] loop_if_less\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
+            break;
+        }
+        case op_jless: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int offset = (++it)->u.operand;
+            printf("[%4d] jless\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
+            break;
+        }
+        case op_jlesseq: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int offset = (++it)->u.operand;
+            printf("[%4d] jlesseq\t\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_loop_if_lesseq: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] loop_if_lesseq\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), offset, location + offset);
+            printf("[%4d] loop_if_lesseq\t %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), offset, location + offset);
             break;
         }
         case op_switch_imm: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            printf("[%4d] switch_imm\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).c_str());
+            printf("[%4d] switch_imm\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_switch_char: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            printf("[%4d] switch_char\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).c_str());
+            printf("[%4d] switch_char\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_switch_string: {
             int tableIndex = (++it)->u.operand;
             int defaultTarget = (++it)->u.operand;
             int scrutineeRegister = (++it)->u.operand;
-            printf("[%4d] switch_string\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).c_str());
+            printf("[%4d] switch_string\t %d, %d(->%d), %s\n", location, tableIndex, defaultTarget, location + defaultTarget, registerName(exec, scrutineeRegister).data());
             break;
         }
         case op_new_func: {
             int r0 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
-            printf("[%4d] new_func\t\t %s, f%d\n", location, registerName(exec, r0).c_str(), f0);
+            printf("[%4d] new_func\t\t %s, f%d\n", location, registerName(exec, r0).data(), f0);
             break;
         }
         case op_new_func_exp: {
             int r0 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
-            printf("[%4d] new_func_exp\t %s, f%d\n", location, registerName(exec, r0).c_str(), f0);
+            printf("[%4d] new_func_exp\t %s, f%d\n", location, registerName(exec, r0).data(), f0);
             break;
         }
         case op_call: {
@@ -968,7 +1037,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call\t\t %s, %s, %d, %d\n", location, registerName(exec, dst).c_str(), registerName(exec, func).c_str(), argCount, registerOffset);
+            printf("[%4d] call\t\t %s, %s, %d, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset);
             break;
         }
         case op_call_eval: {
@@ -976,7 +1045,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_eval\t %s, %s, %d, %d\n", location, registerName(exec, dst).c_str(), registerName(exec, func).c_str(), argCount, registerOffset);
+            printf("[%4d] call_eval\t %s, %s, %d, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset);
             break;
         }
         case op_call_varargs: {
@@ -984,7 +1053,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_varargs\t %s, %s, %s, %d\n", location, registerName(exec, dst).c_str(), registerName(exec, func).c_str(), registerName(exec, argCount).c_str(), registerOffset);
+            printf("[%4d] call_varargs\t %s, %s, %s, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), registerName(exec, argCount).data(), registerOffset);
             break;
         }
         case op_load_varargs: {
@@ -993,7 +1062,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_tear_off_activation: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] tear_off_activation\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] tear_off_activation\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_tear_off_arguments: {
@@ -1002,7 +1071,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_ret: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] ret\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] ret\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_construct: {
@@ -1012,26 +1081,26 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int registerOffset = (++it)->u.operand;
             int proto = (++it)->u.operand;
             int thisRegister = (++it)->u.operand;
-            printf("[%4d] construct\t %s, %s, %d, %d, %s, %s\n", location, registerName(exec, dst).c_str(), registerName(exec, func).c_str(), argCount, registerOffset, registerName(exec, proto).c_str(), registerName(exec, thisRegister).c_str());
+            printf("[%4d] construct\t %s, %s, %d, %d, %s, %s\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset, registerName(exec, proto).data(), registerName(exec, thisRegister).data());
             break;
         }
         case op_construct_verify: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] construct_verify\t %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] construct_verify\t %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_strcat: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
             int count = (++it)->u.operand;
-            printf("[%4d] strcat\t\t %s, %s, %d\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), count);
+            printf("[%4d] strcat\t\t %s, %s, %d\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), count);
             break;
         }
         case op_to_primitive: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] to_primitive\t %s, %s\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] to_primitive\t %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_get_pnames: {
@@ -1040,7 +1109,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r2 = it[3].u.operand;
             int r3 = it[4].u.operand;
             int offset = it[5].u.operand;
-            printf("[%4d] get_pnames\t %s, %s, %s, %s, %d(->%d)\n", location, registerName(exec, r0).c_str(), registerName(exec, r1).c_str(), registerName(exec, r2).c_str(), registerName(exec, r3).c_str(), offset, location + offset);
+            printf("[%4d] get_pnames\t %s, %s, %s, %s, %d(->%d)\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data(), registerName(exec, r3).data(), offset, location + offset);
             it += OPCODE_LENGTH(op_get_pnames) - 1;
             break;
         }
@@ -1048,13 +1117,13 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int dest = it[1].u.operand;
             int iter = it[4].u.operand;
             int offset = it[5].u.operand;
-            printf("[%4d] next_pname\t %s, %s, %d(->%d)\n", location, registerName(exec, dest).c_str(), registerName(exec, iter).c_str(), offset, location + offset);
+            printf("[%4d] next_pname\t %s, %s, %d(->%d)\n", location, registerName(exec, dest).data(), registerName(exec, iter).data(), offset, location + offset);
             it += OPCODE_LENGTH(op_next_pname) - 1;
             break;
         }
         case op_push_scope: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] push_scope\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] push_scope\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_pop_scope: {
@@ -1065,7 +1134,7 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
-            printf("[%4d] push_new_scope \t%s, %s, %s\n", location, registerName(exec, r0).c_str(), idName(id0, m_identifiers[id0]).c_str(), registerName(exec, r1).c_str());
+            printf("[%4d] push_new_scope \t%s, %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
             break;
         }
         case op_jmp_scopes: {
@@ -1076,30 +1145,30 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_catch: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] catch\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] catch\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_throw: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] throw\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] throw\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_error: {
             int r0 = (++it)->u.operand;
             int errorType = (++it)->u.operand;
             int k0 = (++it)->u.operand;
-            printf("[%4d] new_error\t %s, %d, %s\n", location, registerName(exec, r0).c_str(), errorType, constantName(exec, k0, getConstant(k0)).c_str());
+            printf("[%4d] new_error\t %s, %d, %s\n", location, registerName(exec, r0).data(), errorType, constantName(exec, k0, getConstant(k0)).data());
             break;
         }
         case op_jsr: {
             int retAddrDst = (++it)->u.operand;
             int offset = (++it)->u.operand;
-            printf("[%4d] jsr\t\t %s, %d(->%d)\n", location, registerName(exec, retAddrDst).c_str(), offset, location + offset);
+            printf("[%4d] jsr\t\t %s, %d(->%d)\n", location, registerName(exec, retAddrDst).data(), offset, location + offset);
             break;
         }
         case op_sret: {
             int retAddrSrc = (++it)->u.operand;
-            printf("[%4d] sret\t\t %s\n", location, registerName(exec, retAddrSrc).c_str());
+            printf("[%4d] sret\t\t %s\n", location, registerName(exec, retAddrSrc).data());
             break;
         }
         case op_debug: {
@@ -1111,17 +1180,17 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_profile_will_call: {
             int function = (++it)->u.operand;
-            printf("[%4d] profile_will_call %s\n", location, registerName(exec, function).c_str());
+            printf("[%4d] profile_will_call %s\n", location, registerName(exec, function).data());
             break;
         }
         case op_profile_did_call: {
             int function = (++it)->u.operand;
-            printf("[%4d] profile_did_call\t %s\n", location, registerName(exec, function).c_str());
+            printf("[%4d] profile_did_call\t %s\n", location, registerName(exec, function).data());
             break;
         }
         case op_end: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] end\t\t %s\n", location, registerName(exec, r0).c_str());
+            printf("[%4d] end\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
     }
@@ -1279,6 +1348,7 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, PassR
 #endif
     , m_needsFullScopeChain(ownerExecutable->needsActivation())
     , m_usesEval(ownerExecutable->usesEval())
+    , m_usesArguments(false)
     , m_isNumericCompareFunction(false)
     , m_codeType(codeType)
     , m_source(sourceProvider)
@@ -1295,13 +1365,14 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, PassR
 
 CodeBlock::~CodeBlock()
 {
-#if !ENABLE(JIT)
+#if ENABLE(INTERPRETER)
     for (size_t size = m_globalResolveInstructions.size(), i = 0; i < size; ++i)
         derefStructures(&m_instructions[m_globalResolveInstructions[i]]);
 
     for (size_t size = m_propertyAccessInstructions.size(), i = 0; i < size; ++i)
         derefStructures(&m_instructions[m_propertyAccessInstructions[i]]);
-#else
+#endif
+#if ENABLE(JIT)
     for (size_t size = m_globalResolveInfos.size(), i = 0; i < size; ++i) {
         if (m_globalResolveInfos[i].structure)
             m_globalResolveInfos[i].structure->deref();
@@ -1329,7 +1400,7 @@ CodeBlock::~CodeBlock()
     unlinkCallers();
 #endif
 
-#endif // !ENABLE(JIT)
+#endif // ENABLE(JIT)
 
 #if DUMP_CODE_BLOCK_STATISTICS
     liveCodeBlockSet.remove(this);
@@ -1353,16 +1424,16 @@ void CodeBlock::derefStructures(Instruction* vPC) const
 {
     Interpreter* interpreter = m_globalData->interpreter;
 
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self)) {
         vPC[4].u.structure->deref();
         return;
     }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto)) {
         vPC[4].u.structure->deref();
         vPC[5].u.structure->deref();
         return;
     }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_chain)) {
         vPC[4].u.structure->deref();
         vPC[5].u.structureChain->deref();
         return;
@@ -1377,13 +1448,17 @@ void CodeBlock::derefStructures(Instruction* vPC) const
         vPC[4].u.structure->deref();
         return;
     }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global) || vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global_dynamic)) {
         if(vPC[4].u.structure)
             vPC[4].u.structure->deref();
         return;
     }
     if ((vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto_list))
-        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self_list))) {
+        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self_list))
+        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_proto_list))
+        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_self_list))
+        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto_list))
+        || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self_list))) {
         PolymorphicAccessStructureList* polymorphicStructures = vPC[4].u.polymorphicStructures;
         polymorphicStructures->derefStructures(vPC[5].u.operand);
         delete polymorphicStructures;
@@ -1398,16 +1473,16 @@ void CodeBlock::refStructures(Instruction* vPC) const
 {
     Interpreter* interpreter = m_globalData->interpreter;
 
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self)) {
         vPC[4].u.structure->ref();
         return;
     }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto)) {
         vPC[4].u.structure->ref();
         vPC[5].u.structure->ref();
         return;
     }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain)) {
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_chain)) {
         vPC[4].u.structure->ref();
         vPC[5].u.structureChain->ref();
         return;
@@ -1593,7 +1668,7 @@ bool CodeBlock::functionRegisterForBytecodeOffset(unsigned bytecodeOffset, int& 
 }
 #endif
 
-#if !ENABLE(JIT)
+#if ENABLE(INTERPRETER)
 bool CodeBlock::hasGlobalResolveInstructionAtBytecodeOffset(unsigned bytecodeOffset)
 {
     if (m_globalResolveInstructions.isEmpty())
@@ -1613,7 +1688,8 @@ bool CodeBlock::hasGlobalResolveInstructionAtBytecodeOffset(unsigned bytecodeOff
         return false;
     return true;
 }
-#else
+#endif
+#if ENABLE(JIT)
 bool CodeBlock::hasGlobalResolveInfoAtBytecodeOffset(unsigned bytecodeOffset)
 {
     if (m_globalResolveInfos.isEmpty())
@@ -1639,10 +1715,11 @@ void CodeBlock::shrinkToFit()
 {
     m_instructions.shrinkToFit();
 
-#if !ENABLE(JIT)
+#if ENABLE(INTERPRETER)
     m_propertyAccessInstructions.shrinkToFit();
     m_globalResolveInstructions.shrinkToFit();
-#else
+#endif
+#if ENABLE(JIT)
     m_structureStubInfos.shrinkToFit();
     m_globalResolveInfos.shrinkToFit();
     m_callLinkInfos.shrinkToFit();

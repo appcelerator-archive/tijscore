@@ -83,7 +83,24 @@ const double msPerHour = 60.0 * 60.0 * 1000.0;
 const double msPerDay = 24.0 * 60.0 * 60.0 * 1000.0;
 const double msPerMonth = 2592000000.0;
 
+// Returns the number of days from 1970-01-01 to the specified date.
+double dateToDaysFrom1970(int year, int month, int day);
+int msToYear(double ms);
+int dayInYear(double ms, int year);
+int monthFromDayInYear(int dayInYear, bool leapYear);
+int dayInMonthFromDayInYear(int dayInYear, bool leapYear);
+
 } // namespace WTI
+
+using WTI::dateToDaysFrom1970;
+using WTI::dayInMonthFromDayInYear;
+using WTI::dayInYear;
+using WTI::minutesPerHour;
+using WTI::monthFromDayInYear;
+using WTI::msPerDay;
+using WTI::msPerSecond;
+using WTI::msToYear;
+using WTI::secondsPerMinute;
 
 #if USE(JSC)
 namespace TI {

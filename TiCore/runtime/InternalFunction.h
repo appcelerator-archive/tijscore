@@ -43,13 +43,13 @@ namespace TI {
         virtual const ClassInfo* classInfo() const; 
         static JS_EXPORTDATA const ClassInfo info;
 
-        const UString& name(TiGlobalData*);
-        const UString displayName(TiGlobalData*);
-        const UString calculatedDisplayName(TiGlobalData*);
+        const UString& name(TiExcState*);
+        const UString displayName(TiExcState*);
+        const UString calculatedDisplayName(TiExcState*);
 
         static PassRefPtr<Structure> createStructure(TiValue proto) 
         { 
-            return Structure::create(proto, TypeInfo(ObjectType, StructureFlags)); 
+            return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
         }
 
     protected:

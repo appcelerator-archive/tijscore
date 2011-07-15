@@ -31,9 +31,9 @@
  */
 
 #include "config.h"
-
-
 #include "MarkStack.h"
+
+#if OS(WINDOWS)
 
 #include "windows.h"
 
@@ -58,3 +58,5 @@ void MarkStack::releaseStack(void* addr, size_t)
 }
 
 }
+
+#endif

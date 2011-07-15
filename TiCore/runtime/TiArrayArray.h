@@ -40,7 +40,7 @@
 namespace TI {
 
     class TiArrayArray : public TiObject {
-        friend struct VPtrSet;
+        friend class TiGlobalData;
     public:
         bool canAccessIndex(unsigned i) { return i < m_storage->length(); }
         TiValue getIndex(TiExcState* exec, unsigned i)
@@ -89,7 +89,7 @@ namespace TI {
         virtual void put(TI::TiExcState*, const TI::Identifier& propertyName, TI::TiValue, TI::PutPropertySlot&);
         virtual void put(TI::TiExcState*, unsigned propertyName, TI::TiValue);
 
-        virtual void getOwnPropertyNames(TI::TiExcState*, TI::PropertyNameArray&);
+        virtual void getOwnPropertyNames(TI::TiExcState*, TI::PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
         virtual const ClassInfo* classInfo() const { return m_classInfo; }
         static const ClassInfo s_defaultInfo;
@@ -97,6 +97,10 @@ namespace TI {
         size_t length() const { return m_storage->length(); }
 
         WTI::ByteArray* storage() const { return m_storage.get(); }
+
+#if !ASSERT_DISABLED
+        virtual ~TiArrayArray();
+#endif
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | TiObject::StructureFlags;

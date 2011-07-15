@@ -33,29 +33,32 @@
 #include "config.h"
 #include "TiValueRef.h"
 
-#include <wtf/Platform.h>
 #include "APICast.h"
+#include "APIShims.h"
 #include "TiCallbackObject.h"
 
 #include <runtime/TiGlobalObject.h>
+#include <runtime/JSONObject.h>
 #include <runtime/TiString.h>
+#include <runtime/LiteralParser.h>
 #include <runtime/Operations.h>
 #include <runtime/Protect.h>
 #include <runtime/UString.h>
 #include <runtime/TiValue.h>
-#include <runtime/DateInstance.h>
 
 #include <wtf/Assertions.h>
+#include <wtf/text/StringHash.h>
 
 #include <algorithm> // for std::min
 
-TiType TiValueGetType(TiContextRef ctx, TiValueRef value)
-{
-    TI::TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TI::TiLock lock(exec);
+using namespace TI;
 
-    TI::TiValue jsValue = toJS(exec, value);
+::TiType TiValueGetType(TiContextRef ctx, TiValueRef value)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+
+    TiValue jsValue = toJS(exec, value);
 
     if (jsValue.isUndefined())
         return kTITypeUndefined;
@@ -71,13 +74,10 @@ TiType TiValueGetType(TiContextRef ctx, TiValueRef value)
     return kTITypeObject;
 }
 
-using namespace TI; // placed here to avoid conflict between TI::TiType and TiType, above.
-
 bool TiValueIsUndefined(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isUndefined();
@@ -86,8 +86,7 @@ bool TiValueIsUndefined(TiContextRef ctx, TiValueRef value)
 bool TiValueIsNull(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isNull();
@@ -96,8 +95,7 @@ bool TiValueIsNull(TiContextRef ctx, TiValueRef value)
 bool TiValueIsBoolean(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isBoolean();
@@ -106,8 +104,7 @@ bool TiValueIsBoolean(TiContextRef ctx, TiValueRef value)
 bool TiValueIsNumber(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isNumber();
@@ -116,38 +113,16 @@ bool TiValueIsNumber(TiContextRef ctx, TiValueRef value)
 bool TiValueIsString(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isString();
 }
 
-bool TiValueIsArray(TiContextRef ctx, TiValueRef value)
-{
-    TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
-
-    TiValue jsValue = toJS(exec, value);
-    return jsValue.inherits(&TiArray::info);
-}
-
-bool TiValueIsDate(TiContextRef ctx, TiValueRef value)
-{
-    TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
-
-    TiValue jsValue = toJS(exec, value);
-    return jsValue.inherits(&DateInstance::info);
-}
-
 bool TiValueIsObject(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isObject();
@@ -156,8 +131,7 @@ bool TiValueIsObject(TiContextRef ctx, TiValueRef value)
 bool TiValueIsObjectOfClass(TiContextRef ctx, TiValueRef value, TiClassRef jsClass)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     
@@ -173,8 +147,7 @@ bool TiValueIsObjectOfClass(TiContextRef ctx, TiValueRef value, TiClassRef jsCla
 bool TiValueIsEqual(TiContextRef ctx, TiValueRef a, TiValueRef b, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsA = toJS(exec, a);
     TiValue jsB = toJS(exec, b);
@@ -191,20 +164,18 @@ bool TiValueIsEqual(TiContextRef ctx, TiValueRef a, TiValueRef b, TiValueRef* ex
 bool TiValueIsStrictEqual(TiContextRef ctx, TiValueRef a, TiValueRef b)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsA = toJS(exec, a);
     TiValue jsB = toJS(exec, b);
 
-    return TiValue::strictEqual(jsA, jsB);
+    return TiValue::strictEqual(exec, jsA, jsB);
 }
 
 bool TiValueIsInstanceOfConstructor(TiContextRef ctx, TiValueRef value, TiObjectRef constructor, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
 
@@ -223,8 +194,7 @@ bool TiValueIsInstanceOfConstructor(TiContextRef ctx, TiValueRef value, TiObject
 TiValueRef TiValueMakeUndefined(TiContextRef ctx)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     return toRef(exec, jsUndefined());
 }
@@ -232,8 +202,7 @@ TiValueRef TiValueMakeUndefined(TiContextRef ctx)
 TiValueRef TiValueMakeNull(TiContextRef ctx)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     return toRef(exec, jsNull());
 }
@@ -241,8 +210,7 @@ TiValueRef TiValueMakeNull(TiContextRef ctx)
 TiValueRef TiValueMakeBoolean(TiContextRef ctx, bool value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     return toRef(exec, jsBoolean(value));
 }
@@ -250,8 +218,13 @@ TiValueRef TiValueMakeBoolean(TiContextRef ctx, bool value)
 TiValueRef TiValueMakeNumber(TiContextRef ctx, double value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
+
+    // Our TiValue representation relies on a standard bit pattern for NaN. NaNs
+    // generated internally to TiCore naturally have that representation,
+    // but an external NaN might not.
+    if (isnan(value))
+        value = NaN;
 
     return toRef(exec, jsNumber(exec, value));
 }
@@ -259,17 +232,40 @@ TiValueRef TiValueMakeNumber(TiContextRef ctx, double value)
 TiValueRef TiValueMakeString(TiContextRef ctx, TiStringRef string)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     return toRef(exec, jsString(exec, string->ustring()));
+}
+
+TiValueRef TiValueMakeFromJSONString(TiContextRef ctx, TiStringRef string)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    LiteralParser parser(exec, string->ustring(), LiteralParser::StrictJSON);
+    return toRef(exec, parser.tryLiteralParse());
+}
+
+TiStringRef TiValueCreateJSONString(TiContextRef ctx, TiValueRef apiValue, unsigned indent, TiValueRef* exception)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    TiValue value = toJS(exec, apiValue);
+    UString result = JSONStringify(exec, value, indent);
+    if (exception)
+        *exception = 0;
+    if (exec->hadException()) {
+        if (exception)
+            *exception = toRef(exec, exec->exception());
+        exec->clearException();
+        return 0;
+    }
+    return OpaqueTiString::create(result).releaseRef();
 }
 
 bool TiValueToBoolean(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.toBoolean(exec);
@@ -278,8 +274,7 @@ bool TiValueToBoolean(TiContextRef ctx, TiValueRef value)
 double TiValueToNumber(TiContextRef ctx, TiValueRef value, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
 
@@ -296,8 +291,7 @@ double TiValueToNumber(TiContextRef ctx, TiValueRef value, TiValueRef* exception
 TiStringRef TiValueToStringCopy(TiContextRef ctx, TiValueRef value, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     
@@ -314,8 +308,7 @@ TiStringRef TiValueToStringCopy(TiContextRef ctx, TiValueRef value, TiValueRef* 
 TiObjectRef TiValueToObject(TiContextRef ctx, TiValueRef value, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsValue = toJS(exec, value);
     
@@ -332,19 +325,17 @@ TiObjectRef TiValueToObject(TiContextRef ctx, TiValueRef value, TiValueRef* exce
 void TiValueProtect(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
-    TiValue jsValue = toJS(exec, value);
+    TiValue jsValue = toJSForGC(exec, value);
     gcProtect(jsValue);
 }
 
 void TiValueUnprotect(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
-    TiValue jsValue = toJS(exec, value);
+    TiValue jsValue = toJSForGC(exec, value);
     gcUnprotect(jsValue);
 }

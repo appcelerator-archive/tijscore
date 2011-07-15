@@ -43,7 +43,6 @@
 #include "TiGlobalObject.h"
 #include "JumpTable.h"
 #include "Nodes.h"
-#include "PtrAndFlags.h"
 #include "RegExp.h"
 #include "UString.h"
 #include <wtf/FastAllocBase.h>
@@ -110,51 +109,63 @@ namespace TI {
     struct CallLinkInfo {
         CallLinkInfo()
             : callee(0)
+            , position(0)
+            , hasSeenShouldRepatch(0)
         {
         }
-    
+
         unsigned bytecodeIndex;
         CodeLocationNearCall callReturnLocation;
         CodeLocationDataLabelPtr hotPathBegin;
         CodeLocationNearCall hotPathOther;
-        PtrAndFlags<CodeBlock, HasSeenShouldRepatch> ownerCodeBlock;
+        CodeBlock* ownerCodeBlock;
         CodeBlock* callee;
-        unsigned position;
+        unsigned position : 31;
+        unsigned hasSeenShouldRepatch : 1;
         
         void setUnlinked() { callee = 0; }
         bool isLinked() { return callee; }
 
         bool seenOnce()
         {
-            return ownerCodeBlock.isFlagSet(hasSeenShouldRepatch);
+            return hasSeenShouldRepatch;
         }
 
         void setSeen()
         {
-            ownerCodeBlock.setFlag(hasSeenShouldRepatch);
+            hasSeenShouldRepatch = true;
         }
     };
 
     struct MethodCallLinkInfo {
         MethodCallLinkInfo()
             : cachedStructure(0)
+            , cachedPrototypeStructure(0)
         {
         }
 
         bool seenOnce()
         {
-            return cachedPrototypeStructure.isFlagSet(hasSeenShouldRepatch);
+            ASSERT(!cachedStructure);
+            return cachedPrototypeStructure;
         }
 
         void setSeen()
         {
-            cachedPrototypeStructure.setFlag(hasSeenShouldRepatch);
+            ASSERT(!cachedStructure && !cachedPrototypeStructure);
+            // We use the values of cachedStructure & cachedPrototypeStructure to indicate the
+            // current state.
+            //     - In the initial state, both are null.
+            //     - Once this transition has been taken once, cachedStructure is
+            //       null and cachedPrototypeStructure is set to a nun-null value.
+            //     - Once the call is linked both structures are set to non-null values.
+            cachedPrototypeStructure = (Structure*)1;
         }
 
         CodeLocationCall callReturnLocation;
         CodeLocationDataLabelPtr structureLabel;
         Structure* cachedStructure;
-        PtrAndFlags<Structure, HasSeenShouldRepatch> cachedPrototypeStructure;
+        Structure* cachedPrototypeStructure;
     };
 
     struct FunctionRegisterInfo {
@@ -351,6 +362,12 @@ namespace TI {
         
         bool functionRegisterForBytecodeOffset(unsigned bytecodeOffset, int& functionRegisterIndex);
 #endif
+#if ENABLE(INTERPRETER)
+        unsigned bytecodeOffset(CallFrame*, Instruction* returnAddress)
+        {
+            return static_cast<Instruction*>(returnAddress) - instructions().begin();
+        }
+#endif
 
         void setIsNumericCompareFunction(bool isNumericCompareFunction) { m_isNumericCompareFunction = isNumericCompareFunction; }
         bool isNumericCompareFunction() { return m_isNumericCompareFunction; }
@@ -392,11 +409,12 @@ namespace TI {
         unsigned jumpTarget(int index) const { return m_jumpTargets[index]; }
         unsigned lastJumpTarget() const { return m_jumpTargets.last(); }
 
-#if !ENABLE(JIT)
+#if ENABLE(INTERPRETER)
         void addPropertyAccessInstruction(unsigned propertyAccessInstruction) { m_propertyAccessInstructions.append(propertyAccessInstruction); }
         void addGlobalResolveInstruction(unsigned globalResolveInstruction) { m_globalResolveInstructions.append(globalResolveInstruction); }
         bool hasGlobalResolveInstructionAtBytecodeOffset(unsigned bytecodeOffset);
-#else
+#endif
+#if ENABLE(JIT)
         size_t numberOfStructureStubInfos() const { return m_structureStubInfos.size(); }
         void addStructureStubInfo(const StructureStubInfo& stubInfo) { m_structureStubInfos.append(stubInfo); }
         StructureStubInfo& structureStubInfo(int index) { return m_structureStubInfos[index]; }
@@ -526,10 +544,11 @@ namespace TI {
         RefPtr<SourceProvider> m_source;
         unsigned m_sourceOffset;
 
-#if !ENABLE(JIT)
+#if ENABLE(INTERPRETER)
         Vector<unsigned> m_propertyAccessInstructions;
         Vector<unsigned> m_globalResolveInstructions;
-#else
+#endif
+#if ENABLE(JIT)
         Vector<StructureStubInfo> m_structureStubInfos;
         Vector<GlobalResolveInfo> m_globalResolveInfos;
         Vector<CallLinkInfo> m_callLinkInfos;

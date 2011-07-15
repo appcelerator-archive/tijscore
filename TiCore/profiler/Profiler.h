@@ -59,7 +59,7 @@ namespace TI {
         }
 
         static Profiler* profiler(); 
-        static CallIdentifier createCallIdentifier(TiGlobalData*, TiValue, const UString& sourceURL, int lineNumber);
+        static CallIdentifier createCallIdentifier(TiExcState* exec, TiValue, const UString& sourceURL, int lineNumber);
 
         void startProfiling(TiExcState*, const UString& title);
         PassRefPtr<Profile> stopProfiling(TiExcState*, const UString& title);

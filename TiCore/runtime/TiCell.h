@@ -49,14 +49,19 @@ namespace TI {
         friend class TiString;
         friend class TiValue;
         friend class TiAPIValueWrapper;
-        friend struct VPtrSet;
+        friend class JSZombie;
+        friend class TiGlobalData;
 
     private:
         explicit TiCell(Structure*);
-        TiCell(); // Only used for initializing Collector blocks.
         virtual ~TiCell();
 
     public:
+        static PassRefPtr<Structure> createDummyStructure()
+        {
+            return Structure::create(jsNull(), TypeInfo(UnspecifiedType), AnonymousSlotCount);
+        }
+
         // Querying the type.
 #if USE(JSVALUE32)
         bool isNumber() const;
@@ -71,8 +76,8 @@ namespace TI {
         Structure* structure() const;
 
         // Extracting the value.
-        bool getString(UString&) const;
-        UString getString() const; // null string if not a string
+        bool getString(TiExcState* exec, UString&) const;
+        UString getString(TiExcState* exec) const; // null string if not a string
         TiObject* getObject(); // NULL if not an object
         const TiObject* getObject() const; // NULL if not an object
         
@@ -97,6 +102,9 @@ namespace TI {
         void* operator new(size_t, void* placementNewDestination) { return placementNewDestination; }
 
         virtual void markChildren(MarkStack&);
+#if ENABLE(JSC_ZOMBIES)
+        virtual bool isZombie() const { return false; }
+#endif
 
         // Object operations, with the toObject operation included.
         virtual const ClassInfo* classInfo() const;
@@ -106,14 +114,21 @@ namespace TI {
         virtual bool deleteProperty(TiExcState*, unsigned propertyName);
 
         virtual TiObject* toThisObject(TiExcState*) const;
-        virtual UString toThisString(TiExcState*) const;
-        virtual TiString* toThisTiString(TiExcState*);
         virtual TiValue getJSNumber();
         void* vptr() { return *reinterpret_cast<void**>(this); }
+        void setVPtr(void* vptr) { *reinterpret_cast<void**>(this) = vptr; }
+
+        // FIXME: Rename getOwnPropertySlot to virtualGetOwnPropertySlot, and
+        // fastGetOwnPropertySlot to getOwnPropertySlot. Callers should always
+        // call this function, not its slower virtual counterpart. (For integer
+        // property names, we want a similar interface with appropriate optimizations.)
+        bool fastGetOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
+
+    protected:
+        static const unsigned AnonymousSlotCount = 0;
 
     private:
         // Base implementation; for non-object classes implements getPropertySlot.
-        bool fastGetOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, unsigned propertyName, PropertySlot&);
         
@@ -125,11 +140,6 @@ namespace TI {
     {
     }
 
-    // Only used for initializing Collector blocks.
-    inline TiCell::TiCell()
-    {
-    }
-
     inline TiCell::~TiCell()
     {
     }
@@ -137,7 +147,7 @@ namespace TI {
 #if USE(JSVALUE32)
     inline bool TiCell::isNumber() const
     {
-        return Heap::isNumber(const_cast<TiCell*>(this));
+        return m_structure->typeInfo().type() == NumberType;
     }
 #endif
 
@@ -165,6 +175,11 @@ namespace TI {
         return globalData->heap.allocate(size);
     }
 
+    inline void* TiCell::operator new(size_t size, TiExcState* exec)
+    {
+        return exec->heap()->allocate(size);
+    }
+
     // --- TiValue inlines ----------------------------
 
     inline bool TiValue::isString() const
@@ -182,14 +197,14 @@ namespace TI {
         return isCell() && asCell()->isObject();
     }
 
-    inline bool TiValue::getString(UString& s) const
+    inline bool TiValue::getString(TiExcState* exec, UString& s) const
     {
-        return isCell() && asCell()->getString(s);
+        return isCell() && asCell()->getString(exec, s);
     }
 
-    inline UString TiValue::getString() const
+    inline UString TiValue::getString(TiExcState* exec) const
     {
-        return isCell() ? asCell()->getString() : UString();
+        return isCell() ? asCell()->getString(exec) : UString();
     }
 
     inline TiObject* TiValue::getObject() const
@@ -296,11 +311,6 @@ namespace TI {
         return asCell()->structure()->typeInfo().needsThisConversion();
     }
 
-    inline UString TiValue::toThisString(TiExcState* exec) const
-    {
-        return isCell() ? asCell()->toThisString(exec) : toString(exec);
-    }
-
     inline TiValue TiValue::getJSNumber()
     {
         if (isInt32() || isDouble())
@@ -349,7 +359,13 @@ namespace TI {
     {
         return cellBlock(c)->heap;
     }
-
+    
+#if ENABLE(JSC_ZOMBIES)
+    inline bool TiValue::isZombie() const
+    {
+        return isCell() && asCell() && asCell()->isZombie();
+    }
+#endif
 } // namespace TI
 
 #endif // TiCell_h

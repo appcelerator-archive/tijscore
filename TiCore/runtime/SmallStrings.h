@@ -64,9 +64,12 @@ namespace TI {
         UString::Rep* singleCharacterStringRep(unsigned char character);
 
         void markChildren(MarkStack&);
+        void clear();
 
         unsigned count() const;
-
+#if ENABLE(JIT)
+        TiString** singleCharacterStrings() { return m_singleCharacterStrings; }
+#endif
     private:
         void createEmptyString(TiGlobalData*);
         void createSingleCharacterString(TiGlobalData*, unsigned char);

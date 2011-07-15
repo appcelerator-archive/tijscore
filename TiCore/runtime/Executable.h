@@ -89,10 +89,10 @@ namespace TI {
 #if ENABLE(JIT)
     class NativeExecutable : public ExecutableBase {
     public:
-        NativeExecutable(TiExcState* exec)
+        NativeExecutable(JITCode thunk)
             : ExecutableBase(NUM_PARAMETERS_IS_HOST)
         {
-            m_jitCode = JITCode(JITCode::HostFunction(exec->globalData().jitStubs.ctiNativeCallThunk()));
+            m_jitCode = thunk;
         }
 
         ~NativeExecutable();
@@ -291,10 +291,10 @@ namespace TI {
 
         const Identifier& name() { return m_name; }
         size_t parameterCount() const { return m_parameters->size(); }
-        size_t variableCount() const { return m_numVariables; }
+        unsigned variableCount() const { return m_numVariables; }
         UString paramString() const;
 
-        void recompile(TiExcState*);
+        void recompile();
         ExceptionInfo* reparseExceptionInfo(TiGlobalData*, ScopeChainNode*, CodeBlock*);
         void markAggregate(MarkStack& markStack);
         static PassRefPtr<FunctionExecutable> fromGlobalCode(const Identifier&, TiExcState*, Debugger*, const SourceCode&, int* errLine = 0, UString* errMsg = 0);
@@ -302,11 +302,11 @@ namespace TI {
     private:
         FunctionExecutable(TiGlobalData* globalData, const Identifier& name, const SourceCode& source, bool forceUsesArguments, FunctionParameters* parameters, int firstLine, int lastLine)
             : ScriptExecutable(globalData, source)
+            , m_numVariables(0)
             , m_forceUsesArguments(forceUsesArguments)
             , m_parameters(parameters)
             , m_codeBlock(0)
             , m_name(name)
-            , m_numVariables(0)
         {
             m_firstLine = firstLine;
             m_lastLine = lastLine;
@@ -314,11 +314,11 @@ namespace TI {
 
         FunctionExecutable(TiExcState* exec, const Identifier& name, const SourceCode& source, bool forceUsesArguments, FunctionParameters* parameters, int firstLine, int lastLine)
             : ScriptExecutable(exec, source)
+            , m_numVariables(0)
             , m_forceUsesArguments(forceUsesArguments)
             , m_parameters(parameters)
             , m_codeBlock(0)
             , m_name(name)
-            , m_numVariables(0)
         {
             m_firstLine = firstLine;
             m_lastLine = lastLine;
@@ -326,11 +326,12 @@ namespace TI {
 
         void compile(TiExcState*, ScopeChainNode*);
 
-        bool m_forceUsesArguments;
+        unsigned m_numVariables : 31;
+        bool m_forceUsesArguments : 1;
+
         RefPtr<FunctionParameters> m_parameters;
         CodeBlock* m_codeBlock;
         Identifier m_name;
-        size_t m_numVariables;
 
 #if ENABLE(JIT)
     public:

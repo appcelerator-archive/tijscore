@@ -40,6 +40,7 @@
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "Parser.h"
+
 #include "Arguments.h"
 #include "TiLock.h"
 
@@ -50,21 +51,27 @@ const UString* DebuggerCallFrame::functionName() const
     if (!m_callFrame->codeBlock())
         return 0;
 
+    if (!m_callFrame->callee())
+        return 0;
+
     TiFunction* function = asFunction(m_callFrame->callee());
     if (!function)
         return 0;
-    return &function->name(&m_callFrame->globalData());
+    return &function->name(m_callFrame);
 }
     
 UString DebuggerCallFrame::calculatedFunctionName() const
 {
     if (!m_callFrame->codeBlock())
-        return 0;
-    
+        return UString();
+
+    if (!m_callFrame->callee())
+        return UString();
+
     TiFunction* function = asFunction(m_callFrame->callee());
     if (!function)
-        return 0;
-    return function->calculatedDisplayName(&m_callFrame->globalData());
+        return UString();
+    return function->calculatedDisplayName(m_callFrame);
 }
 
 TiValue DebuggerCallFrame::functionArguments() const

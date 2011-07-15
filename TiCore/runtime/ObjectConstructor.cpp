@@ -43,6 +43,7 @@ ASSERT_CLASS_FITS_IN_CELL(ObjectConstructor);
 
 static TiValue JSC_HOST_CALL objectConstructorGetPrototypeOf(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState*, TiObject*, TiValue, const ArgList&);
+static TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL objectConstructorKeys(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL objectConstructorDefineProperty(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL objectConstructorDefineProperties(TiExcState*, TiObject*, TiValue, const ArgList&);
@@ -59,6 +60,7 @@ ObjectConstructor::ObjectConstructor(TiExcState* exec, NonNullPassRefPtr<Structu
     
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().getPrototypeOf, objectConstructorGetPrototypeOf), DontEnum);
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().getOwnPropertyDescriptor, objectConstructorGetOwnPropertyDescriptor), DontEnum);
+    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().getOwnPropertyNames, objectConstructorGetOwnPropertyNames), DontEnum);
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().keys, objectConstructorKeys), DontEnum);
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 3, exec->propertyNames().defineProperty, objectConstructorDefineProperty), DontEnum);
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().defineProperties, objectConstructorDefineProperties), DontEnum);
@@ -133,6 +135,20 @@ TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState* exec
 }
 
 // FIXME: Use the enumeration cache.
+TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+{
+    if (!args.at(0).isObject())
+        return throwError(exec, TypeError, "Requested property names of a value that is not an object.");
+    PropertyNameArray properties(exec);
+    asObject(args.at(0))->getOwnPropertyNames(exec, properties, IncludeDontEnumProperties);
+    TiArray* names = constructEmptyArray(exec);
+    size_t numProperties = properties.size();
+    for (size_t i = 0; i < numProperties; i++)
+        names->push(exec, jsOwnedString(exec, properties[i].ustring()));
+    return names;
+}
+
+// FIXME: Use the enumeration cache.
 TiValue JSC_HOST_CALL objectConstructorKeys(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
     if (!args.at(0).isObject())
@@ -155,14 +171,14 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
     }
     TiObject* description = asObject(in);
 
-    PropertySlot enumerableSlot;
+    PropertySlot enumerableSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().enumerable, enumerableSlot)) {
         desc.setEnumerable(enumerableSlot.getValue(exec, exec->propertyNames().enumerable).toBoolean(exec));
         if (exec->hadException())
             return false;
     }
 
-    PropertySlot configurableSlot;
+    PropertySlot configurableSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().configurable, configurableSlot)) {
         desc.setConfigurable(configurableSlot.getValue(exec, exec->propertyNames().configurable).toBoolean(exec));
         if (exec->hadException())
@@ -170,21 +186,21 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
     }
 
     TiValue value;
-    PropertySlot valueSlot;
+    PropertySlot valueSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().value, valueSlot)) {
         desc.setValue(valueSlot.getValue(exec, exec->propertyNames().value));
         if (exec->hadException())
             return false;
     }
 
-    PropertySlot writableSlot;
+    PropertySlot writableSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().writable, writableSlot)) {
         desc.setWritable(writableSlot.getValue(exec, exec->propertyNames().writable).toBoolean(exec));
         if (exec->hadException())
             return false;
     }
 
-    PropertySlot getSlot;
+    PropertySlot getSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().get, getSlot)) {
         TiValue get = getSlot.getValue(exec, exec->propertyNames().get);
         if (exec->hadException())
@@ -200,7 +216,7 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
         desc.setGetter(get);
     }
 
-    PropertySlot setSlot;
+    PropertySlot setSlot(description);
     if (description->getPropertySlot(exec, exec->propertyNames().set, setSlot)) {
         TiValue set = setSlot.getValue(exec, exec->propertyNames().set);
         if (exec->hadException())

@@ -46,7 +46,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
     protected:

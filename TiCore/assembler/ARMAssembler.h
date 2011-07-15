@@ -6,7 +6,7 @@
  */
 
 /*
- * Copyright (C) 2009 University of Szeged
+ * Copyright (C) 2009, 2010 University of Szeged
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -34,9 +34,7 @@
 #ifndef ARMAssembler_h
 #define ARMAssembler_h
 
-#include <wtf/Platform.h>
-
-#if ENABLE(ASSEMBLER) && PLATFORM(ARM_TRADITIONAL)
+#if ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
 
 #include "AssemblerBufferWithConstantPool.h"
 #include <wtf/Assertions.h>
@@ -128,9 +126,11 @@ namespace TI {
             MUL = 0x00000090,
             MULL = 0x00c00090,
             FADDD = 0x0e300b00,
+            FDIVD = 0x0e800b00,
             FSUBD = 0x0e300b40,
             FMULD = 0x0e200b00,
             FCMPD = 0x0eb40b40,
+            FSQRTD = 0x0eb10bc0,
             DTR = 0x05000000,
             LDRH = 0x00100090,
             STRH = 0x00000090,
@@ -139,16 +139,20 @@ namespace TI {
             FDTR = 0x0d000b00,
             B = 0x0a000000,
             BL = 0x0b000000,
+#if WTF_ARM_ARCH_AT_LEAST(5) || defined(__ARM_ARCH_4T__)
+            BX = 0x012fff10,
+#endif
             FMSR = 0x0e000a10,
             FMRS = 0x0e100a10,
             FSITOD = 0x0eb80bc0,
             FTOSID = 0x0ebd0b40,
             FMSTAT = 0x0ef1fa10,
-#if ARM_ARCH_VERSION >= 5
+#if WTF_ARM_ARCH_AT_LEAST(5)
             CLZ = 0x016f0f10,
             BKPT = 0xe120070,
+            BLX = 0x012fff30,
 #endif
-#if ARM_ARCH_VERSION >= 7
+#if WTF_ARM_ARCH_AT_LEAST(7)
             MOVW = 0x03000000,
             MOVT = 0x03400000,
 #endif
@@ -161,6 +165,7 @@ namespace TI {
             SET_CC = (1 << 20),
             OP2_OFSREG = (1 << 25),
             DT_UP = (1 << 23),
+            DT_BYTE = (1 << 22),
             DT_WB = (1 << 21),
             // This flag is inlcuded in LDR and STR
             DT_PRE = (1 << 24),
@@ -189,6 +194,8 @@ namespace TI {
         };
 
         static const ARMWord INVALID_IMM = 0xf0000000;
+        static const ARMWord InvalidBranchTarget = 0xffffffff;
+        static const int DefaultPrefetching = 2;
 
         class JmpSrc {
             friend class ARMAssembler;
@@ -348,7 +355,7 @@ namespace TI {
             emitInst(static_cast<ARMWord>(cc) | MOV, rd, ARMRegisters::r0, op2);
         }
 
-#if ARM_ARCH_VERSION >= 7
+#if WTF_ARM_ARCH_AT_LEAST(7)
         void movw_r(int rd, ARMWord op2, Condition cc = AL)
         {
             ASSERT((op2 | 0xf0fff) == 0xf0fff);
@@ -407,6 +414,11 @@ namespace TI {
             emitInst(static_cast<ARMWord>(cc) | FADDD, dd, dn, dm);
         }
 
+        void fdivd_r(int dd, int dn, int dm, Condition cc = AL)
+        {
+            emitInst(static_cast<ARMWord>(cc) | FDIVD, dd, dn, dm);
+        }
+
         void fsubd_r(int dd, int dn, int dm, Condition cc = AL)
         {
             emitInst(static_cast<ARMWord>(cc) | FSUBD, dd, dn, dm);
@@ -420,6 +432,11 @@ namespace TI {
         void fcmpd_r(int dd, int dm, Condition cc = AL)
         {
             emitInst(static_cast<ARMWord>(cc) | FCMPD, dd, 0, dm);
+        }
+
+        void fsqrtd_r(int dd, int dm, Condition cc = AL)
+        {
+            emitInst(static_cast<ARMWord>(cc) | FSQRTD, dd, 0, dm);
         }
 
         void ldr_imm(int rd, ARMWord imm, Condition cc = AL)
@@ -511,9 +528,9 @@ namespace TI {
             emitInst(static_cast<ARMWord>(cc) | FMSR, rn, dd, 0);
         }
 
-        void fmrs_r(int dd, int rn, Condition cc = AL)
+        void fmrs_r(int rd, int dn, Condition cc = AL)
         {
-            emitInst(static_cast<ARMWord>(cc) | FMRS, rn, dd, 0);
+            emitInst(static_cast<ARMWord>(cc) | FMRS, rd, dn, 0);
         }
 
         void fsitod_r(int dd, int dm, Condition cc = AL)
@@ -531,7 +548,7 @@ namespace TI {
             m_buffer.putInt(static_cast<ARMWord>(cc) | FMSTAT);
         }
 
-#if ARM_ARCH_VERSION >= 5
+#if WTF_ARM_ARCH_AT_LEAST(5)
         void clz_r(int rd, int rm, Condition cc = AL)
         {
             m_buffer.putInt(static_cast<ARMWord>(cc) | CLZ | RD(rd) | RM(rm));
@@ -540,12 +557,36 @@ namespace TI {
 
         void bkpt(ARMWord value)
         {
-#if ARM_ARCH_VERSION >= 5
+#if WTF_ARM_ARCH_AT_LEAST(5)
             m_buffer.putInt(BKPT | ((value & 0xff0) << 4) | (value & 0xf));
 #else
             // Cannot access to Zero memory address
             dtr_dr(true, ARMRegisters::S0, ARMRegisters::S0, ARMRegisters::S0);
 #endif
+        }
+
+        void bx(int rm, Condition cc = AL)
+        {
+#if WTF_ARM_ARCH_AT_LEAST(5) || defined(__ARM_ARCH_4T__)
+            emitInst(static_cast<ARMWord>(cc) | BX, 0, 0, RM(rm));
+#else
+            mov_r(ARMRegisters::pc, RM(rm), cc);
+#endif
+        }
+
+        JmpSrc blx(int rm, Condition cc = AL)
+        {
+#if WTF_ARM_ARCH_AT_LEAST(5)
+            int s = m_buffer.uncheckedSize();
+            emitInst(static_cast<ARMWord>(cc) | BLX, 0, 0, RM(rm));
+#else
+            ASSERT(rm != 14);
+            ensureSpace(2 * sizeof(ARMWord), 0);
+            mov_r(ARMRegisters::lr, ARMRegisters::pc, cc);
+            int s = m_buffer.uncheckedSize();
+            bx(rm, cc);
+#endif
+            return JmpSrc(s);
         }
 
         static ARMWord lsl(int reg, ARMWord value)
@@ -620,28 +661,58 @@ namespace TI {
             return label();
         }
 
-        JmpSrc jmp(Condition cc = AL, int useConstantPool = 0)
+        JmpSrc loadBranchTarget(int rd, Condition cc = AL, int useConstantPool = 0)
         {
             ensureSpace(sizeof(ARMWord), sizeof(ARMWord));
             int s = m_buffer.uncheckedSize();
-            ldr_un_imm(ARMRegisters::pc, 0xffffffff, cc);
+            ldr_un_imm(rd, InvalidBranchTarget, cc);
             m_jumps.append(s | (useConstantPool & 0x1));
             return JmpSrc(s);
+        }
+
+        JmpSrc jmp(Condition cc = AL, int useConstantPool = 0)
+        {
+            return loadBranchTarget(ARMRegisters::pc, cc, useConstantPool);
         }
 
         void* executableCopy(ExecutablePool* allocator);
 
         // Patching helpers
 
-        static ARMWord* getLdrImmAddress(ARMWord* insn, uint32_t* constPool = 0);
-        static void linkBranch(void* code, JmpSrc from, void* to, int useConstantPool = 0);
+        static ARMWord* getLdrImmAddress(ARMWord* insn)
+        {
+#if WTF_ARM_ARCH_AT_LEAST(5)
+            // Check for call
+            if ((*insn & 0x0f7f0000) != 0x051f0000) {
+                // Must be BLX
+                ASSERT((*insn & 0x012fff30) == 0x012fff30);
+                insn--;
+            }
+#endif
+            // Must be an ldr ..., [pc +/- imm]
+            ASSERT((*insn & 0x0f7f0000) == 0x051f0000);
+
+            ARMWord addr = reinterpret_cast<ARMWord>(insn) + DefaultPrefetching * sizeof(ARMWord);
+            if (*insn & DT_UP)
+                return reinterpret_cast<ARMWord*>(addr + (*insn & SDT_OFFSET_MASK));
+            return reinterpret_cast<ARMWord*>(addr - (*insn & SDT_OFFSET_MASK));
+        }
+
+        static ARMWord* getLdrImmAddressOnPool(ARMWord* insn, uint32_t* constPool)
+        {
+            // Must be an ldr ..., [pc +/- imm]
+            ASSERT((*insn & 0x0f7f0000) == 0x051f0000);
+
+            if (*insn & 0x1)
+                return reinterpret_cast<ARMWord*>(constPool + ((*insn & SDT_OFFSET_MASK) >> 1));
+            return getLdrImmAddress(insn);
+        }
 
         static void patchPointerInternal(intptr_t from, void* to)
         {
             ARMWord* insn = reinterpret_cast<ARMWord*>(from);
             ARMWord* addr = getLdrImmAddress(insn);
             *addr = reinterpret_cast<ARMWord>(to);
-            ExecutableAllocator::cacheFlush(addr, sizeof(ARMWord));
         }
 
         static ARMWord patchConstantPoolLoad(ARMWord load, ARMWord value)
@@ -686,12 +757,13 @@ namespace TI {
         void linkJump(JmpSrc from, JmpDst to)
         {
             ARMWord* insn = reinterpret_cast<ARMWord*>(m_buffer.data()) + (from.m_offset / sizeof(ARMWord));
-            *getLdrImmAddress(insn, m_buffer.poolAddress()) = static_cast<ARMWord>(to.m_offset);
+            ARMWord* addr = getLdrImmAddressOnPool(insn, m_buffer.poolAddress());
+            *addr = static_cast<ARMWord>(to.m_offset);
         }
 
         static void linkJump(void* code, JmpSrc from, void* to)
         {
-            linkBranch(code, from, to);
+            patchPointerInternal(reinterpret_cast<intptr_t>(code) + from.m_offset, to);
         }
 
         static void relinkJump(void* from, void* to)
@@ -701,12 +773,12 @@ namespace TI {
 
         static void linkCall(void* code, JmpSrc from, void* to)
         {
-            linkBranch(code, from, to, true);
+            patchPointerInternal(reinterpret_cast<intptr_t>(code) + from.m_offset, to);
         }
 
         static void relinkCall(void* from, void* to)
         {
-            relinkJump(from, to);
+            patchPointerInternal(reinterpret_cast<intptr_t>(from) - sizeof(ARMWord), to);
         }
 
         // Address operations
@@ -748,7 +820,7 @@ namespace TI {
 
         static ARMWord getOp2(ARMWord imm);
 
-#if ARM_ARCH_VERSION >= 7
+#if WTF_ARM_ARCH_AT_LEAST(7)
         static ARMWord getImm16Op2(ARMWord imm)
         {
             if (imm <= 0xffff)
@@ -762,7 +834,7 @@ namespace TI {
 
         // Memory load/store helpers
 
-        void dataTransfer32(bool isLoad, RegisterID srcDst, RegisterID base, int32_t offset);
+        void dataTransfer32(bool isLoad, RegisterID srcDst, RegisterID base, int32_t offset, bool bytes = false);
         void baseIndexTransfer32(bool isLoad, RegisterID srcDst, RegisterID base, RegisterID index, int scale, int32_t offset);
         void doubleTransfer(bool isLoad, FPRegisterID srcDst, RegisterID base, int32_t offset);
 
@@ -813,6 +885,6 @@ namespace TI {
 
 } // namespace TI
 
-#endif // ENABLE(ASSEMBLER) && PLATFORM(ARM_TRADITIONAL)
+#endif // ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
 
 #endif // ARMAssembler_h

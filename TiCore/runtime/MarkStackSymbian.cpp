@@ -27,6 +27,8 @@
 #include "config.h"
 #include "MarkStack.h"
 
+#if OS(SYMBIAN)
+
 #include <e32hal.h>
 
 namespace TI {
@@ -49,3 +51,5 @@ void MarkStack::releaseStack(void* addr, size_t size)
 }
 
 }
+
+#endif
