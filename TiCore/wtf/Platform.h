@@ -639,9 +639,9 @@
     // ARMv7;
     #define WTF_USE_JSVALUE32_64 1
     #define ENABLE_INTERPRETER 1
-    #define ENABLE_JIT 1
+    #define ENABLE_JIT 0
     #define ENABLE_YARR 1
-    #define ENABLE_YARR_JIT 1
+    #define ENABLE_YARR_JIT 0
 #else
     // ARMv6; never use the JIT, use JSVALUE32_64 only if compiling with llvm.
     #define ENABLE_JIT 0
