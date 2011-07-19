@@ -1,7 +1,7 @@
-xcodebuild -sdk iphonesimulator4.3 -configuration Release -target JavascriptCore-Static clean
-xcodebuild -sdk iphoneos4.3 -configuration Release -target JavascriptCore-Static clean
+xcodebuild -sdk iphonesimulator -configuration Release -target iOSTiCore clean
+xcodebuild -sdk iphoneos -configuration Release -target iOSTiCore clean
 
-xcodebuild -sdk iphonesimulator4.3 -configuration Release -target JavascriptCore-Static
-xcodebuild -sdk iphoneos4.3 -configuration Release -target JavascriptCore-Static
+xcodebuild -sdk iphonesimulator -configuration Release -target iOSTiCore
+xcodebuild -sdk iphoneos -configuration Release -target iOSTiCore
 
 python lipoit.py
