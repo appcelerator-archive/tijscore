@@ -33,6 +33,7 @@
 #include "ArgList.h"
 #include "ClassInfo.h"
 #include "CommonIdentifiers.h"
+#include "Completion.h"
 #include "CallFrame.h"
 #include "TiCell.h"
 #include "JSNumberCell.h"
@@ -42,6 +43,7 @@
 #include "ScopeChain.h"
 #include "Structure.h"
 #include "TiGlobalData.h"
+#include "TiString.h"
 #include <wtf/StdLibExtras.h>
 
 namespace TI {
@@ -129,8 +131,8 @@ namespace TI {
 
         virtual bool hasInstance(TiExcState*, TiValue, TiValue prototypeProperty);
 
-        virtual void getPropertyNames(TiExcState*, PropertyNameArray&);
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
+        virtual void getPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
         virtual TiValue toPrimitive(TiExcState*, PreferredPrimitiveType = NoPreference) const;
         virtual bool getPrimitiveNumber(TiExcState*, double& number, TiValue& value);
@@ -142,7 +144,6 @@ namespace TI {
         virtual TiObject* toThisObject(TiExcState*) const;
         virtual TiObject* unwrappedObject();
 
-        virtual bool getPropertyAttributes(TiExcState*, const Identifier& propertyName, unsigned& attributes) const;
         bool getPropertySpecificValue(TiExcState* exec, const Identifier& propertyName, TiCell*& specificFunction) const;
 
         // This get function only looks at the property map.
@@ -178,6 +179,7 @@ namespace TI {
 
         void putDirect(const Identifier& propertyName, TiValue value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot);
         void putDirect(const Identifier& propertyName, TiValue value, unsigned attr = 0);
+        void putDirect(const Identifier& propertyName, TiValue value, PutPropertySlot&);
 
         void putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attr = 0);
         void putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot);
@@ -202,8 +204,9 @@ namespace TI {
         virtual bool isGlobalObject() const { return false; }
         virtual bool isVariableObject() const { return false; }
         virtual bool isActivationObject() const { return false; }
-        virtual bool isWatchdogException() const { return false; }
         virtual bool isNotAnObjectErrorStub() const { return false; }
+
+        virtual ComplType exceptionType() const { return Throw; }
 
         void allocatePropertyStorage(size_t oldSize, size_t newSize);
         void allocatePropertyStorageInline(size_t oldSize, size_t newSize);
@@ -214,7 +217,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
         void flattenDictionaryObject()
@@ -225,13 +228,14 @@ namespace TI {
     protected:
         static const unsigned StructureFlags = 0;
 
-        void addAnonymousSlots(unsigned count);
         void putAnonymousValue(unsigned index, TiValue value)
         {
+            ASSERT(index < m_structure->anonymousSlotCount());
             *locationForOffset(index) = value;
         }
-        TiValue getAnonymousValue(unsigned index)
+        TiValue getAnonymousValue(unsigned index) const
         {
+            ASSERT(index < m_structure->anonymousSlotCount());
             return *locationForOffset(index);
         }
 
@@ -241,7 +245,7 @@ namespace TI {
         using TiCell::isGetterSetter;
         using TiCell::toObject;
         void getObject();
-        void getString();
+        void getString(TiExcState* exec);
         void isObject();
         void isString();
 #if USE(JSVALUE32)
@@ -389,7 +393,7 @@ ALWAYS_INLINE bool TiCell::fastGetOwnPropertySlot(TiExcState* exec, const Identi
 
 // It may seem crazy to inline a function this large but it makes a big difference
 // since this is function very hot in variable lookup
-inline bool TiObject::getPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
+ALWAYS_INLINE bool TiObject::getPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
     TiObject* object = this;
     while (true) {
@@ -402,7 +406,7 @@ inline bool TiObject::getPropertySlot(TiExcState* exec, const Identifier& proper
     }
 }
 
-inline bool TiObject::getPropertySlot(TiExcState* exec, unsigned propertyName, PropertySlot& slot)
+ALWAYS_INLINE bool TiObject::getPropertySlot(TiExcState* exec, unsigned propertyName, PropertySlot& slot)
 {
     TiObject* object = this;
     while (true) {
@@ -443,12 +447,20 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
         TiCell* currentSpecificFunction;
         size_t offset = m_structure->get(propertyName, currentAttributes, currentSpecificFunction);
         if (offset != WTI::notFound) {
+            // If there is currently a specific function, and there now either isn't,
+            // or the new value is different, then despecify.
             if (currentSpecificFunction && (specificFunction != currentSpecificFunction))
                 m_structure->despecifyDictionaryFunction(propertyName);
             if (checkReadOnly && currentAttributes & ReadOnly)
                 return;
             putDirectOffset(offset, value);
-            if (!specificFunction && !currentSpecificFunction)
+            // At this point, the objects structure only has a specific value set if previously there
+            // had been one set, and if the new value being specified is the same (otherwise we would
+            // have despecified, above).  So, if currentSpecificFunction is not set, or if the new
+            // value is different (or there is no new value), then the slot now has no value - and
+            // as such it is cachable.
+            // If there was previously a value, and the new value is the same, then we cannot cache.
+            if (!currentSpecificFunction || (specificFunction != currentSpecificFunction))
                 slot.setExistingProperty(this, offset);
             return;
         }
@@ -475,7 +487,8 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
         ASSERT(offset < structure->propertyStorageCapacity());
         setStructure(structure.release());
         putDirectOffset(offset, value);
-        // See comment on setNewProperty call below.
+        // This is a new property; transitions with specific values are not currently cachable,
+        // so leave the slot in an uncachable state.
         if (!specificFunction)
             slot.setNewProperty(this, offset);
         return;
@@ -488,14 +501,28 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
         if (checkReadOnly && currentAttributes & ReadOnly)
             return;
 
-        if (currentSpecificFunction && (specificFunction != currentSpecificFunction)) {
+        // There are three possibilities here:
+        //  (1) There is an existing specific value set, and we're overwriting with *the same value*.
+        //       * Do nothing - no need to despecify, but that means we can't cache (a cached
+        //         put could write a different value). Leave the slot in an uncachable state.
+        //  (2) There is a specific value currently set, but we're writing a different value.
+        //       * First, we have to despecify.  Having done so, this is now a regular slot
+        //         with no specific value, so go ahead & cache like normal.
+        //  (3) Normal case, there is no specific value set.
+        //       * Go ahead & cache like normal.
+        if (currentSpecificFunction) {
+            // case (1) Do the put, then return leaving the slot uncachable.
+            if (specificFunction == currentSpecificFunction) {
+                putDirectOffset(offset, value);
+                return;
+            }
+            // case (2) Despecify, fall through to (3).
             setStructure(Structure::despecifyFunctionTransition(m_structure, propertyName));
-            putDirectOffset(offset, value);
-            // Function transitions are not currently cachable, so leave the slot in an uncachable state.
-            return;
         }
-        putDirectOffset(offset, value);
+
+        // case (3) set the slot, do the put, return.
         slot.setExistingProperty(this, offset);
+        putDirectOffset(offset, value);
         return;
     }
 
@@ -517,7 +544,8 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
     ASSERT(offset < structure->propertyStorageCapacity());
     setStructure(structure.release());
     putDirectOffset(offset, value);
-    // Function transitions are not currently cachable, so leave the slot in an uncachable state.
+    // This is a new property; transitions with specific values are not currently cachable,
+    // so leave the slot in an uncachable state.
     if (!specificFunction)
         slot.setNewProperty(this, offset);
 }
@@ -536,17 +564,6 @@ inline void TiObject::putDirectInternal(TiGlobalData& globalData, const Identifi
     putDirectInternal(propertyName, value, attributes, false, slot, getTiFunction(globalData, value));
 }
 
-inline void TiObject::addAnonymousSlots(unsigned count)
-{
-    size_t currentCapacity = m_structure->propertyStorageCapacity();
-    RefPtr<Structure> structure = Structure::addAnonymousSlotsTransition(m_structure, count);
-
-    if (currentCapacity != structure->propertyStorageCapacity())
-        allocatePropertyStorage(currentCapacity, structure->propertyStorageCapacity());
-
-    setStructure(structure.release());
-}
-
 inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
 {
     ASSERT(value);
@@ -559,6 +576,11 @@ inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, u
 {
     PutPropertySlot slot;
     putDirectInternal(propertyName, value, attributes, false, slot, 0);
+}
+
+inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
+{
+    putDirectInternal(propertyName, value, 0, false, slot, 0);
 }
 
 inline void TiObject::putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
@@ -663,6 +685,12 @@ inline void TiValue::put(TiExcState* exec, const Identifier& propertyName, TiVal
     asCell()->put(exec, propertyName, value, slot);
 }
 
+inline void TiValue::putDirect(TiExcState*, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
+{
+    ASSERT(isCell() && isObject());
+    asObject(asCell())->putDirect(propertyName, value, slot);
+}
+
 inline void TiValue::put(TiExcState* exec, unsigned propertyName, TiValue value)
 {
     if (UNLIKELY(!isCell())) {
@@ -701,6 +729,18 @@ ALWAYS_INLINE void TiObject::markChildrenDirect(MarkStack& markStack)
     PropertyStorage storage = propertyStorage();
     size_t storageSize = m_structure->propertyStorageSize();
     markStack.appendValues(reinterpret_cast<TiValue*>(storage), storageSize);
+}
+
+// --- TiValue inlines ----------------------------
+
+ALWAYS_INLINE UString TiValue::toThisString(TiExcState* exec) const
+{
+    return isString() ? static_cast<TiString*>(asCell())->value(exec) : toThisObject(exec)->toString(exec);
+}
+
+inline TiString* TiValue::toThisTiString(TiExcState* exec) const
+{
+    return isString() ? static_cast<TiString*>(asCell()) : jsString(exec, toThisObject(exec)->toString(exec));
 }
 
 } // namespace TI

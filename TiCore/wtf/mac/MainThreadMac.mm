@@ -36,44 +36,125 @@
 #import "config.h"
 #import "MainThread.h"
 
-#import <wtf/Assertions.h>
 #import <CoreFoundation/CoreFoundation.h>
+#import <Foundation/NSThread.h>
+#import <stdio.h>
+#import <wtf/Assertions.h>
+#import <wtf/Threading.h>
 
-void dispatchFunctionsFromCFRunLoopSource(void *unused);
+@interface WTIMainThreadCaller : NSObject {
+}
+- (void)call;
+@end
 
-void dispatchFunctionsFromCFRunLoopSource(void *unused)
+@implementation WTIMainThreadCaller
+
+- (void)call
 {
     WTI::dispatchFunctionsFromMainThread();
 }
 
+@end // implementation WTIMainThreadCaller
+
 namespace WTI {
 
-static CFRunLoopSourceRef dispatchRunLoopSource = NULL;
+static WTIMainThreadCaller* staticMainThreadCaller;
+static bool isTimerPosted; // This is only accessed on the 'main' thread.
+static bool mainThreadEstablishedAsPthreadMain;
+static pthread_t mainThreadPthread;
+static NSThread* mainThreadNSThread;
 
 void initializeMainThreadPlatform()
 {
-    ASSERT(!dispatchRunLoopSource);
+#if !defined(BUILDING_ON_TIGER)
+    ASSERT(!staticMainThreadCaller);
+    staticMainThreadCaller = [[WTIMainThreadCaller alloc] init];
 
-    CFRunLoopSourceContext ourContext;
-    ourContext.version = 0;
-    ourContext.info = NULL;
-    ourContext.retain = NULL;
-    ourContext.release = NULL;
-    ourContext.copyDescription = NULL;
-    ourContext.equal = NULL;
-    ourContext.hash = NULL;
-    ourContext.schedule = NULL;
-    ourContext.cancel = NULL;
-    ourContext.perform = dispatchFunctionsFromCFRunLoopSource;
+    mainThreadEstablishedAsPthreadMain = false;
+    mainThreadPthread = pthread_self();
+    mainThreadNSThread = [[NSThread currentThread] retain];
+#else
+    ASSERT_NOT_REACHED();
+#endif
+}
 
-    dispatchRunLoopSource = CFRunLoopSourceCreate(NULL, 0, &ourContext);
-    CFRunLoopAddSource(CFRunLoopGetMain(), dispatchRunLoopSource, kCFRunLoopCommonModes);
+void initializeMainThreadToProcessMainThreadPlatform()
+{
+    if (!pthread_main_np())
+        NSLog(@"WebKit Threading Violation - initial use of WebKit from a secondary thread.");
+
+    ASSERT(!staticMainThreadCaller);
+    staticMainThreadCaller = [[WTIMainThreadCaller alloc] init];
+
+    mainThreadEstablishedAsPthreadMain = true;
+    mainThreadPthread = 0;
+    mainThreadNSThread = nil;
+}
+
+static void timerFired(CFRunLoopTimerRef timer, void*)
+{
+    CFRelease(timer);
+    isTimerPosted = false;
+    WTI::dispatchFunctionsFromMainThread();
+}
+
+static void postTimer()
+{
+    ASSERT(isMainThread());
+
+    if (isTimerPosted)
+        return;
+
+    isTimerPosted = true;
+    CFRunLoopAddTimer(CFRunLoopGetCurrent(), CFRunLoopTimerCreate(0, 0, 0, 0, 0, timerFired, 0), kCFRunLoopCommonModes);
 }
 
 void scheduleDispatchFunctionsOnMainThread()
 {
-    ASSERT(dispatchRunLoopSource);
-    CFRunLoopSourceSignal(dispatchRunLoopSource);
+    ASSERT(staticMainThreadCaller);
+
+    if (isMainThread()) {
+        postTimer();
+        return;
+    }
+
+    if (mainThreadEstablishedAsPthreadMain) {
+        ASSERT(!mainThreadNSThread);
+        [staticMainThreadCaller performSelectorOnMainThread:@selector(call) withObject:nil waitUntilDone:NO];
+        return;
+    }
+
+#if !defined(BUILDING_ON_TIGER)
+    ASSERT(mainThreadNSThread);
+    [staticMainThreadCaller performSelector:@selector(call) onThread:mainThreadNSThread withObject:nil waitUntilDone:NO];
+#else
+    ASSERT_NOT_REACHED();
+#endif
+}
+
+bool isMainThread()
+{
+    if (mainThreadEstablishedAsPthreadMain) {
+        ASSERT(!mainThreadPthread);
+        return pthread_main_np();
+    }
+
+#if !defined(BUILDING_ON_TIGER)
+    ASSERT(mainThreadPthread);
+    return pthread_equal(pthread_self(), mainThreadPthread);
+#else
+    ASSERT_NOT_REACHED();
+    return false;
+#endif
+}
+
+// This function is the same as isMainThread() above except that it does not do
+// a ASSERT(mainThreadPthread). This should only be used by code that can get
+// invoked when the WebThread hasn't been started. See <rdar://8502487>.
+bool isWebThread()
+{
+    ASSERT(!mainThreadEstablishedAsPthreadMain);
+    return pthread_equal(pthread_self(), mainThreadPthread);
 }
 
 } // namespace WTI

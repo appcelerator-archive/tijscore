@@ -29,6 +29,7 @@
 #ifndef Operations_h
 #define Operations_h
 
+#include "ExceptionHelpers.h"
 #include "Interpreter.h"
 #include "JSImmediate.h"
 #include "JSNumberCell.h"
@@ -36,11 +37,211 @@
 
 namespace TI {
 
-    NEVER_INLINE TiValue throwOutOfMemoryError(TiExcState*);
     NEVER_INLINE TiValue jsAddSlowCase(CallFrame*, TiValue, TiValue);
     TiValue jsTypeStringForValue(CallFrame*, TiValue);
     bool jsIsObjectType(TiValue);
     bool jsIsFunctionType(TiValue);
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, TiString* s1, TiString* s2)
+    {
+        unsigned length1 = s1->length();
+        if (!length1)
+            return s2;
+        unsigned length2 = s2->length();
+        if (!length2)
+            return s1;
+        if ((length1 + length2) < length1)
+            return throwOutOfMemoryError(exec);
+
+        unsigned fiberCount = s1->size() + s2->size();
+        TiGlobalData* globalData = &exec->globalData();
+
+        if (fiberCount <= TiString::s_maxInternalRopeLength)
+            return new (globalData) TiString(globalData, fiberCount, s1, s2);
+
+        TiString::RopeBuilder ropeBuilder(fiberCount);
+        if (UNLIKELY(ropeBuilder.isOutOfMemory()))
+            return throwOutOfMemoryError(exec);
+        ropeBuilder.append(s1);
+        ropeBuilder.append(s2);
+        return new (globalData) TiString(globalData, ropeBuilder.release());
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, TiString* s2)
+    {
+        unsigned length1 = u1.size();
+        if (!length1)
+            return s2;
+        unsigned length2 = s2->length();
+        if (!length2)
+            return jsString(exec, u1);
+        if ((length1 + length2) < length1)
+            return throwOutOfMemoryError(exec);
+
+        unsigned fiberCount = 1 + s2->size();
+        TiGlobalData* globalData = &exec->globalData();
+
+        if (fiberCount <= TiString::s_maxInternalRopeLength)
+            return new (globalData) TiString(globalData, fiberCount, u1, s2);
+
+        TiString::RopeBuilder ropeBuilder(fiberCount);
+        if (UNLIKELY(ropeBuilder.isOutOfMemory()))
+            return throwOutOfMemoryError(exec);
+        ropeBuilder.append(u1);
+        ropeBuilder.append(s2);
+        return new (globalData) TiString(globalData, ropeBuilder.release());
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, TiString* s1, const UString& u2)
+    {
+        unsigned length1 = s1->length();
+        if (!length1)
+            return jsString(exec, u2);
+        unsigned length2 = u2.size();
+        if (!length2)
+            return s1;
+        if ((length1 + length2) < length1)
+            return throwOutOfMemoryError(exec);
+
+        unsigned fiberCount = s1->size() + 1;
+        TiGlobalData* globalData = &exec->globalData();
+
+        if (fiberCount <= TiString::s_maxInternalRopeLength)
+            return new (globalData) TiString(globalData, fiberCount, s1, u2);
+
+        TiString::RopeBuilder ropeBuilder(fiberCount);
+        if (UNLIKELY(ropeBuilder.isOutOfMemory()))
+            return throwOutOfMemoryError(exec);
+        ropeBuilder.append(s1);
+        ropeBuilder.append(u2);
+        return new (globalData) TiString(globalData, ropeBuilder.release());
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, const UString& u2)
+    {
+        unsigned length1 = u1.size();
+        if (!length1)
+            return jsString(exec, u2);
+        unsigned length2 = u2.size();
+        if (!length2)
+            return jsString(exec, u1);
+        if ((length1 + length2) < length1)
+            return throwOutOfMemoryError(exec);
+
+        TiGlobalData* globalData = &exec->globalData();
+        return new (globalData) TiString(globalData, u1, u2);
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, const UString& u2, const UString& u3)
+    {
+        unsigned length1 = u1.size();
+        unsigned length2 = u2.size();
+        unsigned length3 = u3.size();
+        if (!length1)
+            return jsString(exec, u2, u3);
+        if (!length2)
+            return jsString(exec, u1, u3);
+        if (!length3)
+            return jsString(exec, u1, u2);
+
+        if ((length1 + length2) < length1)
+            return throwOutOfMemoryError(exec);
+        if ((length1 + length2 + length3) < length3)
+            return throwOutOfMemoryError(exec);
+
+        TiGlobalData* globalData = &exec->globalData();
+        return new (globalData) TiString(globalData, u1, u2, u3);
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, Register* strings, unsigned count)
+    {
+        ASSERT(count >= 3);
+
+        unsigned fiberCount = 0;
+        for (unsigned i = 0; i < count; ++i) {
+            TiValue v = strings[i].jsValue();
+            if (LIKELY(v.isString()))
+                fiberCount += asString(v)->size();
+            else
+                ++fiberCount;
+        }
+
+        TiGlobalData* globalData = &exec->globalData();
+        if (fiberCount == 3)
+            return new (globalData) TiString(exec, strings[0].jsValue(), strings[1].jsValue(), strings[2].jsValue());
+
+        TiString::RopeBuilder ropeBuilder(fiberCount);
+        if (UNLIKELY(ropeBuilder.isOutOfMemory()))
+            return throwOutOfMemoryError(exec);
+
+        unsigned length = 0;
+        bool overflow = false;
+
+        for (unsigned i = 0; i < count; ++i) {
+            TiValue v = strings[i].jsValue();
+            if (LIKELY(v.isString()))
+                ropeBuilder.append(asString(v));
+            else
+                ropeBuilder.append(v.toString(exec));
+
+            unsigned newLength = ropeBuilder.length();
+            if (newLength < length)
+                overflow = true;
+            length = newLength;
+        }
+
+        if (overflow)
+            return throwOutOfMemoryError(exec);
+
+        return new (globalData) TiString(globalData, ropeBuilder.release());
+    }
+
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, TiValue thisValue, const ArgList& args)
+    {
+        unsigned fiberCount = 0;
+        if (LIKELY(thisValue.isString()))
+            fiberCount += asString(thisValue)->size();
+        else
+            ++fiberCount;
+        for (unsigned i = 0; i < args.size(); ++i) {
+            TiValue v = args.at(i);
+            if (LIKELY(v.isString()))
+                fiberCount += asString(v)->size();
+            else
+                ++fiberCount;
+        }
+
+        TiString::RopeBuilder ropeBuilder(fiberCount);
+        if (UNLIKELY(ropeBuilder.isOutOfMemory()))
+            return throwOutOfMemoryError(exec);
+
+        if (LIKELY(thisValue.isString()))
+            ropeBuilder.append(asString(thisValue));
+        else
+            ropeBuilder.append(thisValue.toString(exec));
+
+        unsigned length = 0;
+        bool overflow = false;
+
+        for (unsigned i = 0; i < args.size(); ++i) {
+            TiValue v = args.at(i);
+            if (LIKELY(v.isString()))
+                ropeBuilder.append(asString(v));
+            else
+                ropeBuilder.append(v.toString(exec));
+
+            unsigned newLength = ropeBuilder.length();
+            if (newLength < length)
+                overflow = true;
+            length = newLength;
+        }
+
+        if (overflow)
+            return throwOutOfMemoryError(exec);
+
+        TiGlobalData* globalData = &exec->globalData();
+        return new (globalData) TiString(globalData, ropeBuilder.release());
+    }
 
     // ECMA 11.9.3
     inline bool TiValue::equal(TiExcState* exec, TiValue v1, TiValue v2)
@@ -60,7 +261,7 @@ namespace TI {
             bool s1 = v1.isString();
             bool s2 = v2.isString();
             if (s1 && s2)
-                return asString(v1)->value() == asString(v2)->value();
+                return asString(v1)->value(exec) == asString(v2)->value(exec);
 
             if (v1.isUndefinedOrNull()) {
                 if (v2.isUndefinedOrNull())
@@ -117,17 +318,17 @@ namespace TI {
     }
 
     // ECMA 11.9.3
-    ALWAYS_INLINE bool TiValue::strictEqualSlowCaseInline(TiValue v1, TiValue v2)
+    ALWAYS_INLINE bool TiValue::strictEqualSlowCaseInline(TiExcState* exec, TiValue v1, TiValue v2)
     {
         ASSERT(v1.isCell() && v2.isCell());
 
         if (v1.asCell()->isString() && v2.asCell()->isString())
-            return asString(v1)->value() == asString(v2)->value();
+            return asString(v1)->value(exec) == asString(v2)->value(exec);
 
         return v1 == v2;
     }
 
-    inline bool TiValue::strictEqual(TiValue v1, TiValue v2)
+    inline bool TiValue::strictEqual(TiExcState* exec, TiValue v1, TiValue v2)
     {
         if (v1.isInt32() && v2.isInt32())
             return v1 == v2;
@@ -138,10 +339,10 @@ namespace TI {
         if (!v1.isCell() || !v2.isCell())
             return v1 == v2;
 
-        return strictEqualSlowCaseInline(v1, v2);
+        return strictEqualSlowCaseInline(exec, v1, v2);
     }
 
-    inline bool jsLess(CallFrame* callFrame, TiValue v1, TiValue v2)
+    ALWAYS_INLINE bool jsLess(CallFrame* callFrame, TiValue v1, TiValue v2)
     {
         if (v1.isInt32() && v2.isInt32())
             return v1.asInt32() < v2.asInt32();
@@ -153,7 +354,7 @@ namespace TI {
 
         TiGlobalData* globalData = &callFrame->globalData();
         if (isTiString(globalData, v1) && isTiString(globalData, v2))
-            return asString(v1)->value() < asString(v2)->value();
+            return asString(v1)->value(callFrame) < asString(v2)->value(callFrame);
 
         TiValue p1;
         TiValue p2;
@@ -163,7 +364,7 @@ namespace TI {
         if (wasNotString1 | wasNotString2)
             return n1 < n2;
 
-        return asString(p1)->value() < asString(p2)->value();
+        return asString(p1)->value(callFrame) < asString(p2)->value(callFrame);
     }
 
     inline bool jsLessEq(CallFrame* callFrame, TiValue v1, TiValue v2)
@@ -178,7 +379,7 @@ namespace TI {
 
         TiGlobalData* globalData = &callFrame->globalData();
         if (isTiString(globalData, v1) && isTiString(globalData, v2))
-            return !(asString(v2)->value() < asString(v1)->value());
+            return !(asString(v2)->value(callFrame) < asString(v1)->value(callFrame));
 
         TiValue p1;
         TiValue p2;
@@ -188,7 +389,7 @@ namespace TI {
         if (wasNotString1 | wasNotString2)
             return n1 <= n2;
 
-        return !(asString(p2)->value() < asString(p1)->value());
+        return !(asString(p2)->value(callFrame) < asString(p1)->value(callFrame));
     }
 
     // Fast-path choices here are based on frequency data from SunSpider:
@@ -202,36 +403,21 @@ namespace TI {
 
     ALWAYS_INLINE TiValue jsAdd(CallFrame* callFrame, TiValue v1, TiValue v2)
     {
-        double left;
-        double right = 0.0;
-
-        bool rightIsNumber = v2.getNumber(right);
-        if (rightIsNumber && v1.getNumber(left))
+        double left = 0.0, right;
+        if (v1.getNumber(left) && v2.getNumber(right))
             return jsNumber(callFrame, left + right);
         
-        bool leftIsString = v1.isString();
-        if (leftIsString && v2.isString()) {
-            RefPtr<UString::Rep> value = concatenate(asString(v1)->value().rep(), asString(v2)->value().rep());
-            if (!value)
-                return throwOutOfMemoryError(callFrame);
-            return jsString(callFrame, value.release());
-        }
-
-        if (rightIsNumber & leftIsString) {
-            RefPtr<UString::Rep> value = v2.isInt32() ?
-                concatenate(asString(v1)->value().rep(), v2.asInt32()) :
-                concatenate(asString(v1)->value().rep(), right);
-
-            if (!value)
-                return throwOutOfMemoryError(callFrame);
-            return jsString(callFrame, value.release());
+        if (v1.isString()) {
+            return v2.isString()
+                ? jsString(callFrame, asString(v1), asString(v2))
+                : jsString(callFrame, asString(v1), v2.toPrimitiveString(callFrame));
         }
 
         // All other cases are pretty uncommon
         return jsAddSlowCase(callFrame, v1, v2);
     }
 
-    inline size_t normalizePrototypeChain(CallFrame* callFrame, TiValue base, TiValue slotBase)
+    inline size_t normalizePrototypeChain(CallFrame* callFrame, TiValue base, TiValue slotBase, const Identifier& propertyName, size_t& slotOffset)
     {
         TiCell* cell = asCell(base);
         size_t count = 0;
@@ -249,8 +435,11 @@ namespace TI {
 
             // Since we're accessing a prototype in a loop, it's a good bet that it
             // should not be treated as a dictionary.
-            if (cell->structure()->isDictionary())
+            if (cell->structure()->isDictionary()) {
                 asObject(cell)->flattenDictionaryObject();
+                if (slotBase == cell)
+                    slotOffset = cell->structure()->get(propertyName); 
+            }
 
             ++count;
         }
@@ -300,52 +489,6 @@ namespace TI {
         ASSERT_NOT_REACHED();
         return TiValue();
     }
-
-    ALWAYS_INLINE TiValue concatenateStrings(CallFrame* callFrame, Register* strings, unsigned count)
-    {
-        ASSERT(count >= 3);
-
-        // Estimate the amount of space required to hold the entire string.  If all
-        // arguments are strings, we can easily calculate the exact amount of space
-        // required.  For any other arguments, for now let's assume they may require
-        // 11 UChars of storage.  This is enouch to hold any int, and likely is also
-        // reasonable for the other immediates.  We may want to come back and tune
-        // this value at some point.
-        unsigned bufferSize = 0;
-        for (unsigned i = 0; i < count; ++i) {
-            TiValue v = strings[i].jsValue();
-            if (LIKELY(v.isString()))
-                bufferSize += asString(v)->value().size();
-            else
-                bufferSize += 11;
-        }
-
-        // Allocate an output string to store the result.
-        // If the first argument is a String, and if it has the capacity (or can grow
-        // its capacity) to hold the entire result then use this as a base to concatenate
-        // onto.  Otherwise, allocate a new empty output buffer.
-        TiValue firstValue = strings[0].jsValue();
-        RefPtr<UString::Rep> resultRep;
-        if (firstValue.isString() && (resultRep = asString(firstValue)->value().rep())->reserveCapacity(bufferSize)) {
-            // We're going to concatenate onto the first string - remove it from the list of items to be appended.
-            ++strings;
-            --count;
-        } else
-            resultRep = UString::Rep::createEmptyBuffer(bufferSize);
-        UString result(resultRep);
-
-        // Loop over the operands, writing them into the output buffer.
-        for (unsigned i = 0; i < count; ++i) {
-            TiValue v = strings[i].jsValue();
-            if (LIKELY(v.isString()))
-                result.append(asString(v)->value());
-            else
-                result.append(v.toString(callFrame));
-        }
-
-        return jsString(callFrame, result);
-    }
-
 } // namespace TI
 
 #endif // Operations_h

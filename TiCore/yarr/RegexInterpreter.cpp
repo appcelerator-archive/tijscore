@@ -287,20 +287,6 @@ public:
         return false;
     }
 
-    bool tryConsumeCharacter(int testChar)
-    {
-        if (input.atEnd())
-            return false;
-
-        int ch = input.read();
-
-        if (pattern->m_ignoreCase ? ((Unicode::toLower(testChar) == ch) || (Unicode::toUpper(testChar) == ch)) : (testChar == ch)) {
-            input.next();
-            return true;
-        }
-        return false;
-    }
-
     bool checkCharacter(int testChar, int inputPosition)
     {
         return testChar == input.readChecked(inputPosition);
@@ -310,23 +296,6 @@ public:
     {
         int ch = input.readChecked(inputPosition);
         return (loChar == ch) || (hiChar == ch);
-    }
-
-    bool tryConsumeCharacterClass(CharacterClass* characterClass, bool invert)
-    {
-        if (input.atEnd())
-            return false;
-
-        bool match = testCharacterClass(characterClass, input.read());
-
-        if (invert)
-            match = !match;
-
-        if (match) {
-            input.next();
-            return true;
-        }
-        return false;
     }
 
     bool checkCharacterClass(CharacterClass* characterClass, bool invert, int inputPosition)
@@ -1592,7 +1561,7 @@ public:
                 }
 
                 case PatternTerm::TypeParentheticalAssertion: {
-                    unsigned alternativeFrameLocation = term.inputPosition + RegexStackSpaceForBackTrackInfoParentheticalAssertion;
+                    unsigned alternativeFrameLocation = term.frameLocation + RegexStackSpaceForBackTrackInfoParentheticalAssertion;
 
                     atomParentheticalAssertionBegin(term.parentheses.subpatternId, term.invertOrCapture, term.frameLocation, alternativeFrameLocation);
                     emitDisjunction(term.parentheses.disjunction, currentCountAlreadyChecked, 0);

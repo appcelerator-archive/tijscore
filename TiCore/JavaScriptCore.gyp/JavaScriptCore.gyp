@@ -75,7 +75,6 @@
             ],
             'include_dirs': [
               '../os-win32',
-              '<(chromium_src_dir)/webkit/build/JavaScriptCore',
             ],
           }],
           ['OS=="mac"', {
@@ -115,9 +114,11 @@
         # ... Then include what we want.
         ['include', '../wtf/'],
         # GLib/GTK, even though its name doesn't really indicate.
-        ['exclude', '/(GOwnPtr|glib/.*)\\.(cpp|h)$'],
+        ['exclude', '/(gtk|glib|gobject)/.*\\.(cpp|h)$'],
         ['exclude', '(Default|Gtk|Mac|None|Qt|Win|Wx)\\.(cpp|mm)$'],
         ['exclude', 'wtf/CurrentTime\\.cpp$'],
+        ['exclude', 'wtf/MainThread.cpp$'],
+        ['exclude', 'wtf/TC.*\\.(cpp|h)$'],
       ],
       'direct_dependent_settings': {
         'include_dirs': [
@@ -134,20 +135,9 @@
       'conditions': [
         ['OS=="win"', {
           'sources/': [
+            ['exclude', 'ThreadIdentifierDataPthreads\\.(h|cpp)$'],
             ['exclude', 'ThreadingPthreads\\.cpp$'],
             ['include', 'Thread(ing|Specific)Win\\.cpp$']
-          ],
-          'include_dirs': [
-            '<(chromium_src_dir)/webkit/build',
-            '../kjs',
-            '../API',
-            # These 3 do not seem to exist.
-            '../bindings',
-            '../bindings/c',
-            '../bindings/jni',
-            # FIXME: removed these - don't seem to exist
-            'pending',
-            'pending/wtf',
           ],
           'include_dirs!': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit',

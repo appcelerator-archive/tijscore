@@ -73,6 +73,8 @@ namespace TI {
         friend class JIT;
         friend class JITStubs;
         friend class JITStubCall;
+        friend class JSInterfaceJIT;
+        friend class SpecializedThunkJIT;
 
     public:
         static EncodedTiValue encode(TiValue value);
@@ -87,6 +89,7 @@ namespace TI {
         enum JSUndefinedTag { JSUndefined };
         enum JSTrueTag { JSTrue };
         enum JSFalseTag { JSFalse };
+        enum EncodeAsDoubleTag { EncodeAsDouble };
 
         TiValue();
         TiValue(JSNullTag);
@@ -97,6 +100,7 @@ namespace TI {
         TiValue(const TiCell* ptr);
 
         // Numbers
+        TiValue(EncodeAsDoubleTag, TiExcState*, double);
         TiValue(TiExcState*, double);
         TiValue(TiExcState*, char);
         TiValue(TiExcState*, unsigned char);
@@ -142,8 +146,8 @@ namespace TI {
         bool getBoolean() const; // false if not a boolean
         bool getNumber(double&) const;
         double uncheckedGetNumber() const;
-        bool getString(UString&) const;
-        UString getString() const; // null string if not a string
+        bool getString(TiExcState* exec, UString&) const;
+        UString getString(TiExcState* exec) const; // null string if not a string
         TiObject* getObject() const; // 0 if not an object
 
         CallType getCallData(CallData&);
@@ -163,6 +167,7 @@ namespace TI {
         double toNumber(TiExcState*) const;
         TiValue toJSNumber(TiExcState*) const; // Fast path for when you expect that the value is an immediate number.
         UString toString(TiExcState*) const;
+        UString toPrimitiveString(TiExcState*) const;
         TiObject* toObject(TiExcState*) const;
 
         // Integer conversions.
@@ -172,6 +177,10 @@ namespace TI {
         int32_t toInt32(TiExcState*, bool& ok) const;
         uint32_t toUInt32(TiExcState*) const;
         uint32_t toUInt32(TiExcState*, bool& ok) const;
+
+#if ENABLE(JSC_ZOMBIES)
+        bool isZombie() const;
+#endif
 
         // Floating point conversions (this is a convenience method for webcore;
         // signle precision float is not a representation used in JS or JSC).
@@ -183,19 +192,20 @@ namespace TI {
         TiValue get(TiExcState*, unsigned propertyName) const;
         TiValue get(TiExcState*, unsigned propertyName, PropertySlot&) const;
         void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
+        void putDirect(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         void put(TiExcState*, unsigned propertyName, TiValue);
 
         bool needsThisConversion() const;
         TiObject* toThisObject(TiExcState*) const;
         UString toThisString(TiExcState*) const;
-        TiString* toThisTiString(TiExcState*);
+        TiString* toThisTiString(TiExcState*) const;
 
         static bool equal(TiExcState* exec, TiValue v1, TiValue v2);
         static bool equalSlowCase(TiExcState* exec, TiValue v1, TiValue v2);
         static bool equalSlowCaseInline(TiExcState* exec, TiValue v1, TiValue v2);
-        static bool strictEqual(TiValue v1, TiValue v2);
-        static bool strictEqualSlowCase(TiValue v1, TiValue v2);
-        static bool strictEqualSlowCaseInline(TiValue v1, TiValue v2);
+        static bool strictEqual(TiExcState* exec, TiValue v1, TiValue v2);
+        static bool strictEqualSlowCase(TiExcState* exec, TiValue v1, TiValue v2);
+        static bool strictEqualSlowCaseInline(TiExcState* exec, TiValue v1, TiValue v2);
 
         TiValue getJSNumber(); // TiValue() if this is not a JSNumber or number object
 
@@ -214,6 +224,10 @@ namespace TI {
         TiObject* toObjectSlowCase(TiExcState*) const;
         TiObject* toThisObjectSlowCase(TiExcState*) const;
 
+        TiObject* synthesizePrototype(TiExcState*) const;
+        TiObject* synthesizeObject(TiExcState*) const;
+
+#if USE(JSVALUE32_64)
         enum { Int32Tag =        0xffffffff };
         enum { CellTag =         0xfffffffe };
         enum { TrueTag =         0xfffffffd };
@@ -222,20 +236,16 @@ namespace TI {
         enum { UndefinedTag =    0xfffffffa };
         enum { EmptyValueTag =   0xfffffff9 };
         enum { DeletedValueTag = 0xfffffff8 };
-
+        
         enum { LowestTag =  DeletedValueTag };
-
+        
         uint32_t tag() const;
         int32_t payload() const;
 
-        TiObject* synthesizePrototype(TiExcState*) const;
-        TiObject* synthesizeObject(TiExcState*) const;
-
-#if USE(JSVALUE32_64)
         union {
             EncodedTiValue asEncodedTiValue;
             double asDouble;
-#if PLATFORM(BIG_ENDIAN)
+#if CPU(BIG_ENDIAN)
             struct {
                 int32_t tag;
                 int32_t payload;
@@ -284,6 +294,11 @@ namespace TI {
     inline TiValue jsBoolean(bool b)
     {
         return b ? TiValue(TiValue::JSTrue) : TiValue(TiValue::JSFalse);
+    }
+
+    ALWAYS_INLINE TiValue jsDoubleNumber(TiExcState* exec, double d)
+    {
+        return TiValue(TiValue::EncodeAsDouble, exec, d);
     }
 
     ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, double d)
@@ -438,6 +453,9 @@ namespace TI {
     {
         TiValue v;
         v.u.asEncodedTiValue = encodedTiValue;
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!v.isZombie());
+#endif
         return v;
     }
 
@@ -484,6 +502,9 @@ namespace TI {
         else
             u.asBits.tag = EmptyValueTag;
         u.asBits.payload = reinterpret_cast<int32_t>(ptr);
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!isZombie());
+#endif
     }
 
     inline TiValue::TiValue(const TiCell* ptr)
@@ -493,6 +514,9 @@ namespace TI {
         else
             u.asBits.tag = EmptyValueTag;
         u.asBits.payload = reinterpret_cast<int32_t>(const_cast<TiCell*>(ptr));
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!isZombie());
+#endif
     }
 
     inline TiValue::operator bool() const
@@ -588,6 +612,11 @@ namespace TI {
     {
         ASSERT(isCell());
         return reinterpret_cast<TiCell*>(u.asBits.payload);
+    }
+
+    ALWAYS_INLINE TiValue::TiValue(EncodeAsDoubleTag, TiExcState*, double d)
+    {
+        u.asDouble = d;
     }
 
     inline TiValue::TiValue(TiExcState* exec, double d)
@@ -788,11 +817,17 @@ namespace TI {
     inline TiValue::TiValue(TiCell* ptr)
         : m_ptr(ptr)
     {
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!isZombie());
+#endif
     }
 
     inline TiValue::TiValue(const TiCell* ptr)
         : m_ptr(const_cast<TiCell*>(ptr))
     {
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!isZombie());
+#endif
     }
 
     inline TiValue::operator bool() const
@@ -820,7 +855,8 @@ namespace TI {
         return asValue() == jsNull();
     }
 #endif // USE(JSVALUE32_64)
-
+    
+    typedef std::pair<TiValue, UString> ValueStringPair;
 } // namespace TI
 
 #endif // TiValue_h

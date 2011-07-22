@@ -7,7 +7,7 @@
 
 /*
  * Copyright (C) 2008 Apple Inc.
- * Copyright (C) 2009 University of Szeged
+ * Copyright (C) 2009, 2010 University of Szeged
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,9 +35,7 @@
 #ifndef MacroAssemblerARM_h
 #define MacroAssemblerARM_h
 
-#include <wtf/Platform.h>
-
-#if ENABLE(ASSEMBLER) && PLATFORM(ARM_TRADITIONAL)
+#if ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
 
 #include "ARMAssembler.h"
 #include "AbstractMacroAssembler.h"
@@ -49,6 +47,8 @@ class MacroAssemblerARM : public AbstractMacroAssembler<ARMAssembler> {
     static const int DoubleConditionBitSpecial = 0x10;
     COMPILE_ASSERT(!(DoubleConditionBitSpecial & DoubleConditionMask), DoubleConditionBitSpecial_should_not_interfere_with_ARMAssembler_Condition_codes);
 public:
+    typedef ARMRegisters::FPRegisterID FPRegisterID;
+
     enum Condition {
         Equal = ARMAssembler::EQ,
         NotEqual = ARMAssembler::NE,
@@ -127,9 +127,9 @@ public:
 
     void lshift32(RegisterID shift_amount, RegisterID dest)
     {
-        ARMWord w = m_assembler.getImm(0x1f, ARMRegisters::S0, true);
-        ASSERT(!(w & ARMAssembler::OP2_INV_IMM));
-        m_assembler.ands_r(ARMRegisters::S0, shift_amount, w);
+        ARMWord w = ARMAssembler::getOp2(0x1f);
+        ASSERT(w != ARMAssembler::INVALID_IMM);
+        m_assembler.and_r(ARMRegisters::S0, shift_amount, w);
 
         m_assembler.movs_r(dest, m_assembler.lsl_r(dest, ARMRegisters::S0));
     }
@@ -154,6 +154,11 @@ public:
         m_assembler.muls_r(dest, src, ARMRegisters::S0);
     }
 
+    void neg32(RegisterID srcDest)
+    {
+        m_assembler.rsbs_r(srcDest, srcDest, ARMAssembler::getOp2(0));
+    }
+
     void not32(RegisterID dest)
     {
         m_assembler.mvns_r(dest, dest);
@@ -171,9 +176,9 @@ public:
 
     void rshift32(RegisterID shift_amount, RegisterID dest)
     {
-        ARMWord w = m_assembler.getImm(0x1f, ARMRegisters::S0, true);
-        ASSERT(!(w & ARMAssembler::OP2_INV_IMM));
-        m_assembler.ands_r(ARMRegisters::S0, shift_amount, w);
+        ARMWord w = ARMAssembler::getOp2(0x1f);
+        ASSERT(w != ARMAssembler::INVALID_IMM);
+        m_assembler.and_r(ARMRegisters::S0, shift_amount, w);
 
         m_assembler.movs_r(dest, m_assembler.asr_r(dest, ARMRegisters::S0));
     }
@@ -181,6 +186,20 @@ public:
     void rshift32(Imm32 imm, RegisterID dest)
     {
         m_assembler.movs_r(dest, m_assembler.asr(dest, imm.m_value & 0x1f));
+    }
+    
+    void urshift32(RegisterID shift_amount, RegisterID dest)
+    {
+        ARMWord w = ARMAssembler::getOp2(0x1f);
+        ASSERT(w != ARMAssembler::INVALID_IMM);
+        m_assembler.and_r(ARMRegisters::S0, shift_amount, w);
+        
+        m_assembler.movs_r(dest, m_assembler.lsr_r(dest, ARMRegisters::S0));
+    }
+    
+    void urshift32(Imm32 imm, RegisterID dest)
+    {
+        m_assembler.movs_r(dest, m_assembler.lsr(dest, imm.m_value & 0x1f));
     }
 
     void sub32(RegisterID src, RegisterID dest)
@@ -216,6 +235,11 @@ public:
         m_assembler.eors_r(dest, dest, m_assembler.getImm(imm.m_value, ARMRegisters::S0));
     }
 
+    void load8(ImplicitAddress address, RegisterID dest)
+    {
+        m_assembler.dataTransfer32(true, dest, address.base, address.offset, true);
+    }
+
     void load32(ImplicitAddress address, RegisterID dest)
     {
         m_assembler.dataTransfer32(true, dest, address.base, address.offset);
@@ -226,7 +250,7 @@ public:
         m_assembler.baseIndexTransfer32(true, dest, address.base, address.index, static_cast<int>(address.scale), address.offset);
     }
 
-#if defined(ARM_REQUIRE_NATURAL_ALIGNMENT) && ARM_REQUIRE_NATURAL_ALIGNMENT
+#if CPU(ARMV5_OR_LOWER)
     void load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest);
 #else
     void load32WithUnalignedHalfWords(BaseIndex address, RegisterID dest)
@@ -257,6 +281,14 @@ public:
             m_assembler.ldrh_u(dest, ARMRegisters::S0, ARMAssembler::getOp2Byte(address.offset));
         else
             m_assembler.ldrh_d(dest, ARMRegisters::S0, ARMAssembler::getOp2Byte(-address.offset));
+    }
+    
+    void load16(ImplicitAddress address, RegisterID dest)
+    {
+        if (address.offset >= 0)
+            m_assembler.ldrh_u(dest, address.base, ARMAssembler::getOp2Byte(address.offset));
+        else
+            m_assembler.ldrh_d(dest, address.base, ARMAssembler::getOp2Byte(-address.offset));   
     }
 
     DataLabel32 store32WithAddressOffsetPatch(RegisterID src, Address address)
@@ -361,6 +393,12 @@ public:
             move(src, dest);
     }
 
+    Jump branch8(Condition cond, Address left, Imm32 right)
+    {
+        load8(left, ARMRegisters::S1);
+        return branch32(cond, ARMRegisters::S1, right);
+    }
+
     Jump branch32(Condition cond, RegisterID left, RegisterID right, int useConstantPool = 0)
     {
         m_assembler.cmp_r(left, right);
@@ -424,6 +462,12 @@ public:
         return m_assembler.jmp(ARMCondition(cond));
     }
 
+    Jump branchTest8(Condition cond, Address address, Imm32 mask = Imm32(-1))
+    {
+        load8(address, ARMRegisters::S1);
+        return branchTest32(cond, ARMRegisters::S1, mask);
+    }
+
     Jump branchTest32(Condition cond, RegisterID reg, RegisterID mask)
     {
         ASSERT((cond == Zero) || (cond == NonZero));
@@ -461,7 +505,7 @@ public:
 
     void jump(RegisterID target)
     {
-        move(target, ARMRegisters::pc);
+        m_assembler.bx(target);
     }
 
     void jump(Address address)
@@ -532,6 +576,20 @@ public:
         return Jump(m_assembler.jmp(ARMCondition(cond)));
     }
 
+    Jump branchNeg32(Condition cond, RegisterID srcDest)
+    {
+        ASSERT((cond == Overflow) || (cond == Signed) || (cond == Zero) || (cond == NonZero));
+        neg32(srcDest);
+        return Jump(m_assembler.jmp(ARMCondition(cond)));
+    }
+
+    Jump branchOr32(Condition cond, RegisterID src, RegisterID dest)
+    {
+        ASSERT((cond == Signed) || (cond == Zero) || (cond == NonZero));
+        or32(src, dest);
+        return Jump(m_assembler.jmp(ARMCondition(cond)));
+    }
+
     void breakpoint()
     {
         m_assembler.bkpt(0);
@@ -539,14 +597,19 @@ public:
 
     Call nearCall()
     {
+#if WTF_ARM_ARCH_AT_LEAST(5)
+        ensureSpace(2 * sizeof(ARMWord), sizeof(ARMWord));
+        m_assembler.loadBranchTarget(ARMRegisters::S1, ARMAssembler::AL, true);
+        return Call(m_assembler.blx(ARMRegisters::S1), Call::LinkableNear);
+#else
         prepareCall();
         return Call(m_assembler.jmp(ARMAssembler::AL, true), Call::LinkableNear);
+#endif
     }
 
     Call call(RegisterID target)
     {
-        prepareCall();
-        move(ARMRegisters::pc, target);
+        m_assembler.blx(target);
         JmpSrc jmpSrc;
         return Call(jmpSrc, Call::None);
     }
@@ -558,7 +621,7 @@ public:
 
     void ret()
     {
-        m_assembler.mov_r(ARMRegisters::pc, linkRegister);
+        m_assembler.bx(linkRegister);
     }
 
     void set32(Condition cond, RegisterID left, RegisterID right, RegisterID dest)
@@ -575,6 +638,25 @@ public:
         m_assembler.mov_r(dest, ARMAssembler::getOp2(1), ARMCondition(cond));
     }
 
+    void set8(Condition cond, RegisterID left, RegisterID right, RegisterID dest)
+    {
+        // ARM doesn't have byte registers
+        set32(cond, left, right, dest);
+    }
+
+    void set8(Condition cond, Address left, RegisterID right, RegisterID dest)
+    {
+        // ARM doesn't have byte registers
+        load32(left, ARMRegisters::S1);
+        set32(cond, ARMRegisters::S1, right, dest);
+    }
+
+    void set8(Condition cond, RegisterID left, Imm32 right, RegisterID dest)
+    {
+        // ARM doesn't have byte registers
+        set32(cond, left, right, dest);
+    }
+
     void setTest32(Condition cond, Address address, Imm32 mask, RegisterID dest)
     {
         load32(address, ARMRegisters::S1);
@@ -584,6 +666,12 @@ public:
             m_assembler.tst_r(ARMRegisters::S1, m_assembler.getImm(mask.m_value, ARMRegisters::S0));
         m_assembler.mov_r(dest, ARMAssembler::getOp2(0));
         m_assembler.mov_r(dest, ARMAssembler::getOp2(1), ARMCondition(cond));
+    }
+
+    void setTest8(Condition cond, Address address, Imm32 mask, RegisterID dest)
+    {
+        // ARM doesn't have byte registers
+        setTest32(cond, address, mask, dest);
     }
 
     void add32(Imm32 imm, RegisterID src, RegisterID dest)
@@ -629,8 +717,14 @@ public:
 
     Call call()
     {
+#if WTF_ARM_ARCH_AT_LEAST(5)
+        ensureSpace(2 * sizeof(ARMWord), sizeof(ARMWord));
+        m_assembler.loadBranchTarget(ARMRegisters::S1, ARMAssembler::AL, true);
+        return Call(m_assembler.blx(ARMRegisters::S1), Call::Linkable);
+#else
         prepareCall();
         return Call(m_assembler.jmp(ARMAssembler::AL, true), Call::Linkable);
+#endif
     }
 
     Call tailRecursiveCall()
@@ -688,9 +782,20 @@ public:
         return false;
     }
 
+    bool supportsFloatingPointSqrt() const
+    {
+        return s_isVFPPresent;
+    }
+
     void loadDouble(ImplicitAddress address, FPRegisterID dest)
     {
         m_assembler.doubleTransfer(true, dest, address.base, address.offset);
+    }
+
+    void loadDouble(const void* address, FPRegisterID dest)
+    {
+        m_assembler.ldr_un_imm(ARMRegisters::S0, (ARMWord)address);
+        m_assembler.fdtr_u(true, dest, ARMRegisters::S0, 0);
     }
 
     void storeDouble(FPRegisterID src, ImplicitAddress address)
@@ -707,6 +812,18 @@ public:
     {
         loadDouble(src, ARMRegisters::SD0);
         addDouble(ARMRegisters::SD0, dest);
+    }
+
+    void divDouble(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.fdivd_r(dest, dest, src);
+    }
+
+    void divDouble(Address src, FPRegisterID dest)
+    {
+        ASSERT_NOT_REACHED(); // Untested
+        loadDouble(src, ARMRegisters::SD0);
+        divDouble(ARMRegisters::SD0, dest);
     }
 
     void subDouble(FPRegisterID src, FPRegisterID dest)
@@ -731,10 +848,32 @@ public:
         mulDouble(ARMRegisters::SD0, dest);
     }
 
+    void sqrtDouble(FPRegisterID src, FPRegisterID dest)
+    {
+        m_assembler.fsqrtd_r(dest, src);
+    }
+
     void convertInt32ToDouble(RegisterID src, FPRegisterID dest)
     {
         m_assembler.fmsr_r(dest, src);
         m_assembler.fsitod_r(dest, dest);
+    }
+
+    void convertInt32ToDouble(Address src, FPRegisterID dest)
+    {
+        ASSERT_NOT_REACHED(); // Untested
+        // flds does not worth the effort here
+        load32(src, ARMRegisters::S1);
+        convertInt32ToDouble(ARMRegisters::S1, dest);
+    }
+
+    void convertInt32ToDouble(AbsoluteAddress src, FPRegisterID dest)
+    {
+        ASSERT_NOT_REACHED(); // Untested
+        // flds does not worth the effort here
+        m_assembler.ldr_un_imm(ARMRegisters::S1, (ARMWord)src.m_ptr);
+        m_assembler.dtr_u(true, ARMRegisters::S1, ARMRegisters::S1, 0);
+        convertInt32ToDouble(ARMRegisters::S1, dest);
     }
 
     Jump branchDouble(DoubleCondition cond, FPRegisterID left, FPRegisterID right)
@@ -764,15 +903,29 @@ public:
     // (specifically, in this case, 0).
     void branchConvertDoubleToInt32(FPRegisterID src, RegisterID dest, JumpList& failureCases, FPRegisterID fpTemp)
     {
-        m_assembler.ftosid_r(src, ARMRegisters::SD0);
-        m_assembler.fmrs_r(ARMRegisters::SD0, dest);
+        m_assembler.ftosid_r(ARMRegisters::SD0, src);
+        m_assembler.fmrs_r(dest, ARMRegisters::SD0);
 
         // Convert the integer result back to float & compare to the original value - if not equal or unordered (NaN) then jump.
         m_assembler.fsitod_r(ARMRegisters::SD0, ARMRegisters::SD0);
-        failureCases.append(branchDouble(DoubleNotEqual, src, ARMRegisters::SD0));
+        failureCases.append(branchDouble(DoubleNotEqualOrUnordered, src, ARMRegisters::SD0));
 
         // If the result is zero, it might have been -0.0, and 0.0 equals to -0.0
         failureCases.append(branchTest32(Zero, dest));
+    }
+
+    Jump branchDoubleNonZero(FPRegisterID reg, FPRegisterID scratch)
+    {
+        m_assembler.mov_r(ARMRegisters::S0, ARMAssembler::getOp2(0));
+        convertInt32ToDouble(ARMRegisters::S0, scratch);
+        return branchDouble(DoubleNotEqual, reg, scratch);
+    }
+
+    Jump branchDoubleZeroOrNaN(FPRegisterID reg, FPRegisterID scratch)
+    {
+        m_assembler.mov_r(ARMRegisters::S0, ARMAssembler::getOp2(0));
+        convertInt32ToDouble(ARMRegisters::S0, scratch);
+        return branchDouble(DoubleEqualOrUnordered, reg, scratch);
     }
 
 protected:
@@ -793,44 +946,56 @@ protected:
 
     void prepareCall()
     {
+#if WTF_ARM_ARCH_VERSION < 5
         ensureSpace(2 * sizeof(ARMWord), sizeof(ARMWord));
 
         m_assembler.mov_r(linkRegister, ARMRegisters::pc);
+#endif
     }
 
     void call32(RegisterID base, int32_t offset)
     {
+#if WTF_ARM_ARCH_AT_LEAST(5)
+        int targetReg = ARMRegisters::S1;
+#else
+        int targetReg = ARMRegisters::pc;
+#endif
+        int tmpReg = ARMRegisters::S1;
+
         if (base == ARMRegisters::sp)
             offset += 4;
 
         if (offset >= 0) {
             if (offset <= 0xfff) {
                 prepareCall();
-                m_assembler.dtr_u(true, ARMRegisters::pc, base, offset);
+                m_assembler.dtr_u(true, targetReg, base, offset);
             } else if (offset <= 0xfffff) {
-                m_assembler.add_r(ARMRegisters::S0, base, ARMAssembler::OP2_IMM | (offset >> 12) | (10 << 8));
+                m_assembler.add_r(tmpReg, base, ARMAssembler::OP2_IMM | (offset >> 12) | (10 << 8));
                 prepareCall();
-                m_assembler.dtr_u(true, ARMRegisters::pc, ARMRegisters::S0, offset & 0xfff);
+                m_assembler.dtr_u(true, targetReg, tmpReg, offset & 0xfff);
             } else {
-                ARMWord reg = m_assembler.getImm(offset, ARMRegisters::S0);
+                ARMWord reg = m_assembler.getImm(offset, tmpReg);
                 prepareCall();
-                m_assembler.dtr_ur(true, ARMRegisters::pc, base, reg);
+                m_assembler.dtr_ur(true, targetReg, base, reg);
             }
         } else  {
             offset = -offset;
             if (offset <= 0xfff) {
                 prepareCall();
-                m_assembler.dtr_d(true, ARMRegisters::pc, base, offset);
+                m_assembler.dtr_d(true, targetReg, base, offset);
             } else if (offset <= 0xfffff) {
-                m_assembler.sub_r(ARMRegisters::S0, base, ARMAssembler::OP2_IMM | (offset >> 12) | (10 << 8));
+                m_assembler.sub_r(tmpReg, base, ARMAssembler::OP2_IMM | (offset >> 12) | (10 << 8));
                 prepareCall();
-                m_assembler.dtr_d(true, ARMRegisters::pc, ARMRegisters::S0, offset & 0xfff);
+                m_assembler.dtr_d(true, targetReg, tmpReg, offset & 0xfff);
             } else {
-                ARMWord reg = m_assembler.getImm(offset, ARMRegisters::S0);
+                ARMWord reg = m_assembler.getImm(offset, tmpReg);
                 prepareCall();
-                m_assembler.dtr_dr(true, ARMRegisters::pc, base, reg);
+                m_assembler.dtr_dr(true, targetReg, base, reg);
             }
         }
+#if WTF_ARM_ARCH_AT_LEAST(5)
+        m_assembler.blx(targetReg);
+#endif
     }
 
 private:
@@ -857,6 +1022,6 @@ private:
 
 }
 
-#endif // ENABLE(ASSEMBLER) && PLATFORM(ARM_TRADITIONAL)
+#endif // ENABLE(ASSEMBLER) && CPU(ARM_TRADITIONAL)
 
 #endif // MacroAssemblerARM_h

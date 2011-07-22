@@ -37,12 +37,12 @@ namespace TI {
 
 static NEVER_INLINE TiValue stringFromCharCodeSlowCase(TiExcState* exec, const ArgList& args)
 {
-    UChar* buf = static_cast<UChar*>(fastMalloc(args.size() * sizeof(UChar)));
-    UChar* p = buf;
-    ArgList::const_iterator end = args.end();
-    for (ArgList::const_iterator it = args.begin(); it != end; ++it)
-        *p++ = static_cast<UChar>((*it).toUInt32(exec));
-    return jsString(exec, UString(buf, p - buf, false));
+    unsigned length = args.size();
+    UChar* buf;
+    PassRefPtr<UStringImpl> impl = UStringImpl::createUninitialized(length, buf);
+    for (unsigned i = 0; i < length; ++i)
+        buf[i] = static_cast<UChar>(args.at(i).toUInt32(exec));
+    return jsString(exec, impl);
 }
 
 static TiValue JSC_HOST_CALL stringFromCharCode(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
@@ -61,8 +61,11 @@ StringConstructor::StringConstructor(TiExcState* exec, NonNullPassRefPtr<Structu
     putDirectWithoutTransition(exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
 
     // ECMA 15.5.3.2 fromCharCode()
+#if ENABLE(JIT) && ENABLE(JIT_OPTIMIZE_NATIVE_CALL)
+    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().fromCharCode, exec->globalData().getThunk(fromCharCodeThunkGenerator), stringFromCharCode), DontEnum);
+#else
     putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().fromCharCode, stringFromCharCode), DontEnum);
-
+#endif
     // no. of arguments for constructor
     putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontEnum | DontDelete);
 }

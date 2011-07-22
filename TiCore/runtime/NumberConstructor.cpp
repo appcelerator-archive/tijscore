@@ -29,6 +29,7 @@
 #include "config.h"
 #include "NumberConstructor.h"
 
+#include "Lookup.h"
 #include "NumberObject.h"
 #include "NumberPrototype.h"
 
@@ -36,11 +37,11 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(NumberConstructor);
 
-static TiValue numberConstructorNaNValue(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue numberConstructorNegInfinity(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue numberConstructorPosInfinity(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue numberConstructorMaxValue(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue numberConstructorMinValue(TiExcState*, const Identifier&, const PropertySlot&);
+static TiValue numberConstructorNaNValue(TiExcState*, TiValue, const Identifier&);
+static TiValue numberConstructorNegInfinity(TiExcState*, TiValue, const Identifier&);
+static TiValue numberConstructorPosInfinity(TiExcState*, TiValue, const Identifier&);
+static TiValue numberConstructorMaxValue(TiExcState*, TiValue, const Identifier&);
+static TiValue numberConstructorMinValue(TiExcState*, TiValue, const Identifier&);
 
 } // namespace TI
 
@@ -80,27 +81,27 @@ bool NumberConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identif
     return getStaticValueDescriptor<NumberConstructor, InternalFunction>(exec, TiExcState::numberTable(exec), this, propertyName, descriptor);
 }
 
-static TiValue numberConstructorNaNValue(TiExcState* exec, const Identifier&, const PropertySlot&)
+static TiValue numberConstructorNaNValue(TiExcState* exec, TiValue, const Identifier&)
 {
     return jsNaN(exec);
 }
 
-static TiValue numberConstructorNegInfinity(TiExcState* exec, const Identifier&, const PropertySlot&)
+static TiValue numberConstructorNegInfinity(TiExcState* exec, TiValue, const Identifier&)
 {
     return jsNumber(exec, -Inf);
 }
 
-static TiValue numberConstructorPosInfinity(TiExcState* exec, const Identifier&, const PropertySlot&)
+static TiValue numberConstructorPosInfinity(TiExcState* exec, TiValue, const Identifier&)
 {
     return jsNumber(exec, Inf);
 }
 
-static TiValue numberConstructorMaxValue(TiExcState* exec, const Identifier&, const PropertySlot&)
+static TiValue numberConstructorMaxValue(TiExcState* exec, TiValue, const Identifier&)
 {
     return jsNumber(exec, 1.7976931348623157E+308);
 }
 
-static TiValue numberConstructorMinValue(TiExcState* exec, const Identifier&, const PropertySlot&)
+static TiValue numberConstructorMinValue(TiExcState* exec, TiValue, const Identifier&)
 {
     return jsNumber(exec, 5E-324);
 }

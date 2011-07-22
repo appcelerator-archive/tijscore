@@ -67,7 +67,7 @@ static void setLockCount(intptr_t count)
 }
 
 TiLock::TiLock(TiExcState* exec)
-    : m_lockBehavior(exec->globalData().isSharedInstance ? LockForReal : SilenceAssertionsOnly)
+    : m_lockBehavior(exec->globalData().isSharedInstance() ? LockForReal : SilenceAssertionsOnly)
 {
     lock(m_lockBehavior);
 }
@@ -112,12 +112,12 @@ void TiLock::unlock(TiLockBehavior lockBehavior)
 
 void TiLock::lock(TiExcState* exec)
 {
-    lock(exec->globalData().isSharedInstance ? LockForReal : SilenceAssertionsOnly);
+    lock(exec->globalData().isSharedInstance() ? LockForReal : SilenceAssertionsOnly);
 }
 
 void TiLock::unlock(TiExcState* exec)
 {
-    unlock(exec->globalData().isSharedInstance ? LockForReal : SilenceAssertionsOnly);
+    unlock(exec->globalData().isSharedInstance() ? LockForReal : SilenceAssertionsOnly);
 }
 
 bool TiLock::currentThreadIsHoldingLock()
@@ -169,7 +169,7 @@ bool TiLock::currentThreadIsHoldingLock()
 static unsigned lockDropDepth = 0;
 
 TiLock::DropAllLocks::DropAllLocks(TiExcState* exec)
-    : m_lockBehavior(exec->globalData().isSharedInstance ? LockForReal : SilenceAssertionsOnly)
+    : m_lockBehavior(exec->globalData().isSharedInstance() ? LockForReal : SilenceAssertionsOnly)
 {
     pthread_once(&createTiLockCountOnce, createTiLockCount);
 

@@ -48,7 +48,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
         static void markStringifiers(MarkStack&, Stringifier*);
@@ -63,6 +63,8 @@ namespace TI {
         virtual const ClassInfo* classInfo() const { return &info; }
         static const ClassInfo info;
     };
+
+    UString JSONStringify(TiExcState* exec, TiValue value, unsigned indent);
 
 } // namespace TI
 

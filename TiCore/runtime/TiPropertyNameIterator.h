@@ -54,8 +54,10 @@ namespace TI {
         
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren));
+            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren), AnonymousSlotCount);
         }
+        
+        virtual ~TiPropertyNameIterator();
 
         virtual bool isPropertyNameIterator() const { return true; }
 
@@ -72,8 +74,13 @@ namespace TI {
         TiValue get(TiExcState*, TiObject*, size_t i);
         size_t size() { return m_jsStringsSize; }
 
-        void setCachedStructure(Structure* structure) { m_cachedStructure = structure; }
-        Structure* cachedStructure() { return m_cachedStructure; }
+        void setCachedStructure(Structure* structure)
+        {
+            ASSERT(!m_cachedStructure);
+            ASSERT(structure);
+            m_cachedStructure = structure;
+        }
+        Structure* cachedStructure() { return m_cachedStructure.get(); }
 
         void setCachedPrototypeChain(NonNullPassRefPtr<StructureChain> cachedPrototypeChain) { m_cachedPrototypeChain = cachedPrototypeChain; }
         StructureChain* cachedPrototypeChain() { return m_cachedPrototypeChain.get(); }
@@ -81,30 +88,28 @@ namespace TI {
     private:
         TiPropertyNameIterator(TiExcState*, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlot);
 
-        Structure* m_cachedStructure;
+        RefPtr<Structure> m_cachedStructure;
         RefPtr<StructureChain> m_cachedPrototypeChain;
         uint32_t m_numCacheableSlots;
         uint32_t m_jsStringsSize;
         OwnArrayPtr<TiValue> m_jsStrings;
     };
 
-inline TiPropertyNameIterator::TiPropertyNameIterator(TiExcState* exec, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlots)
-    : TiCell(exec->globalData().propertyNameIteratorStructure.get())
-    , m_cachedStructure(0)
-    , m_numCacheableSlots(numCacheableSlots)
-    , m_jsStringsSize(propertyNameArrayData->propertyNameVector().size())
-    , m_jsStrings(new TiValue[m_jsStringsSize])
-{
-    PropertyNameArrayData::PropertyNameVector& propertyNameVector = propertyNameArrayData->propertyNameVector();
-    for (size_t i = 0; i < m_jsStringsSize; ++i)
-        m_jsStrings[i] = jsOwnedString(exec, propertyNameVector[i].ustring());
-}
+    inline void Structure::setEnumerationCache(TiPropertyNameIterator* enumerationCache)
+    {
+        ASSERT(!isDictionary());
+        m_enumerationCache = enumerationCache;
+    }
 
-inline void Structure::setEnumerationCache(TiPropertyNameIterator* enumerationCache)
-{
-    ASSERT(!isDictionary());
-    m_enumerationCache = enumerationCache;
-}
+    inline void Structure::clearEnumerationCache(TiPropertyNameIterator* enumerationCache)
+    {
+        m_enumerationCache.clear(enumerationCache);
+    }
+
+    inline TiPropertyNameIterator* Structure::enumerationCache()
+    {
+        return m_enumerationCache.get();
+    }
 
 } // namespace TI
 

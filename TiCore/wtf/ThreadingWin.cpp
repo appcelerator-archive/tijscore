@@ -94,10 +94,10 @@
 #include "Threading.h"
 
 #include "MainThread.h"
-#if !USE(PTHREADS) && PLATFORM(WIN_OS)
+#if !USE(PTHREADS) && OS(WINDOWS)
 #include "ThreadSpecific.h"
 #endif
-#if !PLATFORM(WINCE)
+#if !OS(WINCE)
 #include <process.h>
 #endif
 #if HAVE(ERRNO_H)
@@ -125,7 +125,7 @@ typedef struct tagTHREADNAME_INFO {
 } THREADNAME_INFO;
 #pragma pack(pop)
 
-void setThreadNameInternal(const char* szThreadName)
+void initializeCurrentThreadInternal(const char* szThreadName)
 {
     THREADNAME_INFO info;
     info.dwType = 0x1000;
@@ -152,8 +152,6 @@ void unlockAtomicallyInitializedStaticMutex()
     atomicallyInitializedStaticMutex->unlock();
 }
 
-static ThreadIdentifier mainThreadIdentifier;
-
 static Mutex& threadMapMutex()
 {
     static Mutex mutex;
@@ -162,14 +160,12 @@ static Mutex& threadMapMutex()
 
 void initializeThreading()
 {
-    if (!atomicallyInitializedStaticMutex) {
-        atomicallyInitializedStaticMutex = new Mutex;
-        threadMapMutex();
-        initializeRandomNumberGenerator();
-        initializeMainThread();
-        mainThreadIdentifier = currentThread();
-        setThreadNameInternal("Main Thread");
-    }
+    if (atomicallyInitializedStaticMutex)
+        return;
+
+    atomicallyInitializedStaticMutex = new Mutex;
+    threadMapMutex();
+    initializeRandomNumberGenerator();
 }
 
 static HashMap<DWORD, HANDLE>& threadMap()
@@ -212,7 +208,7 @@ static unsigned __stdcall wtfThreadEntryPoint(void* param)
 
     void* result = invocation.function(invocation.data);
 
-#if !USE(PTHREADS) && PLATFORM(WIN_OS)
+#if !USE(PTHREADS) && OS(WINDOWS)
     // Do the TLS cleanup.
     ThreadSpecificThreadExit();
 #endif
@@ -225,7 +221,7 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
     unsigned threadIdentifier = 0;
     ThreadIdentifier threadID = 0;
     ThreadFunctionInvocation* invocation = new ThreadFunctionInvocation(entryPoint, data);
-#if PLATFORM(WINCE)
+#if OS(WINCE)
     // This is safe on WINCE, since CRT is in the core and innately multithreaded.
     // On desktop Windows, need to use _beginthreadex (not available on WinCE) if using any CRT functions
     HANDLE threadHandle = CreateThread(0, 0, (LPTHREAD_START_ROUTINE)wtfThreadEntryPoint, invocation, 0, (LPDWORD)&threadIdentifier);
@@ -233,7 +229,7 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
     HANDLE threadHandle = reinterpret_cast<HANDLE>(_beginthreadex(0, 0, wtfThreadEntryPoint, invocation, 0, &threadIdentifier));
 #endif
     if (!threadHandle) {
-#if PLATFORM(WINCE)
+#if OS(WINCE)
         LOG_ERROR("Failed to create thread at entry point %p with data %p: %ld", entryPoint, data, ::GetLastError());
 #elif defined(NO_ERRNO)
         LOG_ERROR("Failed to create thread at entry point %p with data %p.", entryPoint, data);
@@ -280,11 +276,6 @@ void detachThread(ThreadIdentifier threadID)
 ThreadIdentifier currentThread()
 {
     return static_cast<ThreadIdentifier>(GetCurrentThreadId());
-}
-
-bool isMainThread()
-{
-    return currentThread() == mainThreadIdentifier;
 }
 
 Mutex::Mutex()

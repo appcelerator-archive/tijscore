@@ -29,6 +29,7 @@
 #define Identifier_h
 
 #include "TiGlobalData.h"
+#include "ThreadSpecific.h"
 #include "UString.h"
 
 namespace TI {
@@ -60,9 +61,9 @@ namespace TI {
         
         const char* ascii() const { return _ustring.ascii(); }
         
-        static Identifier from(TiExcState* exec, unsigned y) { return Identifier(exec, UString::from(y)); }
-        static Identifier from(TiExcState* exec, int y) { return Identifier(exec, UString::from(y)); }
-        static Identifier from(TiExcState* exec, double y) { return Identifier(exec, UString::from(y)); }
+        static Identifier from(TiExcState* exec, unsigned y);
+        static Identifier from(TiExcState* exec, int y);
+        static Identifier from(TiExcState* exec, double y);
         
         bool isNull() const { return _ustring.isNull(); }
         bool isEmpty() const { return _ustring.isEmpty(); }
@@ -79,11 +80,9 @@ namespace TI {
         friend bool operator==(const Identifier&, const char*);
         friend bool operator!=(const Identifier&, const char*);
     
-        static void remove(UString::Rep*);
-
         static bool equal(const UString::Rep*, const char*);
-        static bool equal(const UString::Rep*, const UChar*, int length);
-        static bool equal(const UString::Rep* a, const UString::Rep* b) { return TI::equal(a, b); }
+        static bool equal(const UString::Rep*, const UChar*, unsigned length);
+        static bool equal(const UString::Rep* a, const UString::Rep* b) { return ::equal(a, b); }
 
         static PassRefPtr<UString::Rep> add(TiExcState*, const char*); // Only to be used with string literals.
         static PassRefPtr<UString::Rep> add(TiGlobalData*, const char*); // Only to be used with string literals.
@@ -99,30 +98,28 @@ namespace TI {
 
         static PassRefPtr<UString::Rep> add(TiExcState* exec, UString::Rep* r)
         {
-            if (r->identifierTable()) {
 #ifndef NDEBUG
-                checkSameIdentifierTable(exec, r);
+            checkCurrentIdentifierTable(exec);
 #endif
+            if (r->isIdentifier())
                 return r;
-            }
             return addSlowCase(exec, r);
         }
         static PassRefPtr<UString::Rep> add(TiGlobalData* globalData, UString::Rep* r)
         {
-            if (r->identifierTable()) {
 #ifndef NDEBUG
-                checkSameIdentifierTable(globalData, r);
+            checkCurrentIdentifierTable(globalData);
 #endif
+            if (r->isIdentifier())
                 return r;
-            }
             return addSlowCase(globalData, r);
         }
 
         static PassRefPtr<UString::Rep> addSlowCase(TiExcState*, UString::Rep* r);
         static PassRefPtr<UString::Rep> addSlowCase(TiGlobalData*, UString::Rep* r);
 
-        static void checkSameIdentifierTable(TiExcState*, UString::Rep*);
-        static void checkSameIdentifierTable(TiGlobalData*, UString::Rep*);
+        static void checkCurrentIdentifierTable(TiExcState*);
+        static void checkCurrentIdentifierTable(TiGlobalData*);
     };
     
     inline bool operator==(const Identifier& a, const Identifier& b)

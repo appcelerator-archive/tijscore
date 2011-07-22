@@ -31,9 +31,9 @@
  */
 
 #include "config.h"
-#include <wtf/Platform.h>
 #include "TiCallbackFunction.h"
 
+#include "APIShims.h"
 #include "APICast.h"
 #include "CodeBlock.h"
 #include "TiFunction.h"
@@ -68,7 +68,7 @@ TiValue TiCallbackFunction::call(TiExcState* exec, TiObject* functionObject, TiV
     TiValueRef exception = 0;
     TiValueRef result;
     {
-        TiLock::DropAllLocks dropAllLocks(exec);
+        APICallbackShim callbackShim(exec);
         result = static_cast<TiCallbackFunction*>(functionObject)->m_callback(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception);
     }
     if (exception)

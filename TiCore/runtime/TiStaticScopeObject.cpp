@@ -65,7 +65,7 @@ void TiStaticScopeObject::putWithAttributes(TiExcState*, const Identifier& prope
     ASSERT_NOT_REACHED();
 }
 
-bool TiStaticScopeObject::isDynamicScope() const
+bool TiStaticScopeObject::isDynamicScope(bool&) const
 {
     return false;
 }

@@ -38,7 +38,9 @@
 #include "ExceptionHelpers.h"
 #include "TiArray.h"
 #include "LiteralParser.h"
+#include "Lookup.h"
 #include "PropertyNameArray.h"
+#include "StringBuilder.h"
 #include <wtf/MathExtras.h>
 
 namespace TI {
@@ -77,8 +79,6 @@ public:
     void markAggregate(MarkStack&);
 
 private:
-    typedef UString StringBuilder;
-
     class Holder {
     public:
         Holder(TiObject*);
@@ -143,7 +143,7 @@ static inline TiValue unwrapBoxedPrimitive(TiExcState* exec, TiValue value)
 
 static inline UString gap(TiExcState* exec, TiValue space)
 {
-    const int maxGapLength = 10;
+    const unsigned maxGapLength = 10;
     space = unwrapBoxedPrimitive(exec, space);
 
     // If the space value is a number, create a gap string with that number of spaces.
@@ -163,7 +163,7 @@ static inline UString gap(TiExcState* exec, TiValue space)
     }
 
     // If the space value is a string, use it as the gap string, otherwise use no gap string.
-    UString spaces = space.getString();
+    UString spaces = space.getString(exec);
     if (spaces.size() > maxGapLength) {
         spaces = spaces.substr(0, maxGapLength);
     }
@@ -220,7 +220,7 @@ Stringifier::Stringifier(TiExcState* exec, TiValue replacer, TiValue space)
                 break;
 
             UString propertyName;
-            if (name.getString(propertyName)) {
+            if (name.getString(exec, propertyName)) {
                 m_arrayReplacerPropertyNames.add(Identifier(exec, propertyName));
                 continue;
             }
@@ -276,7 +276,7 @@ TiValue Stringifier::stringify(TiValue value)
     if (m_exec->hadException())
         return jsNull();
 
-    return jsString(m_exec, result);
+    return jsString(m_exec, result.build());
 }
 
 void Stringifier::appendQuotedString(StringBuilder& builder, const UString& value)
@@ -396,7 +396,7 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
     }
 
     UString stringValue;
-    if (value.getString(stringValue)) {
+    if (value.getString(m_exec, stringValue)) {
         appendQuotedString(builder, stringValue);
         return StringifySucceeded;
     }
@@ -464,9 +464,9 @@ inline bool Stringifier::willIndent() const
 inline void Stringifier::indent()
 {
     // Use a single shared string, m_repeatedGap, so we don't keep allocating new ones as we indent and unindent.
-    int newSize = m_indent.size() + m_gap.size();
+    unsigned newSize = m_indent.size() + m_gap.size();
     if (newSize > m_repeatedGap.size())
-        m_repeatedGap.append(m_gap);
+        m_repeatedGap = makeString(m_repeatedGap, m_gap);
     ASSERT(newSize <= m_repeatedGap.size());
     m_indent = m_repeatedGap.substr(0, newSize);
 }
@@ -509,7 +509,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
                 m_propertyNames = stringifier.m_arrayReplacerPropertyNames.data();
             else {
                 PropertyNameArray objectPropertyNames(exec);
-                m_object->getPropertyNames(exec, objectPropertyNames);
+                m_object->getOwnPropertyNames(exec, objectPropertyNames);
                 m_propertyNames = objectPropertyNames.releaseData();
             }
             m_size = m_propertyNames->propertyNameVector().size();
@@ -593,7 +593,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
             // This only occurs when get an undefined value for an object property.
             // In this case we don't want the separator and property name that we
             // already appended, so roll back.
-            builder = builder.substr(0, rollBackPoint);
+            builder.resize(rollBackPoint);
             break;
     }
 
@@ -754,7 +754,7 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
                 objectStack.append(object);
                 indexStack.append(0);
                 propertyStack.append(PropertyNameArray(m_exec));
-                object->getPropertyNames(m_exec, propertyStack.last());
+                object->getOwnPropertyNames(m_exec, propertyStack.last());
                 // fallthrough
             }
             objectStartVisitMember:
@@ -874,6 +874,14 @@ TiValue JSC_HOST_CALL JSONProtoFuncStringify(TiExcState* exec, TiObject*, TiValu
     TiValue replacer = args.at(1);
     TiValue space = args.at(2);
     return Stringifier(exec, replacer, space).stringify(value);
+}
+
+UString JSONStringify(TiExcState* exec, TiValue value, unsigned indent)
+{
+    TiValue result = Stringifier(exec, jsNull(), jsNumber(exec, indent)).stringify(value);
+    if (result.isUndefinedOrNull())
+        return UString();
+    return result.getString(exec);
 }
 
 } // namespace TI

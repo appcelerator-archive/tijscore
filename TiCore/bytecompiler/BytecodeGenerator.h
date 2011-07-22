@@ -113,7 +113,7 @@ namespace TI {
         //
         // NB: depth does _not_ include the local scope.  eg. a depth of 0 refers
         // to the scope containing this codeblock.
-        bool findScopedProperty(const Identifier&, int& index, size_t& depth, bool forWriting, TiObject*& globalObject);
+        bool findScopedProperty(const Identifier&, int& index, size_t& depth, bool forWriting, bool& includesDynamicScopes, TiObject*& globalObject);
 
         // Returns the register storing "this"
         RegisterID* thisRegister() { return &m_thisRegister; }
@@ -197,6 +197,19 @@ namespace TI {
         RegisterID* emitNode(Node* n)
         {
             return emitNode(0, n);
+        }
+
+        void emitNodeInConditionContext(ExpressionNode* n, Label* trueTarget, Label* falseTarget, bool fallThroughMeansTrue)
+        {
+            if (!m_codeBlock->numberOfLineInfos() || m_codeBlock->lastLineInfo().lineNumber != n->lineNo()) {
+                LineInfo info = { instructions().size(), n->lineNo() };
+                m_codeBlock->addLineInfo(info);
+            }
+            if (m_emitNodeDepth >= s_maxEmitNodeDepth)
+                emitThrowExpressionTooDeepException();
+            ++m_emitNodeDepth;
+            n->emitBytecodeInConditionContext(*this, trueTarget, falseTarget, fallThroughMeansTrue);
+            --m_emitNodeDepth;
         }
 
         void emitExpressionInfo(unsigned divot, unsigned startOffset, unsigned endOffset)
@@ -295,6 +308,7 @@ namespace TI {
 
         RegisterID* emitGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
         RegisterID* emitPutById(RegisterID* base, const Identifier& property, RegisterID* value);
+        RegisterID* emitDirectPutById(RegisterID* base, const Identifier& property, RegisterID* value);
         RegisterID* emitDeleteById(RegisterID* dst, RegisterID* base, const Identifier&);
         RegisterID* emitGetByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
         RegisterID* emitPutByVal(RegisterID* base, RegisterID* property, RegisterID* value);
@@ -374,8 +388,8 @@ namespace TI {
         void emitOpcode(OpcodeID);
         void retrieveLastBinaryOp(int& dstIndex, int& src1Index, int& src2Index);
         void retrieveLastUnaryOp(int& dstIndex, int& srcIndex);
-        void rewindBinaryOp();
-        void rewindUnaryOp();
+        ALWAYS_INLINE void rewindBinaryOp();
+        ALWAYS_INLINE void rewindUnaryOp();
 
         PassRefPtr<Label> emitComplexJumpScopes(Label* target, ControlFlowContext* topScope, ControlFlowContext* bottomScope);
 
@@ -517,9 +531,29 @@ namespace TI {
         bool m_regeneratingForExceptionInfo;
         CodeBlock* m_codeBlockBeingRegeneratedFrom;
 
-        static const unsigned s_maxEmitNodeDepth = 5000;
+        static const unsigned s_maxEmitNodeDepth = 3000;
+
+        friend class IncreaseEmitNodeDepth;
     };
 
+    class IncreaseEmitNodeDepth {
+    public:
+        IncreaseEmitNodeDepth(BytecodeGenerator& generator, unsigned count = 1)
+            : m_generator(generator)
+            , m_count(count)
+        {
+            m_generator.m_emitNodeDepth += count;
+        }
+
+        ~IncreaseEmitNodeDepth()
+        {
+            m_generator.m_emitNodeDepth -= m_count;
+        }
+
+    private:
+        BytecodeGenerator& m_generator;
+        unsigned m_count;
+    };
 }
 
 #endif // BytecodeGenerator_h

@@ -78,14 +78,14 @@ bool DebuggerActivation::deleteProperty(TiExcState* exec, const Identifier& prop
     return m_activation->deleteProperty(exec, propertyName);
 }
 
-void DebuggerActivation::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void DebuggerActivation::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    m_activation->getPropertyNames(exec, propertyNames);
+    m_activation->getPropertyNames(exec, propertyNames, mode);
 }
 
-bool DebuggerActivation::getPropertyAttributes(TI::TiExcState* exec, const Identifier& propertyName, unsigned& attributes) const
+bool DebuggerActivation::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    return m_activation->getPropertyAttributes(exec, propertyName, attributes);
+    return m_activation->getOwnPropertyDescriptor(exec, propertyName, descriptor);
 }
 
 void DebuggerActivation::defineGetter(TiExcState* exec, const Identifier& propertyName, TiObject* getterFunction, unsigned attributes)

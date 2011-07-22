@@ -40,9 +40,9 @@
 #include "TiClassRef.h"
 #include "TiGlobalObject.h"
 #include "TiObject.h"
-#include <wtf/Platform.h>
+#include <wtf/text/StringHash.h>
 
-#if PLATFORM(DARWIN)
+#if OS(DARWIN)
 #include <mach-o/dyld.h>
 
 static const int32_t webkitFirstVersionWithConcurrentGlobalContexts = 0x2100500; // 528.5.0
@@ -53,7 +53,7 @@ using namespace TI;
 TiContextGroupRef TiContextGroupCreate()
 {
     initializeThreading();
-    return toRef(TiGlobalData::create().releaseRef());
+    return toRef(TiGlobalData::createContextGroup(ThreadStackTypeSmall).releaseRef());
 }
 
 TiContextGroupRef TiContextGroupRetain(TiContextGroupRef group)
@@ -70,7 +70,7 @@ void TiContextGroupRelease(TiContextGroupRef group)
 TiGlobalContextRef TiGlobalContextCreate(TiClassRef globalObjectClass)
 {
     initializeThreading();
-#if PLATFORM(DARWIN)
+#if OS(DARWIN)
     // When running on Tiger or Leopard, or if the application was linked before TiGlobalContextCreate was changed
     // to use a unique TiGlobalData, we use a shared one for compatibility.
 #if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD)
@@ -81,7 +81,7 @@ TiGlobalContextRef TiGlobalContextCreate(TiClassRef globalObjectClass)
         TiLock lock(LockForReal);
         return TiGlobalContextCreateInGroup(toRef(&TiGlobalData::sharedInstance()), globalObjectClass);
     }
-#endif // PLATFORM(DARWIN)
+#endif // OS(DARWIN)
 
     return TiGlobalContextCreateInGroup(0, globalObjectClass);
 }
@@ -91,8 +91,9 @@ TiGlobalContextRef TiGlobalContextCreateInGroup(TiContextGroupRef group, TiClass
     initializeThreading();
 
     TiLock lock(LockForReal);
+    RefPtr<TiGlobalData> globalData = group ? PassRefPtr<TiGlobalData>(toJS(group)) : TiGlobalData::createContextGroup(ThreadStackTypeSmall);
 
-    RefPtr<TiGlobalData> globalData = group ? PassRefPtr<TiGlobalData>(toJS(group)) : TiGlobalData::create();
+    APIEntryShim entryShim(globalData.get(), false);
 
 #if ENABLE(JSC_MULTIPLE_THREADS)
     globalData->makeUsableFromMultipleThreads();
@@ -115,12 +116,9 @@ TiGlobalContextRef TiGlobalContextCreateInGroup(TiContextGroupRef group, TiClass
 TiGlobalContextRef TiGlobalContextRetain(TiGlobalContextRef ctx)
 {
     TiExcState* exec = toJS(ctx);
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiGlobalData& globalData = exec->globalData();
-
-    globalData.heap.registerThread();
-
     gcProtect(exec->dynamicGlobalObject());
     globalData.ref();
     return ctx;
@@ -131,25 +129,39 @@ void TiGlobalContextRelease(TiGlobalContextRef ctx)
     TiExcState* exec = toJS(ctx);
     TiLock lock(exec);
 
-    gcUnprotect(exec->dynamicGlobalObject());
-
     TiGlobalData& globalData = exec->globalData();
-    if (globalData.refCount() == 2) { // One reference is held by TiGlobalObject, another added by TiGlobalContextRetain().
-        // The last reference was released, this is our last chance to collect.
-        ASSERT(!globalData.heap.protectedObjectCount());
-        ASSERT(!globalData.heap.isBusy());
+    TiGlobalObject* dgo = exec->dynamicGlobalObject();
+    IdentifierTable* savedIdentifierTable = wtfThreadData().setCurrentIdentifierTable(globalData.identifierTable);
+
+    // One reference is held by TiGlobalObject, another added by TiGlobalContextRetain().
+    bool releasingContextGroup = globalData.refCount() == 2;
+    bool releasingGlobalObject = Heap::heap(dgo)->unprotect(dgo);
+    // If this is the last reference to a global data, it should also
+    // be the only remaining reference to the global object too!
+    ASSERT(!releasingContextGroup || releasingGlobalObject);
+
+    // An API 'TiGlobalContextRef' retains two things - a global object and a
+    // global data (or context group, in API terminology).
+    // * If this is the last reference to any contexts in the given context group,
+    //   call destroy on the heap (the global data is being  freed).
+    // * If this was the last reference to the global object, then unprotecting
+    //   it may  release a lot of GC memory - run the garbage collector now.
+    // * If there are more references remaining the the global object, then do nothing
+    //   (specifically that is more protects, which we assume come from other TiGlobalContextRefs).
+    if (releasingContextGroup)
         globalData.heap.destroy();
-    } else
-        globalData.heap.collect();
+    else if (releasingGlobalObject)
+        globalData.heap.collectAllGarbage();
 
     globalData.deref();
+
+    wtfThreadData().setCurrentIdentifierTable(savedIdentifierTable);
 }
 
 TiObjectRef TiContextGetGlobalObject(TiContextRef ctx)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     // It is necessary to call toThisObject to get the wrapper object when used with WebCore.
     return toRef(exec->lexicalGlobalObject()->toThisObject(exec));
@@ -164,8 +176,7 @@ TiContextGroupRef TiContextGetGroup(TiContextRef ctx)
 TiGlobalContextRef TiContextGetGlobalContext(TiContextRef ctx)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     return toGlobalRef(exec->lexicalGlobalObject()->globalExec());
 }

@@ -158,7 +158,8 @@ TiArray::TiArray(NonNullPassRefPtr<Structure> structure, unsigned initialLength)
     m_vectorLength = initialCapacity;
     m_storage->m_numValuesInVector = 0;
     m_storage->m_sparseValueMap = 0;
-    m_storage->lazyCreationData = 0;
+    m_storage->subclassData = 0;
+    m_storage->reportedMapCapacity = 0;
 
     TiValue* vector = m_storage->m_vector;
     for (size_t i = 0; i < initialCapacity; ++i)
@@ -179,6 +180,8 @@ TiArray::TiArray(NonNullPassRefPtr<Structure> structure, const ArgList& list)
     m_vectorLength = initialCapacity;
     m_storage->m_numValuesInVector = initialCapacity;
     m_storage->m_sparseValueMap = 0;
+    m_storage->subclassData = 0;
+    m_storage->reportedMapCapacity = 0;
 
     size_t i = 0;
     ArgList::const_iterator end = list.end();
@@ -192,6 +195,7 @@ TiArray::TiArray(NonNullPassRefPtr<Structure> structure, const ArgList& list)
 
 TiArray::~TiArray()
 {
+    ASSERT(vptr() == TiGlobalData::jsArrayVPtr);
     checkConsistency(DestructorConsistencyCheck);
 
     delete m_storage->m_sparseValueMap;
@@ -335,13 +339,24 @@ NEVER_INLINE void TiArray::putSlowCase(TiExcState* exec, unsigned i, TiValue val
         }
 
         // We miss some cases where we could compact the storage, such as a large array that is being filled from the end
-        // (which will only be compacted as we reach indices that are less than cutoff) - but this makes the check much faster.
+        // (which will only be compacted as we reach indices that are less than MIN_SPARSE_ARRAY_INDEX) - but this makes the check much faster.
         if ((i > MAX_STORAGE_VECTOR_INDEX) || !isDenseEnoughForVector(i + 1, storage->m_numValuesInVector + 1)) {
             if (!map) {
                 map = new SparseArrayValueMap;
                 storage->m_sparseValueMap = map;
             }
-            map->set(i, value);
+
+            pair<SparseArrayValueMap::iterator, bool> result = map->add(i, value);
+            if (!result.second) { // pre-existing entry
+                result.first->second = value;
+                return;
+            }
+
+            size_t capacity = map->capacity();
+            if (capacity != storage->reportedMapCapacity) {
+                Heap::heap(this)->reportExtraMemoryCost((capacity - storage->reportedMapCapacity) * (sizeof(unsigned) + sizeof(TiValue)));
+                storage->reportedMapCapacity = capacity;
+            }
             return;
         }
     }
@@ -387,8 +402,6 @@ NEVER_INLINE void TiArray::putSlowCase(TiExcState* exec, unsigned i, TiValue val
 
     unsigned vectorLength = m_vectorLength;
 
-    Heap::heap(this)->reportExtraMemoryCost(storageSize(newVectorLength) - storageSize(vectorLength));
-
     if (newNumValuesInVector == storage->m_numValuesInVector + 1) {
         for (unsigned j = vectorLength; j < newVectorLength; ++j)
             storage->m_vector[j] = TiValue();
@@ -409,6 +422,8 @@ NEVER_INLINE void TiArray::putSlowCase(TiExcState* exec, unsigned i, TiValue val
     m_storage = storage;
 
     checkConsistency();
+
+    Heap::heap(this)->reportExtraMemoryCost(storageSize(newVectorLength) - storageSize(vectorLength));
 }
 
 bool TiArray::deleteProperty(TiExcState* exec, const Identifier& propertyName)
@@ -461,7 +476,7 @@ bool TiArray::deleteProperty(TiExcState* exec, unsigned i)
     return false;
 }
 
-void TiArray::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void TiArray::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     // FIXME: Filling PropertyNameArray with an identifier for every integer
     // is incredibly inefficient for large arrays. We need a different approach,
@@ -481,7 +496,10 @@ void TiArray::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyN
             propertyNames.add(Identifier::from(exec, it->first));
     }
 
-    TiObject::getOwnPropertyNames(exec, propertyNames);
+    if (mode == IncludeDontEnumProperties)
+        propertyNames.add(exec->propertyNames().length);
+
+    TiObject::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
 bool TiArray::increaseVectorLength(unsigned newLength)
@@ -499,13 +517,15 @@ bool TiArray::increaseVectorLength(unsigned newLength)
     if (!tryFastRealloc(storage, storageSize(newVectorLength)).getValue(storage))
         return false;
 
-    Heap::heap(this)->reportExtraMemoryCost(storageSize(newVectorLength) - storageSize(vectorLength));
     m_vectorLength = newVectorLength;
 
     for (unsigned i = vectorLength; i < newVectorLength; ++i)
         storage->m_vector[i] = TiValue();
 
     m_storage = storage;
+
+    Heap::heap(this)->reportExtraMemoryCost(storageSize(newVectorLength) - storageSize(vectorLength));
+
     return true;
 }
 
@@ -630,8 +650,6 @@ static int compareNumbersForQSort(const void* a, const void* b)
     return (da > db) - (da < db);
 }
 
-typedef std::pair<TiValue, UString> ValueStringPair;
-
 static int compareByStringPairForQSort(const void* a, const void* b)
 {
     const ValueStringPair* va = static_cast<const ValueStringPair*>(a);
@@ -691,6 +709,8 @@ void TiArray::sort(TiExcState* exec)
         throwOutOfMemoryError(exec);
         return;
     }
+    
+    Heap::heap(this)->pushTempSortVector(&values);
 
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++) {
         TiValue value = m_storage->m_vector[i];
@@ -698,17 +718,16 @@ void TiArray::sort(TiExcState* exec)
         values[i].first = value;
     }
 
-    // FIXME: While calling these toString functions, the array could be mutated.
-    // In that case, objects pointed to by values in this vector might get garbage-collected!
-
     // FIXME: The following loop continues to call toString on subsequent values even after
     // a toString call raises an exception.
 
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++)
         values[i].second = values[i].first.toString(exec);
 
-    if (exec->hadException())
+    if (exec->hadException()) {
+        Heap::heap(this)->popTempSortVector(&values);
         return;
+    }
 
     // FIXME: Since we sort by string value, a fast algorithm might be to use a radix sort. That would be O(N) rather
     // than O(N log N).
@@ -721,12 +740,18 @@ void TiArray::sort(TiExcState* exec)
     qsort(values.begin(), values.size(), sizeof(ValueStringPair), compareByStringPairForQSort);
 #endif
 
-    // FIXME: If the toString function changed the length of the array, this might be
-    // modifying the vector incorrectly.
-
+    // If the toString function changed the length of the array or vector storage,
+    // increase the length to handle the orignal number of actual values.
+    if (m_vectorLength < lengthNotIncludingUndefined)
+        increaseVectorLength(lengthNotIncludingUndefined);
+    if (m_storage->m_length < lengthNotIncludingUndefined)
+        m_storage->m_length = lengthNotIncludingUndefined;
+        
     for (size_t i = 0; i < lengthNotIncludingUndefined; i++)
         m_storage->m_vector[i] = values[i].first;
 
+    Heap::heap(this)->popTempSortVector(&values);
+    
     checkConsistency(SortConsistencyCheck);
 }
 
@@ -792,7 +817,7 @@ struct AVLTreeAbstractorForArrayCompare {
             m_cachedCall->setThis(m_globalThisValue);
             m_cachedCall->setArgument(0, va);
             m_cachedCall->setArgument(1, vb);
-            compareResult = m_cachedCall->call().toNumber(m_cachedCall->newCallFrame());
+            compareResult = m_cachedCall->call().toNumber(m_cachedCall->newCallFrame(m_exec));
         } else {
             MarkedArgumentBuffer arguments;
             arguments.append(va);
@@ -935,10 +960,10 @@ void TiArray::fillArgList(TiExcState* exec, MarkedArgumentBuffer& args)
 
 void TiArray::copyToRegisters(TiExcState* exec, Register* buffer, uint32_t maxSize)
 {
-    ASSERT(m_storage->m_length == maxSize);
+    ASSERT(m_storage->m_length >= maxSize);
     UNUSED_PARAM(maxSize);
     TiValue* vector = m_storage->m_vector;
-    unsigned vectorEnd = min(m_storage->m_length, m_vectorLength);
+    unsigned vectorEnd = min(maxSize, m_vectorLength);
     unsigned i = 0;
     for (; i < vectorEnd; ++i) {
         TiValue& v = vector[i];
@@ -947,7 +972,7 @@ void TiArray::copyToRegisters(TiExcState* exec, Register* buffer, uint32_t maxSi
         buffer[i] = v;
     }
 
-    for (; i < m_storage->m_length; ++i)
+    for (; i < maxSize; ++i)
         buffer[i] = get(exec, i);
 }
 
@@ -1009,14 +1034,14 @@ unsigned TiArray::compactForSorting()
     return numDefined;
 }
 
-void* TiArray::lazyCreationData()
+void* TiArray::subclassData() const
 {
-    return m_storage->lazyCreationData;
+    return m_storage->subclassData;
 }
 
-void TiArray::setLazyCreationData(void* d)
+void TiArray::setSubclassData(void* d)
 {
-    m_storage->lazyCreationData = d;
+    m_storage->subclassData = d;
 }
 
 #if CHECK_ARRAY_CONSISTENCY

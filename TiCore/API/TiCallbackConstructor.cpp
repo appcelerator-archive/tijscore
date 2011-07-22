@@ -33,6 +33,7 @@
 #include "config.h"
 #include "TiCallbackConstructor.h"
 
+#include "APIShims.h"
 #include "APICast.h"
 #include <runtime/TiGlobalObject.h>
 #include <runtime/TiLock.h>
@@ -73,7 +74,7 @@ static TiObject* constructTiCallback(TiExcState* exec, TiObject* constructor, co
         TiValueRef exception = 0;
         TiObjectRef result;
         {
-            TiLock::DropAllLocks dropAllLocks(exec);
+            APICallbackShim callbackShim(exec);
             result = callback(ctx, constructorRef, argumentCount, arguments.data(), &exception);
         }
         if (exception)

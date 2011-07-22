@@ -51,25 +51,42 @@
 
 #include "Platform.h"
 
+#include <stdbool.h>
+
 #if COMPILER(MSVC)
 #include <stddef.h>
 #else
 #include <inttypes.h>
 #endif
 
-#if PLATFORM(SYMBIAN)
+#if OS(SYMBIAN)
 #include <e32def.h>
 #include <e32debug.h>
 #endif
 
 #ifdef NDEBUG
+/* Disable ASSERT* macros in release mode. */
 #define ASSERTIONS_DISABLED_DEFAULT 1
 #else
 #define ASSERTIONS_DISABLED_DEFAULT 0
 #endif
 
+#if COMPILER(MSVC7_OR_LOWER) || COMPILER(WINSCW)
+#define HAVE_VARIADIC_MACRO 0
+#else
+#define HAVE_VARIADIC_MACRO 1
+#endif
+
 #ifndef ASSERT_DISABLED
 #define ASSERT_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#endif
+
+#ifndef ASSERT_MSG_DISABLED
+#if HAVE(VARIADIC_MACRO)
+#define ASSERT_MSG_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#else
+#define ASSERT_MSG_DISABLED 1
+#endif
 #endif
 
 #ifndef ASSERT_ARG_DISABLED
@@ -77,15 +94,27 @@
 #endif
 
 #ifndef FATAL_DISABLED
+#if HAVE(VARIADIC_MACRO)
 #define FATAL_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#else
+#define FATAL_DISABLED 1
+#endif
 #endif
 
 #ifndef ERROR_DISABLED
+#if HAVE(VARIADIC_MACRO)
 #define ERROR_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#else
+#define ERROR_DISABLED 1
+#endif
 #endif
 
 #ifndef LOG_DISABLED
+#if HAVE(VARIADIC_MACRO)
 #define LOG_DISABLED ASSERTIONS_DISABLED_DEFAULT
+#else
+#define LOG_DISABLED 1
+#endif
 #endif
 
 #if COMPILER(GCC)
@@ -103,6 +132,13 @@
 #define WTF_ATTRIBUTE_PRINTF(formatStringArgument, extraArguments) 
 #endif
 
+/* This macro is needed to prevent the clang static analyzer from generating false-positive reports in ASSERT() macros. */
+#ifdef __clang__
+#define CLANG_ANALYZER_NORETURN __attribute__((analyzer_noreturn))
+#else
+#define CLANG_ANALYZER_NORETURN
+#endif
+
 /* These helper functions are always declared, but not necessarily always defined if the corresponding function is disabled. */
 
 #ifdef __cplusplus
@@ -117,10 +153,10 @@ typedef struct {
     WTFLogChannelState state;
 } WTFLogChannel;
 
-void WTFReportAssertionFailure(const char* file, int line, const char* function, const char* assertion);
-void WTFReportAssertionFailureWithMessage(const char* file, int line, const char* function, const char* assertion, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
-void WTFReportArgumentAssertionFailure(const char* file, int line, const char* function, const char* argName, const char* assertion);
-void WTFReportFatalError(const char* file, int line, const char* function, const char* format, ...) WTF_ATTRIBUTE_PRINTF(4, 5);
+void WTFReportAssertionFailure(const char* file, int line, const char* function, const char* assertion) CLANG_ANALYZER_NORETURN;
+void WTFReportAssertionFailureWithMessage(const char* file, int line, const char* function, const char* assertion, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(5, 6);
+void WTFReportArgumentAssertionFailure(const char* file, int line, const char* function, const char* argName, const char* assertion) CLANG_ANALYZER_NORETURN;
+void WTFReportFatalError(const char* file, int line, const char* function, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(4, 5);
 void WTFReportError(const char* file, int line, const char* function, const char* format, ...) WTF_ATTRIBUTE_PRINTF(4, 5);
 void WTFLog(WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(2, 3);
 void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
@@ -129,10 +165,16 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
 }
 #endif
 
-/* CRASH -- gets us into the debugger or the crash reporter -- signals are ignored by the crash reporter so we must do better */
+/* CRASH() - Raises a fatal error resulting in program termination and triggering either the debugger or the crash reporter.
 
+   Use CRASH() in response to known, unrecoverable errors like out-of-memory.
+   Macro is enabled in both debug and release mode.
+   To test for unknown errors and verify assumptions, use ASSERT instead, to avoid impacting performance in release builds.
+
+   Signals are ignored by the crash reporter on OS X so we must do better.
+*/
 #ifndef CRASH
-#if PLATFORM(SYMBIAN)
+#if OS(SYMBIAN)
 #define CRASH() do { \
     __DEBUGGER(); \
     User::Panic(_L("Webkit CRASH"),0); \
@@ -145,9 +187,13 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
 #endif
 #endif
 
-/* ASSERT, ASSERT_WITH_MESSAGE, ASSERT_NOT_REACHED */
+/* ASSERT, ASSERT_NOT_REACHED, ASSERT_UNUSED
 
-#if PLATFORM(WINCE) && !PLATFORM(TORCHMOBILE)
+  These macros are compiled out of release builds.
+  Expressions inside them are evaluated in debug builds only.
+*/
+
+#if OS(WINCE) && !PLATFORM(TORCHMOBILE)
 /* FIXME: We include this here only to avoid a conflict with the ASSERT macro. */
 #include <windows.h>
 #undef min
@@ -155,19 +201,22 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
 #undef ERROR
 #endif
 
-#if PLATFORM(WIN_OS) || PLATFORM(SYMBIAN)
+#if OS(WINDOWS) || OS(SYMBIAN)
 /* FIXME: Change to use something other than ASSERT to avoid this conflict with the underlying platform */
 #undef ASSERT
+#endif
+
+#if PLATFORM(BREWMP)
+/* FIXME: We include this here only to avoid a conflict with the COMPILE_ASSERT macro. */
+#include <AEEClassIDs.h>
+
+/* FIXME: Change to use something other than COMPILE_ASSERT to avoid this conflict with the underlying platform */
+#undef COMPILE_ASSERT
 #endif
 
 #if ASSERT_DISABLED
 
 #define ASSERT(assertion) ((void)0)
-#if COMPILER(MSVC7) || COMPILER(WINSCW)
-#define ASSERT_WITH_MESSAGE(assertion) ((void)0)
-#else
-#define ASSERT_WITH_MESSAGE(assertion, ...) ((void)0)
-#endif /* COMPILER(MSVC7) */
 #define ASSERT_NOT_REACHED() ((void)0)
 #define ASSERT_UNUSED(variable, assertion) ((void)variable)
 
@@ -179,16 +228,7 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
         CRASH(); \
     } \
 while (0)
-#if COMPILER(MSVC7) || COMPILER(WINSCW)
-#define ASSERT_WITH_MESSAGE(assertion) ((void)0)
-#else
-#define ASSERT_WITH_MESSAGE(assertion, ...) do \
-    if (!(assertion)) { \
-        WTFReportAssertionFailureWithMessage(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion, __VA_ARGS__); \
-        CRASH(); \
-    } \
-while (0)
-#endif /* COMPILER(MSVC7) */
+
 #define ASSERT_NOT_REACHED() do { \
     WTFReportAssertionFailure(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, 0); \
     CRASH(); \
@@ -198,6 +238,24 @@ while (0)
 
 #endif
 
+/* ASSERT_WITH_MESSAGE */
+
+#if COMPILER(MSVC7_OR_LOWER)
+#define ASSERT_WITH_MESSAGE(assertion) ((void)0)
+#elif COMPILER(WINSCW)
+#define ASSERT_WITH_MESSAGE(assertion, arg...) ((void)0)
+#elif ASSERT_MSG_DISABLED
+#define ASSERT_WITH_MESSAGE(assertion, ...) ((void)0)
+#else
+#define ASSERT_WITH_MESSAGE(assertion, ...) do \
+    if (!(assertion)) { \
+        WTFReportAssertionFailureWithMessage(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion, __VA_ARGS__); \
+        CRASH(); \
+    } \
+while (0)
+#endif
+                        
+                        
 /* ASSERT_ARG */
 
 #if ASSERT_ARG_DISABLED
@@ -222,10 +280,12 @@ while (0)
 
 /* FATAL */
 
-#if FATAL_DISABLED && !COMPILER(MSVC7) && !COMPILER(WINSCW)
-#define FATAL(...) ((void)0)
-#elif COMPILER(MSVC7)
+#if COMPILER(MSVC7_OR_LOWER)
 #define FATAL() ((void)0)
+#elif COMPILER(WINSCW)
+#define FATAL(arg...) ((void)0)
+#elif FATAL_DISABLED
+#define FATAL(...) ((void)0)
 #else
 #define FATAL(...) do { \
     WTFReportFatalError(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, __VA_ARGS__); \
@@ -235,20 +295,24 @@ while (0)
 
 /* LOG_ERROR */
 
-#if ERROR_DISABLED && !COMPILER(MSVC7) && !COMPILER(WINSCW)
-#define LOG_ERROR(...) ((void)0)
-#elif COMPILER(MSVC7) || COMPILER(WINSCW)
+#if COMPILER(MSVC7_OR_LOWER)
 #define LOG_ERROR() ((void)0)
+#elif COMPILER(WINSCW)
+#define LOG_ERROR(arg...)  ((void)0)
+#elif ERROR_DISABLED
+#define LOG_ERROR(...) ((void)0)
 #else
 #define LOG_ERROR(...) WTFReportError(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, __VA_ARGS__)
 #endif
 
 /* LOG */
 
-#if LOG_DISABLED && !COMPILER(MSVC7) && !COMPILER(WINSCW)
-#define LOG(channel, ...) ((void)0)
-#elif COMPILER(MSVC7) || COMPILER(WINSCW)
+#if COMPILER(MSVC7_OR_LOWER)
 #define LOG() ((void)0)
+#elif COMPILER(WINSCW)
+#define LOG(arg...) ((void)0)
+#elif LOG_DISABLED
+#define LOG(channel, ...) ((void)0)
 #else
 #define LOG(channel, ...) WTFLog(&JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
 #define JOIN_LOG_CHANNEL_WITH_PREFIX(prefix, channel) JOIN_LOG_CHANNEL_WITH_PREFIX_LEVEL_2(prefix, channel)
@@ -257,10 +321,12 @@ while (0)
 
 /* LOG_VERBOSE */
 
-#if LOG_DISABLED && !COMPILER(MSVC7) && !COMPILER(WINSCW)
-#define LOG_VERBOSE(channel, ...) ((void)0)
-#elif COMPILER(MSVC7) || COMPILER(WINSCW)
+#if COMPILER(MSVC7_OR_LOWER)
 #define LOG_VERBOSE(channel) ((void)0)
+#elif COMPILER(WINSCW)
+#define LOG_VERBOSE(channel, arg...) ((void)0)
+#elif LOG_DISABLED
+#define LOG_VERBOSE(channel, ...) ((void)0)
 #else
 #define LOG_VERBOSE(channel, ...) WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, &JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
 #endif

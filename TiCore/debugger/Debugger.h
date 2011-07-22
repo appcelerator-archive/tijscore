@@ -43,14 +43,14 @@ namespace TI {
 
     class Debugger {
     public:
-	Debugger();
         virtual ~Debugger();
+		Debugger();
 
         void attach(TiGlobalObject*);
         virtual void detach(TiGlobalObject*);
 
         virtual void sourceParsed(TiExcState*, const SourceCode&, int errorLineNumber, const UString& errorMessage) = 0;
-        virtual void exception(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;
+        virtual void exception(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber, bool hasHandler) = 0;
         virtual void atStatement(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;
         virtual void callEvent(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;
         virtual void returnEvent(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;

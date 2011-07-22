@@ -160,15 +160,15 @@ void PropertyDescriptor::setGetter(TiValue getter)
     m_attributes &= ~ReadOnly;
 }
 
-bool PropertyDescriptor::equalTo(const PropertyDescriptor& other) const
+bool PropertyDescriptor::equalTo(TiExcState* exec, const PropertyDescriptor& other) const
 {
     if (!other.m_value == m_value ||
         !other.m_getter == m_getter ||
         !other.m_setter == m_setter)
         return false;
-    return (!m_value || TiValue::strictEqual(other.m_value, m_value)) && 
-           (!m_getter || TiValue::strictEqual(other.m_getter, m_getter)) && 
-           (!m_setter || TiValue::strictEqual(other.m_setter, m_setter)) &&
+    return (!m_value || TiValue::strictEqual(exec, other.m_value, m_value)) && 
+           (!m_getter || TiValue::strictEqual(exec, other.m_getter, m_getter)) && 
+           (!m_setter || TiValue::strictEqual(exec, other.m_setter, m_setter)) &&
            attributesEqual(other);
 }
 

@@ -39,6 +39,7 @@
 #include "Collector.h"
 #include "ExecutableAllocator.h"
 #include "Register.h"
+#include "WeakGCPtr.h"
 #include <stdio.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/VMTags.h>
@@ -131,8 +132,9 @@ namespace TI {
         Register* end() const { return m_end; }
         size_t size() const { return m_end - m_start; }
 
-        void setGlobalObject(TiGlobalObject* globalObject) { m_globalObject = globalObject; }
-        TiGlobalObject* globalObject() { return m_globalObject; }
+        void setGlobalObject(TiGlobalObject*);
+        bool clearGlobalObject(TiGlobalObject*);
+        TiGlobalObject* globalObject();
 
         bool grow(Register* newEnd);
         void shrink(Register* newEnd);
@@ -160,7 +162,7 @@ namespace TI {
         Register* m_commitEnd;
 #endif
 
-        TiGlobalObject* m_globalObject; // The global object whose vars are currently stored in the register file.
+        WeakGCPtr<TiGlobalObject> m_globalObject; // The global object whose vars are currently stored in the register file.
     };
 
     // FIXME: Add a generic getpagesize() to WTF, then move this function to WTF as well.
@@ -173,7 +175,6 @@ namespace TI {
         , m_end(0)
         , m_max(0)
         , m_buffer(0)
-        , m_globalObject(0)
     {
         // Verify that our values will play nice with mmap and VirtualAlloc.
         ASSERT(isPageAligned(maxGlobals));
@@ -183,7 +184,7 @@ namespace TI {
     #if HAVE(MMAP)
         m_buffer = static_cast<Register*>(mmap(0, bufferLength, PROT_READ|PROT_WRITE, MAP_PRIVATE|MAP_ANON, VM_TAG_FOR_REGISTERFILE_MEMORY, 0));
         if (m_buffer == MAP_FAILED) {
-#if PLATFORM(WINCE)
+#if OS(WINCE)
             fprintf(stderr, "Could not allocate register file: %d\n", GetLastError());
 #else
             fprintf(stderr, "Could not allocate register file: %d\n", errno);
@@ -193,7 +194,7 @@ namespace TI {
     #elif HAVE(VIRTUALALLOC)
         m_buffer = static_cast<Register*>(VirtualAlloc(0, roundUpAllocationSize(bufferLength, commitSize), MEM_RESERVE, PAGE_READWRITE));
         if (!m_buffer) {
-#if PLATFORM(WINCE)
+#if OS(WINCE)
             fprintf(stderr, "Could not allocate register file: %d\n", GetLastError());
 #else
             fprintf(stderr, "Could not allocate register file: %d\n", errno);
@@ -203,7 +204,7 @@ namespace TI {
         size_t committedSize = roundUpAllocationSize(maxGlobals * sizeof(Register), commitSize);
         void* commitCheck = VirtualAlloc(m_buffer, committedSize, MEM_COMMIT, PAGE_READWRITE);
         if (commitCheck != m_buffer) {
-#if PLATFORM(WINCE)
+#if OS(WINCE)
             fprintf(stderr, "Could not allocate register file: %d\n", GetLastError());
 #else
             fprintf(stderr, "Could not allocate register file: %d\n", errno);
@@ -249,7 +250,7 @@ namespace TI {
         if (newEnd > m_commitEnd) {
             size_t size = roundUpAllocationSize(reinterpret_cast<char*>(newEnd) - reinterpret_cast<char*>(m_commitEnd), commitSize);
             if (!VirtualAlloc(m_commitEnd, size, MEM_COMMIT, PAGE_READWRITE)) {
-#if PLATFORM(WINCE)
+#if OS(WINCE)
                 fprintf(stderr, "Could not allocate register file: %d\n", GetLastError());
 #else
                 fprintf(stderr, "Could not allocate register file: %d\n", errno);

@@ -33,6 +33,7 @@
 
 #include "config.h"
 #include "TiObjectRef.h"
+#include "TiObjectRefPrivate.h"
 
 #include "APICast.h"
 #include "CodeBlock.h"
@@ -55,7 +56,6 @@
 #include "ObjectPrototype.h"
 #include "PropertyNameArray.h"
 #include "RegExpConstructor.h"
-#include <wtf/Platform.h>
 
 using namespace TI;
 
@@ -83,8 +83,7 @@ void TiClassRelease(TiClassRef jsClass)
 TiObjectRef TiObjectMake(TiContextRef ctx, TiClassRef jsClass, void* data)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     if (!jsClass)
         return toRef(new (exec) TiObject(exec->lexicalGlobalObject()->emptyObjectStructure())); // slightly more efficient
@@ -99,8 +98,7 @@ TiObjectRef TiObjectMake(TiContextRef ctx, TiClassRef jsClass, void* data)
 TiObjectRef TiObjectMakeFunctionWithCallback(TiContextRef ctx, TiStringRef name, TiObjectCallAsFunctionCallback callAsFunction)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     Identifier nameID = name ? name->identifier(&exec->globalData()) : Identifier(exec, "anonymous");
     
@@ -110,8 +108,7 @@ TiObjectRef TiObjectMakeFunctionWithCallback(TiContextRef ctx, TiStringRef name,
 TiObjectRef TiObjectMakeConstructor(TiContextRef ctx, TiClassRef jsClass, TiObjectCallAsConstructorCallback callAsConstructor)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiValue jsPrototype = jsClass ? jsClass->prototype(exec) : 0;
     if (!jsPrototype)
@@ -125,8 +122,7 @@ TiObjectRef TiObjectMakeConstructor(TiContextRef ctx, TiClassRef jsClass, TiObje
 TiObjectRef TiObjectMakeFunction(TiContextRef ctx, TiStringRef name, unsigned parameterCount, const TiStringRef parameterNames[], TiStringRef body, TiStringRef sourceURL, int startingLineNumber, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     Identifier nameID = name ? name->identifier(&exec->globalData()) : Identifier(exec, "anonymous");
     
@@ -148,8 +144,7 @@ TiObjectRef TiObjectMakeFunction(TiContextRef ctx, TiStringRef name, unsigned pa
 TiObjectRef TiObjectMakeArray(TiContextRef ctx, size_t argumentCount, const TiValueRef arguments[],  TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* result;
     if (argumentCount) {
@@ -174,8 +169,7 @@ TiObjectRef TiObjectMakeArray(TiContextRef ctx, size_t argumentCount, const TiVa
 TiObjectRef TiObjectMakeDate(TiContextRef ctx, size_t argumentCount, const TiValueRef arguments[],  TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; ++i)
@@ -195,8 +189,7 @@ TiObjectRef TiObjectMakeDate(TiContextRef ctx, size_t argumentCount, const TiVal
 TiObjectRef TiObjectMakeError(TiContextRef ctx, size_t argumentCount, const TiValueRef arguments[],  TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; ++i)
@@ -216,8 +209,7 @@ TiObjectRef TiObjectMakeError(TiContextRef ctx, size_t argumentCount, const TiVa
 TiObjectRef TiObjectMakeRegExp(TiContextRef ctx, size_t argumentCount, const TiValueRef arguments[],  TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     MarkedArgumentBuffer argList;
     for (size_t i = 0; i < argumentCount; ++i)
@@ -237,8 +229,7 @@ TiObjectRef TiObjectMakeRegExp(TiContextRef ctx, size_t argumentCount, const TiV
 TiValueRef TiObjectGetPrototype(TiContextRef ctx, TiObjectRef object)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     return toRef(exec, jsObject->prototype());
@@ -247,8 +238,7 @@ TiValueRef TiObjectGetPrototype(TiContextRef ctx, TiObjectRef object)
 void TiObjectSetPrototype(TiContextRef ctx, TiObjectRef object, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     TiValue jsValue = toJS(exec, value);
@@ -259,8 +249,7 @@ void TiObjectSetPrototype(TiContextRef ctx, TiObjectRef object, TiValueRef value
 bool TiObjectHasProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     
@@ -270,8 +259,7 @@ bool TiObjectHasProperty(TiContextRef ctx, TiObjectRef object, TiStringRef prope
 TiValueRef TiObjectGetProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
 
@@ -287,8 +275,7 @@ TiValueRef TiObjectGetProperty(TiContextRef ctx, TiObjectRef object, TiStringRef
 void TiObjectSetProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName, TiValueRef value, TiPropertyAttributes attributes, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     Identifier name(propertyName->identifier(&exec->globalData()));
@@ -311,8 +298,7 @@ void TiObjectSetProperty(TiContextRef ctx, TiObjectRef object, TiStringRef prope
 TiValueRef TiObjectGetPropertyAtIndex(TiContextRef ctx, TiObjectRef object, unsigned propertyIndex, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
 
@@ -329,8 +315,7 @@ TiValueRef TiObjectGetPropertyAtIndex(TiContextRef ctx, TiObjectRef object, unsi
 void TiObjectSetPropertyAtIndex(TiContextRef ctx, TiObjectRef object, unsigned propertyIndex, TiValueRef value, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     TiValue jsValue = toJS(exec, value);
@@ -346,8 +331,7 @@ void TiObjectSetPropertyAtIndex(TiContextRef ctx, TiObjectRef object, unsigned p
 bool TiObjectDeleteProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
 
@@ -387,6 +371,55 @@ bool TiObjectSetPrivate(TiObjectRef object, void* data)
     return false;
 }
 
+TiValueRef TiObjectGetPrivateProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    TiObject* jsObject = toJS(object);
+    TiValue result;
+    Identifier name(propertyName->identifier(&exec->globalData()));
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info))
+        result = static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->getPrivateProperty(name);
+    else if (jsObject->inherits(&TiCallbackObject<TiObject>::info))
+        result = static_cast<TiCallbackObject<TiObject>*>(jsObject)->getPrivateProperty(name);
+    return toRef(exec, result);
+}
+
+bool TiObjectSetPrivateProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName, TiValueRef value)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    TiObject* jsObject = toJS(object);
+    TiValue jsValue = toJS(exec, value);
+    Identifier name(propertyName->identifier(&exec->globalData()));
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info)) {
+        static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->setPrivateProperty(name, jsValue);
+        return true;
+    }
+    if (jsObject->inherits(&TiCallbackObject<TiObject>::info)) {
+        static_cast<TiCallbackObject<TiObject>*>(jsObject)->setPrivateProperty(name, jsValue);
+        return true;
+    }
+    return false;
+}
+
+bool TiObjectDeletePrivateProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    TiObject* jsObject = toJS(object);
+    Identifier name(propertyName->identifier(&exec->globalData()));
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info)) {
+        static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->deletePrivateProperty(name);
+        return true;
+    }
+    if (jsObject->inherits(&TiCallbackObject<TiObject>::info)) {
+        static_cast<TiCallbackObject<TiObject>*>(jsObject)->deletePrivateProperty(name);
+        return true;
+    }
+    return false;
+}
+
 bool TiObjectIsFunction(TiContextRef, TiObjectRef object)
 {
     CallData callData;
@@ -396,8 +429,7 @@ bool TiObjectIsFunction(TiContextRef, TiObjectRef object)
 TiValueRef TiObjectCallAsFunction(TiContextRef ctx, TiObjectRef object, TiObjectRef thisObject, size_t argumentCount, const TiValueRef arguments[], TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
     TiObject* jsThisObject = toJS(thisObject);
@@ -434,8 +466,7 @@ bool TiObjectIsConstructor(TiContextRef, TiObjectRef object)
 TiObjectRef TiObjectCallAsConstructor(TiContextRef ctx, TiObjectRef object, size_t argumentCount, const TiValueRef arguments[], TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsObject = toJS(object);
 
@@ -473,8 +504,7 @@ TiPropertyNameArrayRef TiObjectCopyPropertyNames(TiContextRef ctx, TiObjectRef o
 {
     TiObject* jsObject = toJS(object);
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiGlobalData* globalData = &exec->globalData();
 
@@ -499,7 +529,7 @@ TiPropertyNameArrayRef TiPropertyNameArrayRetain(TiPropertyNameArrayRef array)
 void TiPropertyNameArrayRelease(TiPropertyNameArrayRef array)
 {
     if (--array->refCount == 0) {
-        TiLock lock(array->globalData->isSharedInstance ? LockForReal : SilenceAssertionsOnly);
+        APIEntryShim entryShim(array->globalData, false);
         delete array;
     }
 }
@@ -517,9 +547,6 @@ TiStringRef TiPropertyNameArrayGetNameAtIndex(TiPropertyNameArrayRef array, size
 void TiPropertyNameAccumulatorAddName(TiPropertyNameAccumulatorRef array, TiStringRef propertyName)
 {
     PropertyNameArray* propertyNames = toJS(array);
-
-    propertyNames->globalData()->heap.registerThread();
-    TiLock lock(propertyNames->globalData()->isSharedInstance ? LockForReal : SilenceAssertionsOnly);
-
+    APIEntryShim entryShim(propertyNames->globalData());
     propertyNames->add(propertyName->identifier(propertyNames->globalData()));
 }

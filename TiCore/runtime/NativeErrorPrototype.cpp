@@ -30,17 +30,19 @@
 
 #include "ErrorPrototype.h"
 #include "TiString.h"
+#include "NativeErrorConstructor.h"
 #include "UString.h"
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(NativeErrorPrototype);
 
-NativeErrorPrototype::NativeErrorPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, const UString& name, const UString& message)
+NativeErrorPrototype::NativeErrorPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, const UString& nameAndMessage, NativeErrorConstructor* constructor)
     : TiObject(structure)
 {
-    putDirect(exec->propertyNames().name, jsString(exec, name), 0);
-    putDirect(exec->propertyNames().message, jsString(exec, message), 0);
+    putDirect(exec->propertyNames().name, jsString(exec, nameAndMessage), 0);
+    putDirect(exec->propertyNames().message, jsString(exec, nameAndMessage), 0);
+    putDirect(exec->propertyNames().constructor, constructor, DontEnum);
 }
 
 } // namespace TI

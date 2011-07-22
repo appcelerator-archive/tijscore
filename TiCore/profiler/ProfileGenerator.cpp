@@ -70,7 +70,7 @@ void ProfileGenerator::addParentForConsoleStart(TiExcState* exec)
     TiValue function;
 
     exec->interpreter()->retrieveLastCaller(exec, lineNumber, sourceID, sourceURL, function);
-    m_currentNode = ProfileNode::create(Profiler::createCallIdentifier(&exec->globalData(), function ? function.toThisObject(exec) : 0, sourceURL, lineNumber), m_head.get(), m_head.get());
+    m_currentNode = ProfileNode::create(Profiler::createCallIdentifier(exec, function ? function.toThisObject(exec) : 0, sourceURL, lineNumber), m_head.get(), m_head.get());
     m_head->insertNode(m_currentNode.get());
 }
 
@@ -84,7 +84,7 @@ void ProfileGenerator::willExecute(const CallIdentifier& callIdentifier)
     if (JAVASCRIPTCORE_PROFILE_WILL_EXECUTE_ENABLED()) {
         CString name = callIdentifier.m_name.UTF8String();
         CString url = callIdentifier.m_url.UTF8String();
-        JAVASCRIPTCORE_PROFILE_WILL_EXECUTE(m_profileGroup, const_cast<char*>(name.c_str()), const_cast<char*>(url.c_str()), callIdentifier.m_lineNumber);
+        JAVASCRIPTCORE_PROFILE_WILL_EXECUTE(m_profileGroup, const_cast<char*>(name.data()), const_cast<char*>(url.data()), callIdentifier.m_lineNumber);
     }
 
     if (!m_originatingGlobalExec)
@@ -99,7 +99,7 @@ void ProfileGenerator::didExecute(const CallIdentifier& callIdentifier)
     if (JAVASCRIPTCORE_PROFILE_DID_EXECUTE_ENABLED()) {
         CString name = callIdentifier.m_name.UTF8String();
         CString url = callIdentifier.m_url.UTF8String();
-        JAVASCRIPTCORE_PROFILE_DID_EXECUTE(m_profileGroup, const_cast<char*>(name.c_str()), const_cast<char*>(url.c_str()), callIdentifier.m_lineNumber);
+        JAVASCRIPTCORE_PROFILE_DID_EXECUTE(m_profileGroup, const_cast<char*>(name.data()), const_cast<char*>(url.data()), callIdentifier.m_lineNumber);
     }
 
     if (!m_originatingGlobalExec)
@@ -131,7 +131,7 @@ void ProfileGenerator::stopProfiling()
     m_currentNode = m_currentNode->parent();
 
    if (double headSelfTime = m_head->selfTime()) {
-        RefPtr<ProfileNode> idleNode = ProfileNode::create(CallIdentifier(NonJSExecution, 0, 0), m_head.get(), m_head.get());
+        RefPtr<ProfileNode> idleNode = ProfileNode::create(CallIdentifier(NonJSExecution, UString(), 0), m_head.get(), m_head.get());
 
         idleNode->setTotalTime(headSelfTime);
         idleNode->setSelfTime(headSelfTime);

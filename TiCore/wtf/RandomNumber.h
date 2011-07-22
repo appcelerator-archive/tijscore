@@ -46,4 +46,6 @@ namespace WTI {
 
 }
 
+using WTI::randomNumber;
+
 #endif

@@ -32,46 +32,230 @@
 
 #include "TiGlobalObject.h"
 #include "TiObject.h"
+#include "Operations.h"
 #include "StringObject.h"
 #include "StringPrototype.h"
 
 namespace TI {
+    
+static const unsigned resolveRopeForSubstringCutoff = 4;
+
+// Overview: this methods converts a TiString from holding a string in rope form
+// down to a simple UString representation.  It does so by building up the string
+// backwards, since we want to avoid recursion, we expect that the tree structure
+// representing the rope is likely imbalanced with more nodes down the left side
+// (since appending to the string is likely more common) - and as such resolving
+// in this fashion should minimize work queue size.  (If we built the queue forwards
+// we would likely have to place all of the constituent UStringImpls into the
+// Vector before performing any concatenation, but by working backwards we likely
+// only fill the queue with the number of substrings at any given level in a
+// rope-of-ropes.)
+void TiString::resolveRope(TiExcState* exec) const
+{
+    ASSERT(isRope());
+
+    // Allocate the buffer to hold the final string, position initially points to the end.
+    UChar* buffer;
+    if (PassRefPtr<UStringImpl> newImpl = UStringImpl::tryCreateUninitialized(m_length, buffer))
+        m_value = newImpl;
+    else {
+        for (unsigned i = 0; i < m_fiberCount; ++i) {
+            RopeImpl::deref(m_other.m_fibers[i]);
+            m_other.m_fibers[i] = 0;
+        }
+        m_fiberCount = 0;
+        ASSERT(!isRope());
+        ASSERT(m_value == UString());
+        if (exec)
+            throwOutOfMemoryError(exec);
+        return;
+    }
+    UChar* position = buffer + m_length;
+
+    // Start with the current RopeImpl.
+    Vector<RopeImpl::Fiber, 32> workQueue;
+    RopeImpl::Fiber currentFiber;
+    for (unsigned i = 0; i < (m_fiberCount - 1); ++i)
+        workQueue.append(m_other.m_fibers[i]);
+    currentFiber = m_other.m_fibers[m_fiberCount - 1];
+    while (true) {
+        if (RopeImpl::isRope(currentFiber)) {
+            RopeImpl* rope = static_cast<RopeImpl*>(currentFiber);
+            // Copy the contents of the current rope into the workQueue, with the last item in 'currentFiber'
+            // (we will be working backwards over the rope).
+            unsigned fiberCountMinusOne = rope->fiberCount() - 1;
+            for (unsigned i = 0; i < fiberCountMinusOne; ++i)
+                workQueue.append(rope->fibers()[i]);
+            currentFiber = rope->fibers()[fiberCountMinusOne];
+        } else {
+            UStringImpl* string = static_cast<UStringImpl*>(currentFiber);
+            unsigned length = string->length();
+            position -= length;
+            UStringImpl::copyChars(position, string->characters(), length);
+
+            // Was this the last item in the work queue?
+            if (workQueue.isEmpty()) {
+                // Create a string from the UChar buffer, clear the rope RefPtr.
+                ASSERT(buffer == position);
+                for (unsigned i = 0; i < m_fiberCount; ++i) {
+                    RopeImpl::deref(m_other.m_fibers[i]);
+                    m_other.m_fibers[i] = 0;
+                }
+                m_fiberCount = 0;
+
+                ASSERT(!isRope());
+                return;
+            }
+
+            // No! - set the next item up to process.
+            currentFiber = workQueue.last();
+            workQueue.removeLast();
+        }
+    }
+}
+    
+// This function construsts a substring out of a rope without flattening by reusing the existing fibers.
+// This can reduce memory usage substantially. Since traversing ropes is slow the function will revert 
+// back to flattening if the rope turns out to be long.
+TiString* TiString::substringFromRope(TiExcState* exec, unsigned substringStart, unsigned substringLength)
+{
+    ASSERT(isRope());
+
+    TiGlobalData* globalData = &exec->globalData();
+
+    UString substringFibers[3];
+    
+    unsigned fiberCount = 0;
+    unsigned substringFiberCount = 0;
+    unsigned substringEnd = substringStart + substringLength;
+    unsigned fiberEnd = 0;
+
+    RopeIterator end;
+    for (RopeIterator it(m_other.m_fibers, m_fiberCount); it != end; ++it) {
+        ++fiberCount;
+        UStringImpl* fiberString = *it;
+        unsigned fiberStart = fiberEnd;
+        fiberEnd = fiberStart + fiberString->length();
+        if (fiberEnd <= substringStart)
+            continue;
+        unsigned copyStart = std::max(substringStart, fiberStart);
+        unsigned copyEnd = std::min(substringEnd, fiberEnd);
+        if (copyStart == fiberStart && copyEnd == fiberEnd)
+            substringFibers[substringFiberCount++] = UString(fiberString);
+        else
+            substringFibers[substringFiberCount++] = UString(UStringImpl::create(fiberString, copyStart - fiberStart, copyEnd - copyStart));
+        if (fiberEnd >= substringEnd)
+            break;
+        if (fiberCount > resolveRopeForSubstringCutoff || substringFiberCount >= 3) {
+            // This turned out to be a really inefficient rope. Just flatten it.
+            resolveRope(exec);
+            return jsSubstring(&exec->globalData(), m_value, substringStart, substringLength);
+        }
+    }
+    ASSERT(substringFiberCount && substringFiberCount <= 3);
+
+    if (substringLength == 1) {
+        ASSERT(substringFiberCount == 1);
+        UChar c = substringFibers[0].data()[0];
+        if (c <= 0xFF)
+            return globalData->smallStrings.singleCharacterString(globalData, c);
+    }
+    if (substringFiberCount == 1)
+        return new (globalData) TiString(globalData, substringFibers[0]);
+    if (substringFiberCount == 2)
+        return new (globalData) TiString(globalData, substringFibers[0], substringFibers[1]);
+    return new (globalData) TiString(globalData, substringFibers[0], substringFibers[1], substringFibers[2]);
+}
+
+TiValue TiString::replaceCharacter(TiExcState* exec, UChar character, const UString& replacement)
+{
+    if (!isRope()) {
+        unsigned matchPosition = m_value.find(character);
+        if (matchPosition == UString::NotFound)
+            return TiValue(this);
+        return jsString(exec, m_value.substr(0, matchPosition), replacement, m_value.substr(matchPosition + 1));
+    }
+
+    RopeIterator end;
+    
+    // Count total fibers and find matching string.
+    size_t fiberCount = 0;
+    UStringImpl* matchString = 0;
+    int matchPosition = -1;
+    for (RopeIterator it(m_other.m_fibers, m_fiberCount); it != end; ++it) {
+        ++fiberCount;
+        if (matchString)
+            continue;
+
+        UStringImpl* string = *it;
+        matchPosition = string->find(character);
+        if (matchPosition == -1)
+            continue;
+        matchString = string;
+    }
+
+    if (!matchString)
+        return this;
+
+    RopeBuilder builder(replacement.size() ? fiberCount + 2 : fiberCount + 1);
+    if (UNLIKELY(builder.isOutOfMemory()))
+        return throwOutOfMemoryError(exec);
+
+    for (RopeIterator it(m_other.m_fibers, m_fiberCount); it != end; ++it) {
+        UStringImpl* string = *it;
+        if (string != matchString) {
+            builder.append(UString(string));
+            continue;
+        }
+
+        builder.append(UString(string).substr(0, matchPosition));
+        if (replacement.size())
+            builder.append(replacement);
+        builder.append(UString(string).substr(matchPosition + 1));
+        matchString = 0;
+    }
+
+    TiGlobalData* globalData = &exec->globalData();
+    return TiValue(new (globalData) TiString(globalData, builder.release()));
+}
+
+TiString* TiString::getIndexSlowCase(TiExcState* exec, unsigned i)
+{
+    ASSERT(isRope());
+    resolveRope(exec);
+    // Return a safe no-value result, this should never be used, since the excetion will be thrown.
+    if (exec->exception())
+        return jsString(exec, "");
+    ASSERT(!isRope());
+    ASSERT(i < m_value.size());
+    return jsSingleCharacterSubstring(exec, m_value, i);
+}
 
 TiValue TiString::toPrimitive(TiExcState*, PreferredPrimitiveType) const
 {
     return const_cast<TiString*>(this);
 }
 
-bool TiString::getPrimitiveNumber(TiExcState*, double& number, TiValue& value)
+bool TiString::getPrimitiveNumber(TiExcState* exec, double& number, TiValue& result)
 {
-    value = this;
-    number = m_value.toDouble();
+    result = this;
+    number = value(exec).toDouble();
     return false;
 }
 
 bool TiString::toBoolean(TiExcState*) const
 {
-    return !m_value.isEmpty();
+    return m_length;
 }
 
-double TiString::toNumber(TiExcState*) const
+double TiString::toNumber(TiExcState* exec) const
 {
-    return m_value.toDouble();
+    return value(exec).toDouble();
 }
 
-UString TiString::toString(TiExcState*) const
+UString TiString::toString(TiExcState* exec) const
 {
-    return m_value;
-}
-
-UString TiString::toThisString(TiExcState*) const
-{
-    return m_value;
-}
-
-TiString* TiString::toThisTiString(TiExcState*)
-{
-    return this;
+    return value(exec);
 }
 
 inline StringObject* StringObject::create(TiExcState* exec, TiString* string)
@@ -113,14 +297,14 @@ bool TiString::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyNa
 bool TiString::getStringPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
     if (propertyName == exec->propertyNames().length) {
-        descriptor.setDescriptor(jsNumber(exec, m_value.size()), DontEnum | DontDelete | ReadOnly);
+        descriptor.setDescriptor(jsNumber(exec, m_length), DontEnum | DontDelete | ReadOnly);
         return true;
     }
     
     bool isStrictUInt32;
     unsigned i = propertyName.toStrictUInt32(&isStrictUInt32);
-    if (isStrictUInt32 && i < static_cast<unsigned>(m_value.size())) {
-        descriptor.setDescriptor(jsSingleCharacterSubstring(exec, m_value, i), DontDelete | ReadOnly);
+    if (isStrictUInt32 && i < m_length) {
+        descriptor.setDescriptor(getIndex(exec, i), DontDelete | ReadOnly);
         return true;
     }
     

@@ -49,7 +49,7 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(TiObject);
 
-static inline void getEnumerablePropertyNames(TiExcState* exec, const ClassInfo* classInfo, PropertyNameArray& propertyNames)
+static inline void getClassPropertyNames(TiExcState* exec, const ClassInfo* classInfo, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
     // Add properties from the static hashtables of properties
     for (; classInfo; classInfo = classInfo->parentClass) {
@@ -62,7 +62,7 @@ static inline void getEnumerablePropertyNames(TiExcState* exec, const ClassInfo*
         int hashSizeMask = table->compactSize - 1;
         const HashEntry* entry = table->table;
         for (int i = 0; i <= hashSizeMask; ++i, ++entry) {
-            if (entry->key() && !(entry->attributes() & DontEnum))
+            if (entry->key() && (!(entry->attributes() & DontEnum) || (mode == IncludeDontEnumProperties)))
                 propertyNames.add(entry->key());
         }
     }
@@ -413,26 +413,10 @@ bool TiObject::hasInstance(TiExcState* exec, TiValue value, TiValue proto)
 
 bool TiObject::propertyIsEnumerable(TiExcState* exec, const Identifier& propertyName) const
 {
-    unsigned attributes;
-    if (!getPropertyAttributes(exec, propertyName, attributes))
+    PropertyDescriptor descriptor;
+    if (!const_cast<TiObject*>(this)->getOwnPropertyDescriptor(exec, propertyName, descriptor))
         return false;
-    return !(attributes & DontEnum);
-}
-
-bool TiObject::getPropertyAttributes(TiExcState* exec, const Identifier& propertyName, unsigned& attributes) const
-{
-    TiCell* specificValue;
-    if (m_structure->get(propertyName, attributes, specificValue) != WTI::notFound)
-        return true;
-    
-    // Look in the static hashtable of properties
-    const HashEntry* entry = findPropertyHashEntry(exec, propertyName);
-    if (entry) {
-        attributes = entry->attributes();
-        return true;
-    }
-    
-    return false;
+    return descriptor.enumerable();
 }
 
 bool TiObject::getPropertySpecificValue(TiExcState*, const Identifier& propertyName, TiCell*& specificValue) const
@@ -448,9 +432,9 @@ bool TiObject::getPropertySpecificValue(TiExcState*, const Identifier& propertyN
     return false;
 }
 
-void TiObject::getPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void TiObject::getPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    getOwnPropertyNames(exec, propertyNames);
+    getOwnPropertyNames(exec, propertyNames, mode);
 
     if (prototype().isNull())
         return;
@@ -458,10 +442,10 @@ void TiObject::getPropertyNames(TiExcState* exec, PropertyNameArray& propertyNam
     TiObject* prototype = asObject(this->prototype());
     while(1) {
         if (prototype->structure()->typeInfo().overridesGetPropertyNames()) {
-            prototype->getPropertyNames(exec, propertyNames);
+            prototype->getPropertyNames(exec, propertyNames, mode);
             break;
         }
-        prototype->getOwnPropertyNames(exec, propertyNames);
+        prototype->getOwnPropertyNames(exec, propertyNames, mode);
         TiValue nextProto = prototype->prototype();
         if (nextProto.isNull())
             break;
@@ -469,10 +453,10 @@ void TiObject::getPropertyNames(TiExcState* exec, PropertyNameArray& propertyNam
     }
 }
 
-void TiObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void TiObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    m_structure->getEnumerablePropertyNames(propertyNames);
-    getEnumerablePropertyNames(exec, classInfo(), propertyNames);
+    m_structure->getPropertyNames(propertyNames, mode);
+    getClassPropertyNames(exec, classInfo(), propertyNames, mode);
 }
 
 bool TiObject::toBoolean(TiExcState*) const
@@ -529,19 +513,22 @@ void TiObject::removeDirect(const Identifier& propertyName)
 
 void TiObject::putDirectFunction(TiExcState* exec, InternalFunction* function, unsigned attr)
 {
-    putDirectFunction(Identifier(exec, function->name(&exec->globalData())), function, attr);
+    putDirectFunction(Identifier(exec, function->name(exec)), function, attr);
 }
 
 void TiObject::putDirectFunctionWithoutTransition(TiExcState* exec, InternalFunction* function, unsigned attr)
 {
-    putDirectFunctionWithoutTransition(Identifier(exec, function->name(&exec->globalData())), function, attr);
+    putDirectFunctionWithoutTransition(Identifier(exec, function->name(exec)), function, attr);
 }
 
 NEVER_INLINE void TiObject::fillGetterPropertySlot(PropertySlot& slot, TiValue* location)
 {
-    if (TiObject* getterFunction = asGetterSetter(*location)->getter())
-        slot.setGetterSlot(getterFunction);
-    else
+    if (TiObject* getterFunction = asGetterSetter(*location)->getter()) {
+        if (!structure()->isDictionary())
+            slot.setCacheableGetterSlot(this, getterFunction, offsetForLocation(location));
+        else
+            slot.setGetterSlot(getterFunction);
+    } else
         slot.setUndefined();
 }
 
@@ -606,7 +593,7 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
     if (descriptor.isEmpty())
         return true;
 
-    if (current.equalTo(descriptor))
+    if (current.equalTo(exec, descriptor))
         return true;
 
     // Filter out invalid changes
@@ -652,7 +639,7 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
                 return false;
             }
             if (!current.writable()) {
-                if (descriptor.value() || !TiValue::strictEqual(current.value(), descriptor.value())) {
+                if (descriptor.value() || !TiValue::strictEqual(exec, current.value(), descriptor.value())) {
                     if (throwException)
                         throwError(exec, TypeError, "Attempting to change value of a readonly property.");
                     return false;
@@ -674,12 +661,12 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
     // Changing the accessor functions of an existing accessor property
     ASSERT(descriptor.isAccessorDescriptor());
     if (!current.configurable()) {
-        if (descriptor.setterPresent() && !(current.setter() && TiValue::strictEqual(current.setter(), descriptor.setter()))) {
+        if (descriptor.setterPresent() && !(current.setter() && TiValue::strictEqual(exec, current.setter(), descriptor.setter()))) {
             if (throwException)
                 throwError(exec, TypeError, "Attempting to change the setter of an unconfigurable property.");
             return false;
         }
-        if (descriptor.getterPresent() && !(current.getter() && TiValue::strictEqual(current.getter(), descriptor.getter()))) {
+        if (descriptor.getterPresent() && !(current.getter() && TiValue::strictEqual(exec, current.getter(), descriptor.getter()))) {
             if (throwException)
                 throwError(exec, TypeError, "Attempting to change the getter of an unconfigurable property.");
             return false;

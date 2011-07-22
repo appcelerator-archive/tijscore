@@ -43,6 +43,8 @@
 #include <wtf/RefCounted.h>
 #include <wtf/Threading.h>
 
+#include <wtf/iphone/WebCoreThread.h>
+
 namespace WTI {
 
     // Used to allowing sharing data across classes and threads (like ThreadedSafeShared).
@@ -96,7 +98,9 @@ namespace WTI {
         void threadSafeDeref();
 
 #ifndef NDEBUG
-        bool isOwnedByCurrentThread() const { return !m_threadId || m_threadId == currentThread(); }
+        bool isOwnedByCurrentThread() const {
+            return !m_threadId || m_threadId == currentThread() || ((isMainThread() || pthread_main_np()) && WebCoreWebThreadIsLockedOrDisabled());
+        }
 #endif
 
         RefCountedBase m_refCounter;
@@ -111,6 +115,7 @@ namespace WTI {
     void CrossThreadRefCounted<T>::ref()
     {
         ASSERT(isOwnedByCurrentThread());
+
         m_refCounter.ref();
 #ifndef NDEBUG
         // Store the threadId as soon as the ref count gets to 2.
@@ -127,6 +132,7 @@ namespace WTI {
     void CrossThreadRefCounted<T>::deref()
     {
         ASSERT(isOwnedByCurrentThread());
+
         if (m_refCounter.derefBase()) {
             threadSafeDeref();
             delete this;
@@ -154,6 +160,7 @@ namespace WTI {
     PassRefPtr<CrossThreadRefCounted<T> > CrossThreadRefCounted<T>::crossThreadCopy()
     {
         ASSERT(isOwnedByCurrentThread());
+
         if (m_threadSafeRefCounter)
             m_threadSafeRefCounter->ref();
         else

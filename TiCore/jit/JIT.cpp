@@ -34,7 +34,7 @@
 #include "JIT.h"
 
 // This probably does not belong here; adding here for now as a quick Windows build fix.
-#if ENABLE(ASSEMBLER) && PLATFORM(X86) && !PLATFORM(MAC)
+#if ENABLE(ASSEMBLER) && CPU(X86) && !OS(MAC_OS_X)
 #include "MacroAssembler.h"
 TI::MacroAssemblerX86Common::SSE2CheckState TI::MacroAssemblerX86Common::s_sse2CheckState = NotCheckedSSE2;
 #endif
@@ -44,7 +44,6 @@ TI::MacroAssemblerX86Common::SSE2CheckState TI::MacroAssemblerX86Common::s_sse2C
 #include "CodeBlock.h"
 #include "Interpreter.h"
 #include "JITInlineMethods.h"
-#include "JITStubs.h"
 #include "JITStubCall.h"
 #include "TiArray.h"
 #include "TiFunction.h"
@@ -79,7 +78,7 @@ void ctiPatchCallByReturnAddress(CodeBlock* codeblock, ReturnAddressPtr returnAd
     repatchBuffer.relinkCallerToFunction(returnAddress, newCalleeFunction);
 }
 
-JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock)
+JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock, void* linkerOffset)
     : m_interpreter(globalData->interpreter)
     , m_globalData(globalData)
     , m_codeBlock(codeBlock)
@@ -97,6 +96,7 @@ JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock)
     , m_lastResultBytecodeRegister(std::numeric_limits<int>::max())
     , m_jumpTargetsPosition(0)
 #endif
+    , m_linkerOffset(linkerOffset)
 {
 }
 
@@ -208,7 +208,6 @@ void JIT::privateCompileMainPass()
         DEFINE_BINARY_OP(op_in)
         DEFINE_BINARY_OP(op_less)
         DEFINE_BINARY_OP(op_lesseq)
-        DEFINE_BINARY_OP(op_urshift)
         DEFINE_UNARY_OP(op_is_boolean)
         DEFINE_UNARY_OP(op_is_function)
         DEFINE_UNARY_OP(op_is_number)
@@ -258,6 +257,8 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_jneq_null)
         DEFINE_OP(op_jneq_ptr)
         DEFINE_OP(op_jnless)
+        DEFINE_OP(op_jless)
+        DEFINE_OP(op_jlesseq)
         DEFINE_OP(op_jnlesseq)
         DEFINE_OP(op_jsr)
         DEFINE_OP(op_jtrue)
@@ -266,6 +267,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_loop_if_less)
         DEFINE_OP(op_loop_if_lesseq)
         DEFINE_OP(op_loop_if_true)
+        DEFINE_OP(op_loop_if_false)
         DEFINE_OP(op_lshift)
         DEFINE_OP(op_method_check)
         DEFINE_OP(op_mod)
@@ -304,10 +306,12 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_resolve)
         DEFINE_OP(op_resolve_base)
         DEFINE_OP(op_resolve_global)
+        DEFINE_OP(op_resolve_global_dynamic)
         DEFINE_OP(op_resolve_skip)
         DEFINE_OP(op_resolve_with_base)
         DEFINE_OP(op_ret)
         DEFINE_OP(op_rshift)
+        DEFINE_OP(op_urshift)
         DEFINE_OP(op_sret)
         DEFINE_OP(op_strcat)
         DEFINE_OP(op_stricteq)
@@ -328,6 +332,16 @@ void JIT::privateCompileMainPass()
         case op_get_by_id_proto_list:
         case op_get_by_id_self:
         case op_get_by_id_self_list:
+        case op_get_by_id_getter_chain:
+        case op_get_by_id_getter_proto:
+        case op_get_by_id_getter_proto_list:
+        case op_get_by_id_getter_self:
+        case op_get_by_id_getter_self_list:
+        case op_get_by_id_custom_chain:
+        case op_get_by_id_custom_proto:
+        case op_get_by_id_custom_proto_list:
+        case op_get_by_id_custom_self:
+        case op_get_by_id_custom_self_list:
         case op_get_string_length:
         case op_put_by_id_generic:
         case op_put_by_id_replace:
@@ -359,9 +373,7 @@ void JIT::privateCompileSlowCases()
     Instruction* instructionsBegin = m_codeBlock->instructions().begin();
 
     m_propertyAccessInstructionIndex = 0;
-#if USE(JSVALUE32_64)
     m_globalResolveInfoIndex = 0;
-#endif
     m_callLinkInfoIndex = 0;
 
     for (Vector<SlowCaseEntry>::iterator iter = m_slowCases.begin(); iter != m_slowCases.end();) {
@@ -397,11 +409,14 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_instanceof)
         DEFINE_SLOWCASE_OP(op_jfalse)
         DEFINE_SLOWCASE_OP(op_jnless)
+        DEFINE_SLOWCASE_OP(op_jless)
+        DEFINE_SLOWCASE_OP(op_jlesseq)
         DEFINE_SLOWCASE_OP(op_jnlesseq)
         DEFINE_SLOWCASE_OP(op_jtrue)
         DEFINE_SLOWCASE_OP(op_loop_if_less)
         DEFINE_SLOWCASE_OP(op_loop_if_lesseq)
         DEFINE_SLOWCASE_OP(op_loop_if_true)
+        DEFINE_SLOWCASE_OP(op_loop_if_false)
         DEFINE_SLOWCASE_OP(op_lshift)
         DEFINE_SLOWCASE_OP(op_method_check)
         DEFINE_SLOWCASE_OP(op_mod)
@@ -418,10 +433,10 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_pre_inc)
         DEFINE_SLOWCASE_OP(op_put_by_id)
         DEFINE_SLOWCASE_OP(op_put_by_val)
-#if USE(JSVALUE32_64)
         DEFINE_SLOWCASE_OP(op_resolve_global)
-#endif
+        DEFINE_SLOWCASE_OP(op_resolve_global_dynamic)
         DEFINE_SLOWCASE_OP(op_rshift)
+        DEFINE_SLOWCASE_OP(op_urshift)
         DEFINE_SLOWCASE_OP(op_stricteq)
         DEFINE_SLOWCASE_OP(op_sub)
         DEFINE_SLOWCASE_OP(op_to_jsnumber)
@@ -487,7 +502,10 @@ JITCode JIT::privateCompile()
 
     ASSERT(m_jmpTable.isEmpty());
 
-    LinkBuffer patchBuffer(this, m_globalData->executableAllocator.poolForSize(m_assembler.size()));
+    RefPtr<ExecutablePool> executablePool = m_globalData->executableAllocator.poolForSize(m_assembler.size());
+    if (!executablePool)
+        return JITCode();
+    LinkBuffer patchBuffer(this, executablePool.release(), m_linkerOffset);
 
     // Translate vPC offsets into addresses in JIT generated code, for switch tables.
     for (unsigned i = 0; i < m_switches.size(); ++i) {
@@ -586,7 +604,7 @@ void JIT::unlinkCall(CallLinkInfo* callLinkInfo)
     // When the TiFunction is deleted the pointer embedded in the instruction stream will no longer be valid
     // (and, if a new TiFunction happened to be constructed at the same location, we could get a false positive
     // match).  Reset the check so it no longer matches.
-    RepatchBuffer repatchBuffer(callLinkInfo->ownerCodeBlock.get());
+    RepatchBuffer repatchBuffer(callLinkInfo->ownerCodeBlock);
 #if USE(JSVALUE32_64)
     repatchBuffer.repatch(callLinkInfo->hotPathBegin, 0);
 #else
@@ -611,7 +629,7 @@ void JIT::linkCall(TiFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* ca
     }
 
     // patch the call so we do not continue to try to link.
-    repatchBuffer.relink(callLinkInfo->callReturnLocation, globalData->jitStubs.ctiVirtualCall());
+    repatchBuffer.relink(callLinkInfo->callReturnLocation, globalData->jitStubs->ctiVirtualCall());
 }
 #endif // ENABLE(JIT_OPTIMIZE_CALL)
 

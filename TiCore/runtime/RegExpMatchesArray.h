@@ -39,58 +39,58 @@ namespace TI {
     private:
         virtual bool getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             return TiArray::getOwnPropertySlot(exec, propertyName, slot);
         }
 
         virtual bool getOwnPropertySlot(TiExcState* exec, unsigned propertyName, PropertySlot& slot)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             return TiArray::getOwnPropertySlot(exec, propertyName, slot);
         }
 
         virtual bool getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             return TiArray::getOwnPropertyDescriptor(exec, propertyName, descriptor);
         }
 
         virtual void put(TiExcState* exec, const Identifier& propertyName, TiValue v, PutPropertySlot& slot)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             TiArray::put(exec, propertyName, v, slot);
         }
 
         virtual void put(TiExcState* exec, unsigned propertyName, TiValue v)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             TiArray::put(exec, propertyName, v);
         }
 
         virtual bool deleteProperty(TiExcState* exec, const Identifier& propertyName)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             return TiArray::deleteProperty(exec, propertyName);
         }
 
         virtual bool deleteProperty(TiExcState* exec, unsigned propertyName)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
             return TiArray::deleteProperty(exec, propertyName);
         }
 
-        virtual void getOwnPropertyNames(TiExcState* exec, PropertyNameArray& arr)
+        virtual void getOwnPropertyNames(TiExcState* exec, PropertyNameArray& arr, EnumerationMode mode = ExcludeDontEnumProperties)
         {
-            if (lazyCreationData())
+            if (subclassData())
                 fillArrayInstance(exec);
-            TiArray::getOwnPropertyNames(exec, arr);
+            TiArray::getOwnPropertyNames(exec, arr, mode);
         }
 
         void fillArrayInstance(TiExcState*);

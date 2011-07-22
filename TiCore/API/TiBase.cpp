@@ -35,6 +35,7 @@
 #include "TiBasePrivate.h"
 
 #include "APICast.h"
+#include "APIShims.h"
 #include "Completion.h"
 #include "OpaqueTiString.h"
 #include "SourceCode.h"
@@ -44,14 +45,14 @@
 #include <runtime/TiGlobalObject.h>
 #include <runtime/TiLock.h>
 #include <runtime/TiObject.h>
+#include <wtf/text/StringHash.h>
 
 using namespace TI;
 
 TiValueRef TiEvalScript(TiContextRef ctx, TiStringRef script, TiObjectRef thisObject, TiStringRef sourceURL, int startingLineNumber, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     TiObject* jsThisObject = toJS(thisObject);
 
@@ -76,8 +77,7 @@ TiValueRef TiEvalScript(TiContextRef ctx, TiStringRef script, TiObjectRef thisOb
 bool TiCheckScriptSyntax(TiContextRef ctx, TiStringRef script, TiStringRef sourceURL, int startingLineNumber, TiValueRef* exception)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
 
     SourceCode source = makeSource(script->ustring(), sourceURL->ustring(), startingLineNumber);
     Completion completion = checkSyntax(exec->dynamicGlobalObject()->globalExec(), source);
@@ -101,12 +101,11 @@ void TiGarbageCollect(TiContextRef ctx)
         return;
 
     TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec, false);
+
     TiGlobalData& globalData = exec->globalData();
-
-    TiLock lock(globalData.isSharedInstance ? LockForReal : SilenceAssertionsOnly);
-
     if (!globalData.heap.isBusy())
-        globalData.heap.collect();
+        globalData.heap.collectAllGarbage();
 
     // FIXME: Perhaps we should trigger a second mark and sweep
     // once the garbage collector is done if this is called when
@@ -116,8 +115,6 @@ void TiGarbageCollect(TiContextRef ctx)
 void JSReportExtraMemoryCost(TiContextRef ctx, size_t size)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
-
+    APIEntryShim entryShim(exec);
     exec->globalData().heap.reportExtraMemoryCost(size);
 }

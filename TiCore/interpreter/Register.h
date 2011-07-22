@@ -58,17 +58,18 @@ namespace TI {
     class Register : public WTI::FastAllocBase {
     public:
         Register();
-        Register(TiValue);
 
+        Register(const TiValue&);
+        Register& operator=(const TiValue&);
         TiValue jsValue() const;
         
-        Register(JSActivation*);
-        Register(CallFrame*);
-        Register(CodeBlock*);
-        Register(TiFunction*);
-        Register(TiPropertyNameIterator*);
-        Register(ScopeChainNode*);
-        Register(Instruction*);
+        Register& operator=(JSActivation*);
+        Register& operator=(CallFrame*);
+        Register& operator=(CodeBlock*);
+        Register& operator=(TiFunction*);
+        Register& operator=(TiPropertyNameIterator*);
+        Register& operator=(ScopeChainNode*);
+        Register& operator=(Instruction*);
 
         int32_t i() const;
         JSActivation* activation() const;
@@ -82,12 +83,12 @@ namespace TI {
 
         static Register withInt(int32_t i)
         {
-            return Register(i);
+            Register r;
+            r.u.i = i;
+            return r;
         }
 
     private:
-        Register(int32_t);
-
         union {
             int32_t i;
             EncodedTiValue value;
@@ -105,13 +106,25 @@ namespace TI {
     ALWAYS_INLINE Register::Register()
     {
 #ifndef NDEBUG
-        u.value = TiValue::encode(TiValue());
+        *this = TiValue();
 #endif
     }
 
-    ALWAYS_INLINE Register::Register(TiValue v)
+    ALWAYS_INLINE Register::Register(const TiValue& v)
     {
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!v.isZombie());
+#endif
         u.value = TiValue::encode(v);
+    }
+
+    ALWAYS_INLINE Register& Register::operator=(const TiValue& v)
+    {
+#if ENABLE(JSC_ZOMBIES)
+        ASSERT(!v.isZombie());
+#endif
+        u.value = TiValue::encode(v);
+        return *this;
     }
 
     ALWAYS_INLINE TiValue Register::jsValue() const
@@ -121,44 +134,46 @@ namespace TI {
 
     // Interpreter functions
 
-    ALWAYS_INLINE Register::Register(JSActivation* activation)
+    ALWAYS_INLINE Register& Register::operator=(JSActivation* activation)
     {
         u.activation = activation;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(CallFrame* callFrame)
+    ALWAYS_INLINE Register& Register::operator=(CallFrame* callFrame)
     {
         u.callFrame = callFrame;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(CodeBlock* codeBlock)
+    ALWAYS_INLINE Register& Register::operator=(CodeBlock* codeBlock)
     {
         u.codeBlock = codeBlock;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(TiFunction* function)
+    ALWAYS_INLINE Register& Register::operator=(TiFunction* function)
     {
         u.function = function;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(Instruction* vPC)
+    ALWAYS_INLINE Register& Register::operator=(Instruction* vPC)
     {
         u.vPC = vPC;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(ScopeChainNode* scopeChain)
+    ALWAYS_INLINE Register& Register::operator=(ScopeChainNode* scopeChain)
     {
         u.scopeChain = scopeChain;
+        return *this;
     }
 
-    ALWAYS_INLINE Register::Register(TiPropertyNameIterator* propertyNameIterator)
+    ALWAYS_INLINE Register& Register::operator=(TiPropertyNameIterator* propertyNameIterator)
     {
         u.propertyNameIterator = propertyNameIterator;
-    }
-
-    ALWAYS_INLINE Register::Register(int32_t i)
-    {
-        u.i = i;
+        return *this;
     }
 
     ALWAYS_INLINE int32_t Register::i() const

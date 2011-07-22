@@ -58,13 +58,13 @@ namespace TI{
         }
         virtual ~TiStaticScopeObject();
         virtual void markChildren(MarkStack&);
-        bool isDynamicScope() const;
+        bool isDynamicScope(bool& requiresDynamicChecks) const;
         virtual TiObject* toThisObject(TiExcState*) const;
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual void put(TiExcState*, const Identifier&, TiValue, PutPropertySlot&);
         void putWithAttributes(TiExcState*, const Identifier&, TiValue, unsigned attributes);
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags)); }
+        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); }
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;

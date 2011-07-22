@@ -47,43 +47,36 @@
 
 #else
 
-#if ENABLE(WREC)
-#include "JIT.h"
-#include "WRECGenerator.h"
-#endif
 #include <pcre/pcre.h>
 
 #endif
 
 namespace TI {
 
-#if ENABLE(WREC)
-using namespace WREC;
-#endif
-
 inline RegExp::RegExp(TiGlobalData* globalData, const UString& pattern)
     : m_pattern(pattern)
     , m_flagBits(0)
     , m_constructionError(0)
     , m_numSubpatterns(0)
+    , m_lastMatchStart(-1)
 {
     compile(globalData);
 }
 
 inline RegExp::RegExp(TiGlobalData* globalData, const UString& pattern, const UString& flags)
     : m_pattern(pattern)
-    , m_flags(flags)
     , m_flagBits(0)
     , m_constructionError(0)
     , m_numSubpatterns(0)
+    , m_lastMatchStart(-1)
 {
     // NOTE: The global flag is handled on a case-by-case basis by functions like
     // String::match and RegExpObject::match.
-    if (flags.find('g') != -1)
+    if (flags.find('g') != UString::NotFound)
         m_flagBits |= Global;
-    if (flags.find('i') != -1)
+    if (flags.find('i') != UString::NotFound)
         m_flagBits |= IgnoreCase;
-    if (flags.find('m') != -1)
+    if (flags.find('m') != UString::NotFound)
         m_flagBits |= Multiline;
 
     compile(globalData);
@@ -125,8 +118,24 @@ int RegExp::match(const UString& s, int startOffset, Vector<int, 32>* ovector)
     if (ovector)
         ovector->clear();
 
-    if (startOffset > s.size() || s.isNull())
+    if (static_cast<unsigned>(startOffset) > s.size() || s.isNull()) {
+        m_lastMatchString = UString();
+        m_lastMatchStart = -1;
+        m_lastOVector.shrink(0);
         return -1;
+    }
+    
+    // Perform check to see if this match call is the same as the last match invocation
+    // and if it is return the prior result.
+    if ((startOffset == m_lastMatchStart) && (s.rep() == m_lastMatchString.rep())) {
+        if (ovector)
+            *ovector = m_lastOVector;
+        
+        if (m_lastOVector.isEmpty())
+            return -1;
+
+        return m_lastOVector.at(0);
+    }
 
 #if ENABLE(YARR_JIT)
     if (!!m_regExpJITCode) {
@@ -164,26 +173,30 @@ int RegExp::match(const UString& s, int startOffset, Vector<int, 32>* ovector)
             if (ovector)
                 ovector->clear();
         }
+        
+        m_lastMatchString = s;
+        m_lastMatchStart = startOffset;
+
+        if (ovector)
+            m_lastOVector = *ovector;
+        else
+            m_lastOVector = nonReturnedOvector;
+
         return result;
     }
+
+    m_lastMatchString = UString();
+    m_lastMatchStart = -1;
+    m_lastOVector.shrink(0);
 
     return -1;
 }
 
 #else
 
-void RegExp::compile(TiGlobalData* globalData)
+void RegExp::compile(TiGlobalData*)
 {
     m_regExp = 0;
-#if ENABLE(WREC)
-    m_wrecFunction = Generator::compileRegExp(globalData, m_pattern, &m_numSubpatterns, &m_constructionError, m_executablePool, ignoreCase(), multiline());
-    if (m_wrecFunction || m_constructionError)
-        return;
-    // Fall through to non-WREC case.
-#else
-    UNUSED_PARAM(globalData);
-#endif
-
     JSRegExpIgnoreCaseOption ignoreCaseOption = ignoreCase() ? JSRegExpIgnoreCase : JSRegExpDoNotIgnoreCase;
     JSRegExpMultilineOption multilineOption = multiline() ? JSRegExpMultiline : JSRegExpSingleLine;
     m_regExp = jsRegExpCompile(reinterpret_cast<const UChar*>(m_pattern.data()), m_pattern.size(), ignoreCaseOption, multilineOption, &m_numSubpatterns, &m_constructionError);
@@ -196,39 +209,9 @@ int RegExp::match(const UString& s, int startOffset, Vector<int, 32>* ovector)
     if (ovector)
         ovector->clear();
 
-    if (startOffset > s.size() || s.isNull())
+    if (static_cast<unsigned>(startOffset) > s.size() || s.isNull())
         return -1;
 
-#if ENABLE(WREC)
-    if (m_wrecFunction) {
-        int offsetVectorSize = (m_numSubpatterns + 1) * 2;
-        int* offsetVector;
-        Vector<int, 32> nonReturnedOvector;
-        if (ovector) {
-            ovector->resize(offsetVectorSize);
-            offsetVector = ovector->data();
-        } else {
-            nonReturnedOvector.resize(offsetVectorSize);
-            offsetVector = nonReturnedOvector.data();
-        }
-        ASSERT(offsetVector);
-        for (int j = 0; j < offsetVectorSize; ++j)
-            offsetVector[j] = -1;
-
-        int result = m_wrecFunction(s.data(), startOffset, s.size(), offsetVector);
-
-        if (result < 0) {
-#ifndef NDEBUG
-            // TODO: define up a symbol, rather than magic -1
-            if (result != -1)
-                fprintf(stderr, "jsRegExpExecute failed with result %d\n", result);
-#endif
-            if (ovector)
-                ovector->clear();
-        }
-        return result;
-    } else
-#endif
     if (m_regExp) {
         // Set up the offset vector for the result.
         // First 2/3 used for result, the last third used by PCRE.

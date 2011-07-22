@@ -37,6 +37,8 @@
 #include "config.h"
 #include "JumpTable.h"
 
+#include <wtf/text/StringHash.h>
+
 namespace TI {
 
 int32_t SimpleJumpTable::offsetForValue(int32_t value, int32_t defaultOffset)

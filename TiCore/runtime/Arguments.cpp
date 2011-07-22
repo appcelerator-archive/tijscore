@@ -211,6 +211,19 @@ bool Arguments::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& pro
     return TiObject::getOwnPropertyDescriptor(exec, propertyName, descriptor);
 }
 
+void Arguments::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
+{
+    if (mode == IncludeDontEnumProperties) {
+        for (unsigned i = 0; i < d->numArguments; ++i) {
+            if (!d->deletedArguments || !d->deletedArguments[i])
+                propertyNames.add(Identifier(exec, UString::from(i)));
+        }
+        propertyNames.add(exec->propertyNames().callee);
+        propertyNames.add(exec->propertyNames().length);
+    }
+    TiObject::getOwnPropertyNames(exec, propertyNames, mode);
+}
+
 void Arguments::put(TiExcState* exec, unsigned i, TiValue value, PutPropertySlot& slot)
 {
     if (i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {

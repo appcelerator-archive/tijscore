@@ -41,6 +41,7 @@ namespace TI {
     // This is an internal value object which stores getter and setter functions
     // for a property.
     class GetterSetter : public TiCell {
+        friend class JIT;
     public:
         GetterSetter(TiExcState* exec)
             : TiCell(exec->globalData().getterSetterStructure.get())
@@ -57,7 +58,7 @@ namespace TI {
         void setSetter(TiObject* setter) { m_setter = setter; }
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(GetterSetterType, OverridesMarkChildren));
+            return Structure::create(prototype, TypeInfo(GetterSetterType, OverridesMarkChildren), AnonymousSlotCount);
         }
     private:
         virtual bool isGetterSetter() const;

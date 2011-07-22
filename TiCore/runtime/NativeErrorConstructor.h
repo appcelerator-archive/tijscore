@@ -38,7 +38,7 @@ namespace TI {
 
     class NativeErrorConstructor : public InternalFunction {
     public:
-        NativeErrorConstructor(TiExcState*, NonNullPassRefPtr<Structure>, NativeErrorPrototype*);
+        NativeErrorConstructor(TiExcState*, NonNullPassRefPtr<Structure> structure, NonNullPassRefPtr<Structure> prototypeStructure, const UString&);
 
         static const ClassInfo info;
 
