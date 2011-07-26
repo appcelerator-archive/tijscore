@@ -47,6 +47,12 @@ DateInstance::DateInstance(TiExcState* exec, NonNullPassRefPtr<Structure> struct
     setInternalValue(jsNaN(exec));
 }
 
+DateInstance::DateInstance(TiExcState* exec, NonNullPassRefPtr<Structure> structure, double time)
+    : JSWrapperObject(structure)
+{
+    setInternalValue(jsNumber(exec, timeClip(time)));
+}
+
 DateInstance::DateInstance(TiExcState* exec, double time)
     : JSWrapperObject(exec->lexicalGlobalObject()->dateStructure())
 {

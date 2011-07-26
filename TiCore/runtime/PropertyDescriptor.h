@@ -68,7 +68,7 @@ namespace TI {
         bool configurablePresent() const { return m_seenAttributes & ConfigurablePresent; }
         bool setterPresent() const { return m_setter; }
         bool getterPresent() const { return m_getter; }
-        bool equalTo(const PropertyDescriptor& other) const;
+        bool equalTo(TiExcState* exec, const PropertyDescriptor& other) const;
         bool attributesEqual(const PropertyDescriptor& other) const;
         unsigned attributesWithOverride(const PropertyDescriptor& other) const;
     private:

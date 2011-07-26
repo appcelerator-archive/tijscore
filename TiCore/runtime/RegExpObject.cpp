@@ -32,16 +32,17 @@
 #include "TiArray.h"
 #include "TiGlobalObject.h"
 #include "TiString.h"
+#include "Lookup.h"
 #include "RegExpConstructor.h"
 #include "RegExpPrototype.h"
 
 namespace TI {
 
-static TiValue regExpObjectGlobal(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpObjectIgnoreCase(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpObjectMultiline(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpObjectSource(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpObjectLastIndex(TiExcState*, const Identifier&, const PropertySlot&);
+static TiValue regExpObjectGlobal(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpObjectIgnoreCase(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpObjectMultiline(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpObjectSource(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpObjectLastIndex(TiExcState*, TiValue, const Identifier&);
 static void setRegExpObjectLastIndex(TiExcState*, TiObject*, TiValue);
 
 } // namespace TI
@@ -84,29 +85,29 @@ bool RegExpObject::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& 
     return getStaticValueDescriptor<RegExpObject, TiObject>(exec, TiExcState::regExpTable(exec), this, propertyName, descriptor);
 }
 
-TiValue regExpObjectGlobal(TiExcState*, const Identifier&, const PropertySlot& slot)
+TiValue regExpObjectGlobal(TiExcState*, TiValue slotBase, const Identifier&)
 {
-    return jsBoolean(asRegExpObject(slot.slotBase())->regExp()->global());
+    return jsBoolean(asRegExpObject(slotBase)->regExp()->global());
 }
 
-TiValue regExpObjectIgnoreCase(TiExcState*, const Identifier&, const PropertySlot& slot)
+TiValue regExpObjectIgnoreCase(TiExcState*, TiValue slotBase, const Identifier&)
 {
-    return jsBoolean(asRegExpObject(slot.slotBase())->regExp()->ignoreCase());
+    return jsBoolean(asRegExpObject(slotBase)->regExp()->ignoreCase());
 }
  
-TiValue regExpObjectMultiline(TiExcState*, const Identifier&, const PropertySlot& slot)
+TiValue regExpObjectMultiline(TiExcState*, TiValue slotBase, const Identifier&)
 {            
-    return jsBoolean(asRegExpObject(slot.slotBase())->regExp()->multiline());
+    return jsBoolean(asRegExpObject(slotBase)->regExp()->multiline());
 }
 
-TiValue regExpObjectSource(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpObjectSource(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return jsString(exec, asRegExpObject(slot.slotBase())->regExp()->pattern());
+    return jsString(exec, asRegExpObject(slotBase)->regExp()->pattern());
 }
 
-TiValue regExpObjectLastIndex(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpObjectLastIndex(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return jsNumber(exec, asRegExpObject(slot.slotBase())->lastIndex());
+    return jsNumber(exec, asRegExpObject(slotBase)->lastIndex());
 }
 
 void RegExpObject::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
@@ -149,7 +150,7 @@ bool RegExpObject::match(TiExcState* exec, const ArgList& args)
 
     UString input = args.isEmpty() ? regExpConstructor->input() : args.at(0).toString(exec);
     if (input.isNull()) {
-        throwError(exec, GeneralError, "No input to " + toString(exec) + ".");
+        throwError(exec, GeneralError, makeString("No input to ", toString(exec), "."));
         return false;
     }
 

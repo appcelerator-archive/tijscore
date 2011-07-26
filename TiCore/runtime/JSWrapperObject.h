@@ -45,8 +45,11 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype) 
         { 
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
+
+    protected:
+        static const unsigned AnonymousSlotCount = 1 + TiObject::AnonymousSlotCount;
 
     private:
         virtual void markChildren(MarkStack&);
@@ -57,7 +60,6 @@ namespace TI {
     inline JSWrapperObject::JSWrapperObject(NonNullPassRefPtr<Structure> structure)
         : TiObject(structure)
     {
-        addAnonymousSlots(1);
         putAnonymousValue(0, jsNull());
     }
 

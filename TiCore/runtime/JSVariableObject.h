@@ -56,18 +56,16 @@ namespace TI {
         virtual void putWithAttributes(TiExcState*, const Identifier&, TiValue, unsigned attributes) = 0;
 
         virtual bool deleteProperty(TiExcState*, const Identifier&);
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         
         virtual bool isVariableObject() const;
-        virtual bool isDynamicScope() const = 0;
-
-        virtual bool getPropertyAttributes(TiExcState*, const Identifier& propertyName, unsigned& attributes) const;
+        virtual bool isDynamicScope(bool& requiresDynamicChecks) const = 0;
 
         Register& registerAt(int index) const { return d->registers[index]; }
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
         
     protected:

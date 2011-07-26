@@ -43,6 +43,7 @@
 #include "StructureTransitionTable.h"
 #include "TiTypeInfo.h"
 #include "UString.h"
+#include "WeakGCPtr.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -58,13 +59,18 @@ namespace TI {
     class PropertyNameArray;
     class PropertyNameArrayData;
 
+    enum EnumerationMode {
+        ExcludeDontEnumProperties,
+        IncludeDontEnumProperties
+    };
+
     class Structure : public RefCounted<Structure> {
     public:
         friend class JIT;
         friend class StructureTransitionTable;
-        static PassRefPtr<Structure> create(TiValue prototype, const TypeInfo& typeInfo)
+        static PassRefPtr<Structure> create(TiValue prototype, const TypeInfo& typeInfo, unsigned anonymousSlotCount)
         {
-            return adoptRef(new Structure(prototype, typeInfo));
+            return adoptRef(new Structure(prototype, typeInfo, anonymousSlotCount));
         }
 
         static void startIgnoringLeaks();
@@ -77,7 +83,6 @@ namespace TI {
         static PassRefPtr<Structure> removePropertyTransition(Structure*, const Identifier& propertyName, size_t& offset);
         static PassRefPtr<Structure> changePrototypeTransition(Structure*, TiValue prototype);
         static PassRefPtr<Structure> despecifyFunctionTransition(Structure*, const Identifier&);
-        static PassRefPtr<Structure> addAnonymousSlotsTransition(Structure*, unsigned count);
         static PassRefPtr<Structure> getterSetterTransition(Structure*);
         static PassRefPtr<Structure> toCacheableDictionaryTransition(Structure*);
         static PassRefPtr<Structure> toUncacheableDictionaryTransition(Structure*);
@@ -104,7 +109,7 @@ namespace TI {
 
         void growPropertyStorageCapacity();
         unsigned propertyStorageCapacity() const { return m_propertyStorageCapacity; }
-        unsigned propertyStorageSize() const { return m_propertyTable ? m_propertyTable->keyCount + m_propertyTable->anonymousSlotCount + (m_propertyTable->deletedOffsets ? m_propertyTable->deletedOffsets->size() : 0) : m_offset + 1; }
+        unsigned propertyStorageSize() const { return m_anonymousSlotCount + (m_propertyTable ? m_propertyTable->keyCount + (m_propertyTable->deletedOffsets ? m_propertyTable->deletedOffsets->size() : 0) : static_cast<unsigned>(m_offset + 1)); }
         bool isUsingInlineStorage() const;
 
         size_t get(const Identifier& propertyName);
@@ -129,19 +134,22 @@ namespace TI {
 
         bool hasNonEnumerableProperties() const { return m_hasNonEnumerableProperties; }
 
-        bool hasAnonymousSlots() const { return m_propertyTable && m_propertyTable->anonymousSlotCount; }
+        bool hasAnonymousSlots() const { return !!m_anonymousSlotCount; }
+        unsigned anonymousSlotCount() const { return m_anonymousSlotCount; }
         
         bool isEmpty() const { return m_propertyTable ? !m_propertyTable->keyCount : m_offset == noOffset; }
 
-        TiCell* specificValue() { return m_specificValueInPrevious; }
         void despecifyDictionaryFunction(const Identifier& propertyName);
+        void disableSpecificFunctionTracking() { m_specificFunctionThrashCount = maxSpecificFunctionThrashCount; }
 
         void setEnumerationCache(TiPropertyNameIterator* enumerationCache); // Defined in TiPropertyNameIterator.h.
-        TiPropertyNameIterator* enumerationCache() { return m_enumerationCache.get(); }
-        void getEnumerablePropertyNames(PropertyNameArray&);
-
+        void clearEnumerationCache(TiPropertyNameIterator* enumerationCache); // Defined in TiPropertyNameIterator.h.
+        TiPropertyNameIterator* enumerationCache(); // Defined in TiPropertyNameIterator.h.
+        void getPropertyNames(PropertyNameArray&, EnumerationMode mode);
+        
     private:
-        Structure(TiValue prototype, const TypeInfo&);
+
+        Structure(TiValue prototype, const TypeInfo&, unsigned anonymousSlotCount);
         
         typedef enum { 
             NoneDictionaryKind = 0,
@@ -152,7 +160,6 @@ namespace TI {
 
         size_t put(const Identifier& propertyName, unsigned attributes, TiCell* specificValue);
         size_t remove(const Identifier& propertyName);
-        void addAnonymousSlots(unsigned slotCount);
 
         void expandPropertyMapHashTable();
         void rehashPropertyMapHashTable();
@@ -163,6 +170,7 @@ namespace TI {
         void checkConsistency();
 
         bool despecifyFunction(const Identifier&);
+        void despecifyAllFunctions();
 
         PropertyMapHashTable* copyPropertyTable();
         void materializePropertyMap();
@@ -178,6 +186,20 @@ namespace TI {
             // Since the number of transitions is always the same as m_offset, we keep the size of Structure down by not storing both.
             return m_offset == noOffset ? 0 : m_offset + 1;
         }
+
+        typedef std::pair<Structure*, Structure*> Transition;
+        typedef HashMap<StructureTransitionTableHash::Key, Transition, StructureTransitionTableHash, StructureTransitionTableHashTraits> TransitionTable;
+
+        inline bool transitionTableContains(const StructureTransitionTableHash::Key& key, TiCell* specificValue);
+        inline void transitionTableRemove(const StructureTransitionTableHash::Key& key, TiCell* specificValue);
+        inline void transitionTableAdd(const StructureTransitionTableHash::Key& key, Structure* structure, TiCell* specificValue);
+        inline bool transitionTableHasTransition(const StructureTransitionTableHash::Key& key) const;
+        inline Structure* transitionTableGet(const StructureTransitionTableHash::Key& key, TiCell* specificValue) const;
+
+        TransitionTable* transitionTable() const { ASSERT(!m_isUsingSingleSlot); return m_transitions.m_table; }
+        inline void setTransitionTable(TransitionTable* table);
+        Structure* singleTransition() const { ASSERT(m_isUsingSingleSlot); return m_transitions.m_singleTransition; }
+        void setSingleTransition(Structure* structure) { ASSERT(m_isUsingSingleSlot); m_transitions.m_singleTransition = structure; }
         
         bool isValid(TiExcState*, StructureChain* cachedPrototypeChain) const;
 
@@ -186,6 +208,8 @@ namespace TI {
         static const signed char s_maxTransitionLength = 64;
 
         static const signed char noOffset = -1;
+
+        static const unsigned maxSpecificFunctionThrashCount = 3;
 
         TypeInfo m_typeInfo;
 
@@ -196,13 +220,19 @@ namespace TI {
         RefPtr<UString::Rep> m_nameInPrevious;
         TiCell* m_specificValueInPrevious;
 
-        StructureTransitionTable table;
+        // 'm_isUsingSingleSlot' indicates whether we are using the single transition optimisation.
+        union {
+            TransitionTable* m_table;
+            Structure* m_singleTransition;
+        } m_transitions;
 
-        ProtectedPtr<TiPropertyNameIterator> m_enumerationCache;
+        WeakGCPtr<TiPropertyNameIterator> m_enumerationCache;
 
         PropertyMapHashTable* m_propertyTable;
 
         uint32_t m_propertyStorageCapacity;
+
+        // m_offset does not account for anonymous slots
         signed char m_offset;
 
         unsigned m_dictionaryKind : 2;
@@ -217,7 +247,10 @@ namespace TI {
 #else
         unsigned m_attributesInPrevious : 7;
 #endif
-        unsigned m_anonymousSlotsInPrevious : 6;
+        unsigned m_specificFunctionThrashCount : 2;
+        unsigned m_anonymousSlotCount : 5;
+        unsigned m_isUsingSingleSlot : 1;
+        // 4 free bits
     };
 
     inline size_t Structure::get(const Identifier& propertyName)
@@ -230,7 +263,7 @@ namespace TI {
 
         UString::Rep* rep = propertyName._ustring.rep();
 
-        unsigned i = rep->computedHash();
+        unsigned i = rep->existingHash();
 
 #if DUMP_PROPERTYMAP_STATS
         ++numProbes;
@@ -247,7 +280,7 @@ namespace TI {
         ++numCollisions;
 #endif
 
-        unsigned k = 1 | WTI::doubleHash(rep->computedHash());
+        unsigned k = 1 | WTI::doubleHash(rep->existingHash());
 
         while (1) {
             i += k;
@@ -264,58 +297,7 @@ namespace TI {
                 return m_propertyTable->entries()[entryIndex - 1].offset;
         }
     }
-    
-    bool StructureTransitionTable::contains(const StructureTransitionTableHash::Key& key, TiCell* specificValue)
-    {
-        if (usingSingleTransitionSlot()) {
-            Structure* existingTransition = singleTransition();
-            return existingTransition && existingTransition->m_nameInPrevious.get() == key.first
-                   && existingTransition->m_attributesInPrevious == key.second
-                   && (existingTransition->m_specificValueInPrevious == specificValue || existingTransition->m_specificValueInPrevious == 0);
-        }
-        TransitionTable::iterator find = table()->find(key);
-        if (find == table()->end())
-            return false;
 
-        return find->second.first || find->second.second->transitionedFor(specificValue);
-    }
-
-    Structure* StructureTransitionTable::get(const StructureTransitionTableHash::Key& key, TiCell* specificValue) const
-    {
-        if (usingSingleTransitionSlot()) {
-            Structure* existingTransition = singleTransition();
-            if (existingTransition && existingTransition->m_nameInPrevious.get() == key.first
-                && existingTransition->m_attributesInPrevious == key.second
-                && (existingTransition->m_specificValueInPrevious == specificValue || existingTransition->m_specificValueInPrevious == 0))
-                return existingTransition;
-            return 0;
-        }
-
-        Transition transition = table()->get(key);
-        if (transition.second && transition.second->transitionedFor(specificValue))
-            return transition.second;
-        return transition.first;
-    }
-
-    bool StructureTransitionTable::hasTransition(const StructureTransitionTableHash::Key& key) const
-    {
-        if (usingSingleTransitionSlot()) {
-            Structure* transition = singleTransition();
-            return transition && transition->m_nameInPrevious == key.first
-            && transition->m_attributesInPrevious == key.second;
-        }
-        return table()->contains(key);
-    }
-    
-    void StructureTransitionTable::reifySingleTransition()
-    {
-        ASSERT(usingSingleTransitionSlot());
-        Structure* existingTransition = singleTransition();
-        TransitionTable* transitionTable = new TransitionTable;
-        setTransitionTable(transitionTable);
-        if (existingTransition)
-            add(make_pair(existingTransition->m_nameInPrevious.get(), existingTransition->m_attributesInPrevious), existingTransition, existingTransition->m_specificValueInPrevious);
-    }
 } // namespace TI
 
 #endif // Structure_h

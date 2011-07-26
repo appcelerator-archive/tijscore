@@ -101,7 +101,7 @@ TiObject* Error::create(TiExcState* exec, ErrorType type, const UString& message
 
 TiObject* Error::create(TiExcState* exec, ErrorType type, const char* message)
 {
-    return create(exec, type, message, -1, -1, NULL);
+    return create(exec, type, message, -1, -1, UString());
 }
 
 TiObject* throwError(TiExcState* exec, TiObject* error)
@@ -112,21 +112,21 @@ TiObject* throwError(TiExcState* exec, TiObject* error)
 
 TiObject* throwError(TiExcState* exec, ErrorType type)
 {
-    TiObject* error = Error::create(exec, type, UString(), -1, -1, NULL);
+    TiObject* error = Error::create(exec, type, UString(), -1, -1, UString());
     exec->setException(error);
     return error;
 }
 
 TiObject* throwError(TiExcState* exec, ErrorType type, const UString& message)
 {
-    TiObject* error = Error::create(exec, type, message, -1, -1, NULL);
+    TiObject* error = Error::create(exec, type, message, -1, -1, UString());
     exec->setException(error);
     return error;
 }
 
 TiObject* throwError(TiExcState* exec, ErrorType type, const char* message)
 {
-    TiObject* error = Error::create(exec, type, message, -1, -1, NULL);
+    TiObject* error = Error::create(exec, type, message, -1, -1, UString());
     exec->setException(error);
     return error;
 }

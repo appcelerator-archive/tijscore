@@ -33,14 +33,12 @@
 #ifndef RegexParser_h
 #define RegexParser_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(YARR)
 
 #include <UString.h>
+#include <limits.h>
 #include <wtf/ASCIICType.h>
 #include <wtf/unicode/Unicode.h>
-#include <limits.h>
 
 namespace TI { namespace Yarr {
 

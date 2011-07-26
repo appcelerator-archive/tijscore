@@ -34,8 +34,6 @@
 #ifndef AssemblerBufferWithConstantPool_h
 #define AssemblerBufferWithConstantPool_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(ASSEMBLER)
 
 #include "AssemblerBuffer.h"

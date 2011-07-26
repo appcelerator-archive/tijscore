@@ -49,8 +49,8 @@ namespace TI {
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual void putWithAttributes(TiExcState*, const Identifier& propertyName, TiValue, unsigned attributes);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
-        virtual bool getPropertyAttributes(TiExcState*, const Identifier& propertyName, unsigned& attributes) const;
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
+        virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
         virtual void defineGetter(TiExcState*, const Identifier& propertyName, TiObject* getterFunction, unsigned attributes);
         virtual void defineSetter(TiExcState*, const Identifier& propertyName, TiObject* setterFunction, unsigned attributes);
         virtual TiValue lookupGetter(TiExcState*, const Identifier& propertyName);
@@ -58,7 +58,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype) 
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags)); 
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
         }
 
     protected:

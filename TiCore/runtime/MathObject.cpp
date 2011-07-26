@@ -28,6 +28,7 @@
 #include "config.h"
 #include "MathObject.h"
 
+#include "Lookup.h"
 #include "ObjectPrototype.h"
 #include "Operations.h"
 #include <time.h>
@@ -126,22 +127,22 @@ TiValue JSC_HOST_CALL mathProtoFuncAbs(TiExcState* exec, TiObject*, TiValue, con
 
 TiValue JSC_HOST_CALL mathProtoFuncACos(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, acos(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, acos(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncASin(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, asin(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, asin(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncATan(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, atan(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, atan(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncATan2(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, atan2(args.at(0).toNumber(exec), args.at(1).toNumber(exec)));
+    return jsDoubleNumber(exec, atan2(args.at(0).toNumber(exec), args.at(1).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncCeil(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
@@ -151,12 +152,12 @@ TiValue JSC_HOST_CALL mathProtoFuncCeil(TiExcState* exec, TiObject*, TiValue, co
 
 TiValue JSC_HOST_CALL mathProtoFuncCos(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, cos(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, cos(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncExp(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, exp(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, exp(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncFloor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
@@ -166,7 +167,7 @@ TiValue JSC_HOST_CALL mathProtoFuncFloor(TiExcState* exec, TiObject*, TiValue, c
 
 TiValue JSC_HOST_CALL mathProtoFuncLog(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, log(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, log(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncMax(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
@@ -217,30 +218,29 @@ TiValue JSC_HOST_CALL mathProtoFuncPow(TiExcState* exec, TiObject*, TiValue, con
 
 TiValue JSC_HOST_CALL mathProtoFuncRandom(TiExcState* exec, TiObject*, TiValue, const ArgList&)
 {
-    return jsNumber(exec, exec->globalData().weakRandom.get());
+    return jsDoubleNumber(exec, exec->lexicalGlobalObject()->weakRandomNumber());
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncRound(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
     double arg = args.at(0).toNumber(exec);
-    if (signbit(arg) && arg >= -0.5)
-         return jsNumber(exec, -0.0);
-    return jsNumber(exec, floor(arg + 0.5));
+    double integer = ceil(arg);
+    return jsNumber(exec, integer - (integer - arg > 0.5));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncSin(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, sin(args.at(0).toNumber(exec)));
+    return exec->globalData().cachedSin(exec, args.at(0).toNumber(exec));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncSqrt(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, sqrt(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, sqrt(args.at(0).toNumber(exec)));
 }
 
 TiValue JSC_HOST_CALL mathProtoFuncTan(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    return jsNumber(exec, tan(args.at(0).toNumber(exec)));
+    return jsDoubleNumber(exec, tan(args.at(0).toNumber(exec)));
 }
 
 } // namespace TI

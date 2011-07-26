@@ -33,6 +33,7 @@
 #ifndef ExecutableAllocator_h
 #define ExecutableAllocator_h
 
+#include <stddef.h> // for ptrdiff_t
 #include <limits>
 #include <wtf/Assertions.h>
 #include <wtf/PassRefPtr.h>
@@ -40,13 +41,23 @@
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
 
-#if PLATFORM(IPHONE)
+#if OS(IPHONE_OS)
 #include <libkern/OSCacheControl.h>
 #include <sys/mman.h>
 #endif
 
-#if PLATFORM(SYMBIAN)
+#if OS(SYMBIAN)
 #include <e32std.h>
+#endif
+
+#if CPU(MIPS) && OS(LINUX)
+#include <sys/cachectl.h>
+#endif
+
+#if OS(WINCE)
+// From pkfuncs.h (private header file from the Platform Builder)
+#define CACHE_SYNC_ALL 0x07F
+extern "C" __declspec(dllimport) void CacheRangeFlush(LPVOID pAddr, DWORD dwLength, DWORD dwFlags);
 #endif
 
 #define JIT_ALLOCATOR_PAGE_SIZE (ExecutableAllocator::pageSize)
@@ -85,7 +96,7 @@ private:
     struct Allocation {
         char* pages;
         size_t size;
-#if PLATFORM(SYMBIAN)
+#if OS(SYMBIAN)
         RChunk* chunk;
 #endif
     };
@@ -116,6 +127,13 @@ public:
         return poolAllocate(n);
     }
     
+    void tryShrink(void* allocation, size_t oldSize, size_t newSize)
+    {
+        if (static_cast<char*>(allocation) + oldSize != m_freePtr)
+            return;
+        m_freePtr = static_cast<char*>(allocation) + roundUpAllocationSize(newSize, sizeof(void*));
+    }
+
     ~ExecutablePool()
     {
         AllocationList::const_iterator end = m_pools.end();
@@ -124,6 +142,8 @@ public:
     }
 
     size_t available() const { return (m_pools.size() > 1) ? 0 : m_end - m_freePtr; }
+
+    static bool underMemoryPressure();
 
 private:
     static Allocation systemAlloc(size_t n);
@@ -147,12 +167,20 @@ public:
     {
         if (!pageSize)
             intializePageSize();
-        m_smallAllocationPool = ExecutablePool::create(JIT_ALLOCATOR_LARGE_ALLOC_SIZE);
+        if (isValid())
+            m_smallAllocationPool = ExecutablePool::create(JIT_ALLOCATOR_LARGE_ALLOC_SIZE);
+#if !ENABLE(INTERPRETER)
+        else
+            CRASH();
+#endif
     }
 
+    bool isValid() const;
+    
     PassRefPtr<ExecutablePool> poolForSize(size_t n)
     {
         // Try to fit in the existing small allocator
+        ASSERT(m_smallAllocationPool);
         if (n < m_smallAllocationPool->available())
             return m_smallAllocationPool;
 
@@ -186,17 +214,43 @@ public:
 #endif
 
 
-#if PLATFORM(X86) || PLATFORM(X86_64)
+#if CPU(X86) || CPU(X86_64)
     static void cacheFlush(void*, size_t)
     {
     }
-#elif PLATFORM(ARM_THUMB2) && PLATFORM(IPHONE)
+#elif CPU(MIPS)
+    static void cacheFlush(void* code, size_t size)
+    {
+#if COMPILER(GCC) && (GCC_VERSION >= 40300)
+#if WTF_MIPS_ISA_REV(2) && (GCC_VERSION < 40403)
+        int lineSize;
+        asm("rdhwr %0, $1" : "=r" (lineSize));
+        //
+        // Modify "start" and "end" to avoid GCC 4.3.0-4.4.2 bug in
+        // mips_expand_synci_loop that may execute synci one more time.
+        // "start" points to the fisrt byte of the cache line.
+        // "end" points to the last byte of the line before the last cache line.
+        // Because size is always a multiple of 4, this is safe to set
+        // "end" to the last byte.
+        //
+        intptr_t start = reinterpret_cast<intptr_t>(code) & (-lineSize);
+        intptr_t end = ((reinterpret_cast<intptr_t>(code) + size - 1) & (-lineSize)) - 1;
+        __builtin___clear_cache(reinterpret_cast<char*>(start), reinterpret_cast<char*>(end));
+#else
+        intptr_t end = reinterpret_cast<intptr_t>(code) + size;
+        __builtin___clear_cache(reinterpret_cast<char*>(code), reinterpret_cast<char*>(end));
+#endif
+#else
+        _flush_cache(reinterpret_cast<char*>(code), size, BCACHE);
+#endif
+    }
+#elif CPU(ARM_THUMB2) && OS(IPHONE_OS)
     static void cacheFlush(void* code, size_t size)
     {
         sys_dcache_flush(code, size);
         sys_icache_invalidate(code, size);
     }
-#elif PLATFORM(ARM_THUMB2) && PLATFORM(LINUX)
+#elif CPU(ARM_THUMB2) && OS(LINUX)
     static void cacheFlush(void* code, size_t size)
     {
         asm volatile (
@@ -210,14 +264,16 @@ public:
             "pop     {r7}\n"
             :
             : "r" (code), "r" (reinterpret_cast<char*>(code) + size)
-            : "r0", "r1");
+            : "r0", "r1", "r2");
     }
-#elif PLATFORM(SYMBIAN)
+#elif OS(SYMBIAN)
     static void cacheFlush(void* code, size_t size)
     {
         User::IMB_Range(code, static_cast<char*>(code) + size);
     }
-#elif PLATFORM(ARM_TRADITIONAL) && PLATFORM(LINUX)
+#elif CPU(ARM_TRADITIONAL) && OS(LINUX) && COMPILER(RVCT)
+    static __asm void cacheFlush(void* code, size_t size);
+#elif CPU(ARM_TRADITIONAL) && OS(LINUX) && COMPILER(GCC)
     static void cacheFlush(void* code, size_t size)
     {
         asm volatile (
@@ -231,7 +287,12 @@ public:
             "pop     {r7}\n"
             :
             : "r" (code), "r" (reinterpret_cast<char*>(code) + size)
-            : "r0", "r1");
+            : "r0", "r1", "r2");
+    }
+#elif OS(WINCE)
+    static void cacheFlush(void* code, size_t size)
+    {
+        CacheRangeFlush(code, size, CACHE_SYNC_ALL);
     }
 #else
     #error "The cacheFlush support is missing on this platform."

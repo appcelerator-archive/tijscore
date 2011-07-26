@@ -10,6 +10,59 @@
 
 #include <stdint.h>
 
+//rls the following macros were taken from utf16.h in icu
+/**
+ * Is this code point a surrogate (U+d800..U+dfff)?
+ * @param c 32-bit code point
+ * @return TRUE or FALSE
+ * @stable ICU 2.4
+ */
+#define U_IS_SURROGATE(c) (((c)&0xfffff800)==0xd800)
+
+/**
+ * Does this code unit alone encode a code point (BMP, not a surrogate)?
+ * @param c 16-bit code unit
+ * @return TRUE or FALSE
+ * @stable ICU 2.4
+ */
+#define U16_IS_SINGLE(c) !U_IS_SURROGATE(c)
+
+/**
+ * Is this code unit a lead surrogate (U+d800..U+dbff)?
+ * @param c 16-bit code unit
+ * @return TRUE or FALSE
+ * @stable ICU 2.4
+ */
+#define U16_IS_LEAD(c) (((c)&0xfffffc00)==0xd800)
+
+/**
+ * Is this code unit a trail surrogate (U+dc00..U+dfff)?
+ * @param c 16-bit code unit
+ * @return TRUE or FALSE
+ * @stable ICU 2.4
+ */
+#define U16_IS_TRAIL(c) (((c)&0xfffffc00)==0xdc00)
+
+/**
+ * Helper constant for U16_GET_SUPPLEMENTARY.
+ * @internal
+ */
+#define U16_SURROGATE_OFFSET ((0xd800<<10UL)+0xdc00-0x10000)
+
+/**
+ * Get a supplementary code point value (U+10000..U+10ffff)
+ * from its lead and trail surrogates.
+ * The result is undefined if the input values are not
+ * lead and trail surrogates.
+ *
+ * @param lead lead surrogate (U+d800..U+dbff)
+ * @param trail trail surrogate (U+dc00..U+dfff)
+ * @return supplementary code point (U+10000..U+10ffff)
+ * @stable ICU 2.4
+ */
+#define U16_GET_SUPPLEMENTARY(lead, trail) \
+(((UChar32)(lead)<<10UL)+(UChar32)(trail)-U16_SURROGATE_OFFSET)
+
 typedef uint16_t UChar;
 typedef int32_t UChar32;
 

@@ -45,6 +45,7 @@
 #include "Assertions.h"
 #include "TCSpinLock.h"
 #include "UnusedParam.h"
+#include "VMTags.h"
 
 #if HAVE(STDINT_H)
 #include <stdint.h>
@@ -54,7 +55,7 @@
 #include <sys/types.h>
 #endif
 
-#if PLATFORM(WIN_OS)
+#if OS(WINDOWS)
 #include "windows.h"
 #else
 #include <errno.h>
@@ -185,7 +186,7 @@ static void* TryMmap(size_t size, size_t *actual_size, size_t alignment) {
   void* result = mmap(NULL, size + extra,
                       PROT_READ | PROT_WRITE,
                       MAP_PRIVATE|MAP_ANONYMOUS,
-                      -1, 0);
+                      VM_TAG_FOR_TCMALLOC_MEMORY, 0);
   if (result == reinterpret_cast<void*>(MAP_FAILED)) {
     mmap_failure = true;
     return NULL;

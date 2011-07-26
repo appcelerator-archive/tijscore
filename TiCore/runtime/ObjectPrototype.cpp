@@ -31,6 +31,7 @@
 #include "Error.h"
 #include "TiFunction.h"
 #include "TiString.h"
+#include "TiStringBuilder.h"
 #include "PrototypeFunction.h"
 
 namespace TI {
@@ -155,7 +156,7 @@ TiValue JSC_HOST_CALL objectProtoFuncToLocaleString(TiExcState* exec, TiObject*,
 
 TiValue JSC_HOST_CALL objectProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
 {
-    return jsNontrivialString(exec, "[object " + thisValue.toThisObject(exec)->className() + "]");
+    return jsMakeNontrivialString(exec, "[object ", thisValue.toThisObject(exec)->className(), "]");
 }
 
 } // namespace TI

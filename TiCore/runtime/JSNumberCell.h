@@ -69,7 +69,6 @@ namespace TI {
         virtual UString toString(TiExcState*) const;
         virtual TiObject* toObject(TiExcState*) const;
 
-        virtual UString toThisString(TiExcState*) const;
         virtual TiObject* toThisObject(TiExcState*) const;
         virtual TiValue getJSNumber();
 
@@ -83,7 +82,7 @@ namespace TI {
             return globalData->heap.allocateNumber(size);
         }
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(NumberType, OverridesGetOwnPropertySlot | NeedsThisConversion)); }
+        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(NumberType, OverridesGetOwnPropertySlot | NeedsThisConversion), AnonymousSlotCount); }
 
     private:
         JSNumberCell(TiGlobalData* globalData, double value)
@@ -114,6 +113,11 @@ namespace TI {
     {
         ASSERT(isNumberCell(v));
         return static_cast<JSNumberCell*>(v.asCell());
+    }
+
+    ALWAYS_INLINE TiValue::TiValue(EncodeAsDoubleTag, TiExcState* exec, double d)
+    {
+        *this = jsNumberCell(exec, d);
     }
 
     inline TiValue::TiValue(TiExcState* exec, double d)
@@ -200,6 +204,11 @@ namespace TI {
 #endif // USE(JSVALUE32)
 
 #if USE(JSVALUE64)
+    ALWAYS_INLINE TiValue::TiValue(EncodeAsDoubleTag, TiExcState*, double d)
+    {
+        *this = JSImmediate::fromNumberOutsideIntegerRange(d);
+    }
+
     inline TiValue::TiValue(TiExcState*, double d)
     {
         TiValue v = JSImmediate::from(d);

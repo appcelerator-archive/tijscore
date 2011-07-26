@@ -36,6 +36,7 @@
 #include "Interpreter.h"
 #include "Parser.h"
 #include "Debugger.h"
+#include "WTFThreadData.h"
 #include <stdio.h>
 
 namespace TI {
@@ -43,6 +44,7 @@ namespace TI {
 Completion checkSyntax(TiExcState* exec, const SourceCode& source)
 {
     TiLock lock(exec);
+    ASSERT(exec->globalData().identifierTable == wtfThreadData().currentIdentifierTable());
 
     RefPtr<ProgramExecutable> program = ProgramExecutable::create(exec, source);
     TiObject* error = program->checkSyntax(exec);
@@ -55,6 +57,7 @@ Completion checkSyntax(TiExcState* exec, const SourceCode& source)
 Completion evaluate(TiExcState* exec, ScopeChain& scopeChain, const SourceCode& source, TiValue thisValue)
 {
     TiLock lock(exec);
+    ASSERT(exec->globalData().identifierTable == wtfThreadData().currentIdentifierTable());
 
     RefPtr<ProgramExecutable> program = ProgramExecutable::create(exec, source);
     TiObject* error = program->compile(exec, scopeChain.node());
@@ -67,9 +70,10 @@ Completion evaluate(TiExcState* exec, ScopeChain& scopeChain, const SourceCode& 
     TiValue result = exec->interpreter()->execute(program.get(), exec, scopeChain.node(), thisObj, &exception);
 
     if (exception) {
-        if (exception.isObject() && asObject(exception)->isWatchdogException())
-            return Completion(Interrupted, exception);
-        return Completion(Throw, exception);
+        ComplType exceptionType = Throw;
+        if (exception.isObject())
+            exceptionType = asObject(exception)->exceptionType();
+        return Completion(exceptionType, exception);
     }
     return Completion(Normal, result);
 }

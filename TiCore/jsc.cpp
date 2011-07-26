@@ -44,7 +44,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#if !PLATFORM(WIN_OS)
+#if !OS(WINDOWS)
 #include <unistd.h>
 #endif
 
@@ -61,10 +61,10 @@
 #include <signal.h>
 #endif
 
-#if COMPILER(MSVC) && !PLATFORM(WINCE)
+#if COMPILER(MSVC) && !OS(WINCE)
 #include <crtdbg.h>
-#include <windows.h>
 #include <mmsystem.h>
+#include <windows.h>
 #endif
 
 #if PLATFORM(QT)
@@ -86,7 +86,7 @@ static TiValue JSC_HOST_CALL functionRun(TiExcState*, TiObject*, TiValue, const 
 static TiValue JSC_HOST_CALL functionLoad(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL functionCheckSyntax(TiExcState*, TiObject*, TiValue, const ArgList&);
 static TiValue JSC_HOST_CALL functionReadline(TiExcState*, TiObject*, TiValue, const ArgList&);
-static NO_RETURN TiValue JSC_HOST_CALL functionQuit(TiExcState*, TiObject*, TiValue, const ArgList&);
+static NO_RETURN_WITH_VALUE TiValue JSC_HOST_CALL functionQuit(TiExcState*, TiObject*, TiValue, const ArgList&);
 
 #if ENABLE(SAMPLING_FLAGS)
 static TiValue JSC_HOST_CALL functionSetSamplingFlags(TiExcState*, TiObject*, TiValue, const ArgList&);
@@ -95,8 +95,8 @@ static TiValue JSC_HOST_CALL functionClearSamplingFlags(TiExcState*, TiObject*, 
 
 struct Script {
     bool isFile;
-    char *argument;
-    
+    char* argument;
+
     Script(bool isFile, char *argument)
         : isFile(isFile)
         , argument(argument)
@@ -181,12 +181,12 @@ GlobalObject::GlobalObject(const Vector<UString>& arguments)
 TiValue JSC_HOST_CALL functionPrint(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
     for (unsigned i = 0; i < args.size(); ++i) {
-        if (i != 0)
+        if (i)
             putchar(' ');
-        
-        printf("%s", args.at(i).toString(exec).UTF8String().c_str());
+
+        printf("%s", args.at(i).toString(exec).UTF8String().data());
     }
-    
+
     putchar('\n');
     fflush(stdout);
     return jsUndefined();
@@ -194,14 +194,14 @@ TiValue JSC_HOST_CALL functionPrint(TiExcState* exec, TiObject*, TiValue, const 
 
 TiValue JSC_HOST_CALL functionDebug(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    fprintf(stderr, "--> %s\n", args.at(0).toString(exec).UTF8String().c_str());
+    fprintf(stderr, "--> %s\n", args.at(0).toString(exec).UTF8String().data());
     return jsUndefined();
 }
 
 TiValue JSC_HOST_CALL functionGC(TiExcState* exec, TiObject*, TiValue, const ArgList&)
 {
     TiLock lock(SilenceAssertionsOnly);
-    exec->heap()->collect();
+    exec->heap()->collectAllGarbage();
     return jsUndefined();
 }
 
@@ -299,8 +299,18 @@ TiValue JSC_HOST_CALL functionReadline(TiExcState* exec, TiObject*, TiValue, con
 
 TiValue JSC_HOST_CALL functionQuit(TiExcState* exec, TiObject*, TiValue, const ArgList&)
 {
+    // Technically, destroying the heap in the middle of JS execution is a no-no,
+    // but we want to maintain compatibility with the Mozilla test suite, so
+    // we pretend that execution has terminated to avoid ASSERTs, then tear down the heap.
+    exec->globalData().dynamicGlobalObject = 0;
+
     cleanupGlobalData(&exec->globalData());
     exit(EXIT_SUCCESS);
+
+#if COMPILER(MSVC) && OS(WINCE)
+    // Without this, Visual Studio will complain that this method does not return a value.
+    return jsUndefined();
+#endif
 }
 
 // Use SEH for Release builds only to get rid of the crash report dialog
@@ -320,7 +330,7 @@ int jscmain(int argc, char** argv, TiGlobalData*);
 
 int main(int argc, char** argv)
 {
-#if defined(_DEBUG) && PLATFORM(WIN_OS)
+#if defined(_DEBUG) && OS(WINDOWS)
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
@@ -329,7 +339,7 @@ int main(int argc, char** argv)
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
 #endif
 
-#if COMPILER(MSVC) && !PLATFORM(WINCE)
+#if COMPILER(MSVC) && !OS(WINCE)
     timeBeginPeriod(1);
 #endif
 
@@ -343,7 +353,7 @@ int main(int argc, char** argv)
     // We can't use destructors in the following code because it uses Windows
     // Structured Exception Handling
     int res = 0;
-    TiGlobalData* globalData = TiGlobalData::create().releaseRef();
+    TiGlobalData* globalData = TiGlobalData::create(ThreadStackTypeLarge).releaseRef();
     TRY
         res = jscmain(argc, argv, globalData);
     EXCEPT(res = 3)
@@ -442,7 +452,7 @@ static void runInteractive(GlobalObject* globalObject)
         if (completion.complType() == Throw)
             printf("Exception: %s\n", completion.value().toString(globalObject->globalExec()).ascii());
         else
-            printf("%s\n", completion.value().toString(globalObject->globalExec()).UTF8String().c_str());
+            printf("%s\n", completion.value().toString(globalObject->globalExec()).UTF8String().data());
 
         globalObject->globalExec()->clearException();
     }
@@ -470,30 +480,27 @@ static void parseArguments(int argc, char** argv, Options& options, TiGlobalData
     int i = 1;
     for (; i < argc; ++i) {
         const char* arg = argv[i];
-        if (strcmp(arg, "-f") == 0) {
+        if (!strcmp(arg, "-f")) {
             if (++i == argc)
                 printUsageStatement(globalData);
             options.scripts.append(Script(true, argv[i]));
             continue;
         }
-        if (strcmp(arg, "-e") == 0) {
+        if (!strcmp(arg, "-e")) {
             if (++i == argc)
                 printUsageStatement(globalData);
             options.scripts.append(Script(false, argv[i]));
             continue;
         }
-        if (strcmp(arg, "-h") == 0 || strcmp(arg, "--help") == 0) {
-            printUsageStatement(globalData, true);
-        }
-        if (strcmp(arg, "-i") == 0) {
+        if (!strcmp(arg, "-i")) {
             options.interactive = true;
             continue;
         }
-        if (strcmp(arg, "-d") == 0) {
+        if (!strcmp(arg, "-d")) {
             options.dump = true;
             continue;
         }
-        if (strcmp(arg, "-s") == 0) {
+        if (!strcmp(arg, "-s")) {
 #if HAVE(SIGNAL_H)
             signal(SIGILL, _exit);
             signal(SIGFPE, _exit);
@@ -502,16 +509,18 @@ static void parseArguments(int argc, char** argv, Options& options, TiGlobalData
 #endif
             continue;
         }
-        if (strcmp(arg, "--") == 0) {
+        if (!strcmp(arg, "--")) {
             ++i;
             break;
         }
+        if (!strcmp(arg, "-h") || !strcmp(arg, "--help"))
+            printUsageStatement(globalData, true);
         options.scripts.append(Script(true, argv[i]));
     }
-    
+
     if (options.scripts.isEmpty())
         options.interactive = true;
-    
+
     for (; i < argc; ++i)
         options.arguments.append(argv[i]);
 }
@@ -533,26 +542,26 @@ int jscmain(int argc, char** argv, TiGlobalData* globalData)
 
 static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer)
 {
-    FILE* f = fopen(fileName.UTF8String().c_str(), "r");
+    FILE* f = fopen(fileName.UTF8String().data(), "r");
     if (!f) {
-        fprintf(stderr, "Could not open file: %s\n", fileName.UTF8String().c_str());
+        fprintf(stderr, "Could not open file: %s\n", fileName.UTF8String().data());
         return false;
     }
 
-    size_t buffer_size = 0;
-    size_t buffer_capacity = 1024;
+    size_t bufferSize = 0;
+    size_t bufferCapacity = 1024;
 
-    buffer.resize(buffer_capacity);
+    buffer.resize(bufferCapacity);
 
     while (!feof(f) && !ferror(f)) {
-        buffer_size += fread(buffer.data() + buffer_size, 1, buffer_capacity - buffer_size, f);
-        if (buffer_size == buffer_capacity) { // guarantees space for trailing '\0'
-            buffer_capacity *= 2;
-            buffer.resize(buffer_capacity);
+        bufferSize += fread(buffer.data() + bufferSize, 1, bufferCapacity - bufferSize, f);
+        if (bufferSize == bufferCapacity) { // guarantees space for trailing '\0'
+            bufferCapacity *= 2;
+            buffer.resize(bufferCapacity);
         }
     }
     fclose(f);
-    buffer[buffer_size] = '\0';
+    buffer[bufferSize] = '\0';
 
     return true;
 }

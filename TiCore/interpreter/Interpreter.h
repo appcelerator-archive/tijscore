@@ -71,7 +71,9 @@ namespace TI {
         WillExecuteStatement
     };
 
-    enum { MaxMainThreadReentryDepth = 256, MaxSecondaryThreadReentryDepth = 32 };
+    // We use a smaller reentrancy limit on iPhone because of the high amount of
+    // stack space required on the web thread.
+    enum { MaxLargeThreadReentryDepth = 100, MaxSmallThreadReentryDepth = 32 };
 
     class Interpreter : public FastAllocBase {
         friend class JIT;
@@ -83,7 +85,7 @@ namespace TI {
         
         Opcode getOpcode(OpcodeID id)
         {
-            #if HAVE(COMPUTED_GOTO)
+            #if ENABLE(COMPUTED_GOTO_INTERPRETER)
                 return m_opcodeTable[id];
             #else
                 return id;
@@ -92,7 +94,7 @@ namespace TI {
 
         OpcodeID getOpcodeID(Opcode opcode)
         {
-            #if HAVE(COMPUTED_GOTO)
+            #if ENABLE(COMPUTED_GOTO_INTERPRETER)
                 ASSERT(isOpcode(opcode));
                 return m_opcodeIDTable.get(opcode);
             #else
@@ -130,10 +132,11 @@ namespace TI {
 
         TiValue execute(EvalExecutable*, CallFrame*, TiObject* thisObject, int globalRegisterOffset, ScopeChainNode*, TiValue* exception);
 
-#if USE(INTERPRETER)
+#if ENABLE(INTERPRETER)
         NEVER_INLINE bool resolve(CallFrame*, Instruction*, TiValue& exceptionValue);
         NEVER_INLINE bool resolveSkip(CallFrame*, Instruction*, TiValue& exceptionValue);
         NEVER_INLINE bool resolveGlobal(CallFrame*, Instruction*, TiValue& exceptionValue);
+        NEVER_INLINE bool resolveGlobalDynamic(CallFrame*, Instruction*, TiValue& exceptionValue);
         NEVER_INLINE void resolveBase(CallFrame*, Instruction* vPC);
         NEVER_INLINE bool resolveBaseAndProperty(CallFrame*, Instruction*, TiValue& exceptionValue);
         NEVER_INLINE ScopeChainNode* createExceptionScope(CallFrame*, const Instruction* vPC);
@@ -142,7 +145,7 @@ namespace TI {
         void uncacheGetByID(CodeBlock*, Instruction* vPC);
         void tryCachePutByID(CallFrame*, CodeBlock*, Instruction*, TiValue baseValue, const PutPropertySlot&);
         void uncachePutByID(CodeBlock*, Instruction* vPC);        
-#endif
+#endif // ENABLE(INTERPRETER)
 
         NEVER_INLINE bool unwindCallFrame(CallFrame*&, TiValue, unsigned& bytecodeOffset, CodeBlock*&);
 
@@ -165,7 +168,7 @@ namespace TI {
 
         RegisterFile m_registerFile;
         
-#if HAVE(COMPUTED_GOTO)
+#if ENABLE(COMPUTED_GOTO_INTERPRETER)
         Opcode m_opcodeTable[numOpcodeIDs]; // Maps OpcodeID => Opcode for compiling
         HashMap<Opcode, OpcodeID> m_opcodeIDTable; // Maps Opcode => OpcodeID for decompiling
 #endif

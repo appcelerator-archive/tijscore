@@ -62,6 +62,10 @@ namespace TI {
 
     class Arguments : public TiObject {
     public:
+        // Use an enum because otherwise gcc insists on doing a memory
+        // read.
+        enum { MaxArguments = 0x10000 };
+
         enum NoParametersType { NoParameters };
 
         Arguments(CallFrame*);
@@ -92,7 +96,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype) 
         { 
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags)); 
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
         }
 
     protected:
@@ -103,6 +107,7 @@ namespace TI {
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, unsigned propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual void put(TiExcState*, unsigned propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);

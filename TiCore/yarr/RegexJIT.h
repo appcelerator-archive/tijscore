@@ -33,8 +33,6 @@
 #ifndef RegexJIT_h
 #define RegexJIT_h
 
-#include <wtf/Platform.h>
-
 #if ENABLE(YARR_JIT)
 
 #include "MacroAssembler.h"
@@ -44,7 +42,7 @@
 #include <pcre.h>
 struct JSRegExp; // temporary, remove when fallback is removed.
 
-#if PLATFORM(X86) && !COMPILER(MSVC)
+#if CPU(X86) && !COMPILER(MSVC)
 #define YARR_CALL __attribute__ ((regparm (3)))
 #else
 #define YARR_CALL
@@ -75,7 +73,7 @@ public:
     JSRegExp* getFallback() { return m_fallback; }
     void setFallback(JSRegExp* fallback) { m_fallback = fallback; }
 
-    bool operator!() { return !m_ref.m_code.executableAddress(); }
+    bool operator!() { return (!m_ref.m_code.executableAddress() && !m_fallback); }
     void set(MacroAssembler::CodeRef ref) { m_ref = ref; }
 
     int execute(const UChar* input, unsigned start, unsigned length, int* output)

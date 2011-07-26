@@ -49,17 +49,21 @@
 #ifndef DateConversion_h
 #define DateConversion_h
 
+#include "UString.h"
+
 namespace TI {
 
 class TiExcState;
-class UString;
 struct GregorianDateTime;
 
+static const unsigned DateConversionBufferSize = 100;
+typedef char DateConversionBuffer[DateConversionBufferSize];
+
 double parseDate(TiExcState* exec, const UString&);
-UString formatDate(const GregorianDateTime&);
-UString formatDateUTCVariant(const GregorianDateTime&);
-UString formatTime(const GregorianDateTime&);
-UString formatTimeUTC(const GregorianDateTime&);
+void formatDate(const GregorianDateTime&, DateConversionBuffer&);
+void formatDateUTCVariant(const GregorianDateTime&, DateConversionBuffer&);
+void formatTime(const GregorianDateTime&, DateConversionBuffer&);
+void formatTimeUTC(const GregorianDateTime&, DateConversionBuffer&);
 
 } // namespace TI
 

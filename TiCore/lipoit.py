@@ -6,4 +6,4 @@
 
 import os,sys
 
-os.system("lipo build/Release-iphonesimulator/libStatic.a build/Release-iphoneos/libStatic.a -create -output build/libTiCore.a")
+os.system("lipo build/Release-iphonesimulator/libiOSTiCore.a build/Release-iphoneos/libiOSTiCore.a -create -output build/libTiCore.a")

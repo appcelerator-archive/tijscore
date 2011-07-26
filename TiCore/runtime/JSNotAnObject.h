@@ -69,7 +69,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags));
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
         }
 
      private:
@@ -98,7 +98,7 @@ namespace TI {
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
         virtual bool deleteProperty(TiExcState*, unsigned propertyName);
 
-        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
         JSNotAnObjectErrorStub* m_exception;
     };

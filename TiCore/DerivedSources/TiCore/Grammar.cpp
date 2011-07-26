@@ -1,10 +1,3 @@
-/**
- * Appcelerator Titanium License
- * This source code and all modifications done by Appcelerator
- * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
- */
-
 /* A Bison parser, made by GNU Bison 2.3.  */
 
 /* Skeleton implementation for Bison's Yacc-like parsers in C
@@ -259,7 +252,7 @@
 // Default values for bison.
 #define YYDEBUG 0 // Set to 1 to debug a parse error.
 #define jscyydebug 0 // Set to 1 to debug a parse error.
-#if !PLATFORM(DARWIN)
+#if !OS(DARWIN)
 // Avoid triggering warnings in older bison by not setting this on the Darwin platform.
 // FIXME: Is this still needed?
 #define YYERROR_VERBOSE
@@ -5014,12 +5007,9 @@ static PropertyNode* makeGetterOrSetterPropertyNode(TiGlobalData* globalData, co
 static ExpressionNode* makeNegateNode(TiGlobalData* globalData, ExpressionNode* n)
 {
     if (n->isNumber()) {
-        NumberNode* number = static_cast<NumberNode*>(n);
-
-        if (number->value() > 0.0) {
-            number->setValue(-number->value());
-            return number;
-        }
+        NumberNode* numberNode = static_cast<NumberNode*>(n);
+        numberNode->setValue(-numberNode->value());
+        return numberNode;
     }
 
     return new (globalData) NegateNode(globalData, n);

@@ -28,14 +28,15 @@
 #include "config.h"
 #include "FunctionConstructor.h"
 
+#include "Debugger.h"
 #include "FunctionPrototype.h"
 #include "TiFunction.h"
 #include "TiGlobalObject.h"
 #include "TiString.h"
-#include "Parser.h"
-#include "Debugger.h"
 #include "Lexer.h"
 #include "Nodes.h"
+#include "Parser.h"
+#include "StringBuilder.h"
 
 namespace TI {
 
@@ -83,12 +84,19 @@ TiObject* constructFunction(TiExcState* exec, const ArgList& args, const Identif
     if (args.isEmpty())
         program = "(function() { \n})";
     else if (args.size() == 1)
-        program = "(function() { " + args.at(0).toString(exec) + "\n})";
+        program = makeString("(function() { ", args.at(0).toString(exec), "\n})");
     else {
-        program = "(function(" + args.at(0).toString(exec);
-        for (size_t i = 1; i < args.size() - 1; i++)
-            program += "," + args.at(i).toString(exec);
-        program += ") { " + args.at(args.size() - 1).toString(exec) + "\n})";
+        StringBuilder builder;
+        builder.append("(function(");
+        builder.append(args.at(0).toString(exec));
+        for (size_t i = 1; i < args.size() - 1; i++) {
+            builder.append(",");
+            builder.append(args.at(i).toString(exec));
+        }
+        builder.append(") { ");
+        builder.append(args.at(args.size() - 1).toString(exec));
+        builder.append("\n})");
+        program = builder.build();
     }
 
     int errLine;

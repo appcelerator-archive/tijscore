@@ -86,15 +86,21 @@ bool StringObject::deleteProperty(TiExcState* exec, const Identifier& propertyNa
 {
     if (propertyName == exec->propertyNames().length)
         return false;
+    bool isStrictUInt32;
+    unsigned i = propertyName.toStrictUInt32(&isStrictUInt32);
+    if (isStrictUInt32 && internalValue()->canGetIndex(i))
+        return false;
     return TiObject::deleteProperty(exec, propertyName);
 }
 
-void StringObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames)
+void StringObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    int size = internalValue()->value().size();
+    int size = internalValue()->length();
     for (int i = 0; i < size; ++i)
         propertyNames.add(Identifier(exec, UString::from(i)));
-    return TiObject::getOwnPropertyNames(exec, propertyNames);
+    if (mode == IncludeDontEnumProperties)
+        propertyNames.add(exec->propertyNames().length);
+    return TiObject::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
 } // namespace TI

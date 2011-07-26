@@ -40,15 +40,17 @@ namespace TI {
     class FunctionPrototype;
     class JSActivation;
     class TiGlobalObject;
+    class NativeExecutable;
 
     class TiFunction : public InternalFunction {
         friend class JIT;
-        friend struct VPtrSet;
+        friend class TiGlobalData;
 
         typedef InternalFunction Base;
 
     public:
         TiFunction(TiExcState*, NonNullPassRefPtr<Structure>, int length, const Identifier&, NativeFunction);
+        TiFunction(TiExcState*, NonNullPassRefPtr<Structure>, int length, const Identifier&, NativeExecutable*, NativeFunction);
         TiFunction(TiExcState*, NonNullPassRefPtr<FunctionExecutable>, ScopeChainNode*);
         virtual ~TiFunction();
 
@@ -68,7 +70,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype) 
         { 
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags)); 
+            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
         }
 
         NativeFunction nativeFunction()
@@ -89,6 +91,7 @@ namespace TI {
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
 
@@ -96,9 +99,9 @@ namespace TI {
 
         virtual const ClassInfo* classInfo() const { return &info; }
 
-        static TiValue argumentsGetter(TiExcState*, const Identifier&, const PropertySlot&);
-        static TiValue callerGetter(TiExcState*, const Identifier&, const PropertySlot&);
-        static TiValue lengthGetter(TiExcState*, const Identifier&, const PropertySlot&);
+        static TiValue argumentsGetter(TiExcState*, TiValue, const Identifier&);
+        static TiValue callerGetter(TiExcState*, TiValue, const Identifier&);
+        static TiValue lengthGetter(TiExcState*, TiValue, const Identifier&);
 
         RefPtr<ExecutableBase> m_executable;
         ScopeChain& scopeChain()

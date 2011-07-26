@@ -35,6 +35,7 @@
 #include "TiCallbackObject.h"
 
 #include "Collector.h"
+#include <wtf/text/StringHash.h>
 
 namespace TI {
 

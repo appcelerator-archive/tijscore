@@ -33,7 +33,6 @@
 #ifndef CodeLocation_h
 #define CodeLocation_h
 
-#include <wtf/Platform.h>
 
 #include <MacroAssemblerCodeRef.h>
 

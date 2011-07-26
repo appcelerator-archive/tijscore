@@ -64,11 +64,6 @@ UString JSNumberCell::toString(TiExcState*) const
     return UString::from(m_value);
 }
 
-UString JSNumberCell::toThisString(TiExcState*) const
-{
-    return UString::from(m_value);
-}
-
 TiObject* JSNumberCell::toObject(TiExcState* exec) const
 {
     return constructNumber(exec, const_cast<JSNumberCell*>(this));

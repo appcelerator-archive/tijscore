@@ -66,10 +66,10 @@ static const union {
     } doubles;
     
 } NaNInf = { {
-#if PLATFORM(BIG_ENDIAN)
+#if CPU(BIG_ENDIAN)
     { 0x7f, 0xf8, 0, 0, 0, 0, 0, 0 },
     { 0x7f, 0xf0, 0, 0, 0, 0, 0, 0 }
-#elif PLATFORM(MIDDLE_ENDIAN)
+#elif CPU(MIDDLE_ENDIAN)
     { 0, 0, 0xf8, 0x7f, 0, 0, 0, 0 },
     { 0, 0, 0xf0, 0x7f, 0, 0, 0, 0 }
 #else
@@ -83,27 +83,22 @@ extern const double Inf = NaNInf.doubles.Inf_Double;
  
 #endif // !(defined NAN && defined INFINITY)
 
-void* TiCell::operator new(size_t size, TiExcState* exec)
-{
-    return exec->heap()->allocate(size);
-}
-
 bool TiCell::getUInt32(uint32_t&) const
 {
     return false;
 }
 
-bool TiCell::getString(UString&stringValue) const
+bool TiCell::getString(TiExcState* exec, UString&stringValue) const
 {
     if (!isString())
         return false;
-    stringValue = static_cast<const TiString*>(this)->value();
+    stringValue = static_cast<const TiString*>(this)->value(exec);
     return true;
 }
 
-UString TiCell::getString() const
+UString TiCell::getString(TiExcState* exec) const
 {
-    return isString() ? static_cast<const TiString*>(this)->value() : UString();
+    return isString() ? static_cast<const TiString*>(this)->value(exec) : UString();
 }
 
 TiObject* TiCell::getObject()
@@ -173,16 +168,6 @@ bool TiCell::deleteProperty(TiExcState* exec, unsigned identifier)
 TiObject* TiCell::toThisObject(TiExcState* exec) const
 {
     return toObject(exec);
-}
-
-UString TiCell::toThisString(TiExcState* exec) const
-{
-    return toThisObject(exec)->toString(exec);
-}
-
-TiString* TiCell::toThisTiString(TiExcState* exec)
-{
-    return jsString(exec, toThisString(exec));
 }
 
 const ClassInfo* TiCell::classInfo() const

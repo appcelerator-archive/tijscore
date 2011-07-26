@@ -53,7 +53,7 @@ public:
     {
     }
 
-    virtual bool isWatchdogException() const { return true; }
+    virtual ComplType exceptionType() const { return Interrupted; }
 
     virtual UString toString(TiExcState*) const { return "Ti execution exceeded timeout."; }
 };
@@ -63,9 +63,26 @@ TiValue createInterruptedExecutionException(TiGlobalData* globalData)
     return new (globalData) InterruptedExecutionError(globalData);
 }
 
+class TerminatedExecutionError : public TiObject {
+public:
+    TerminatedExecutionError(TiGlobalData* globalData)
+        : TiObject(globalData->terminatedExecutionErrorStructure)
+    {
+    }
+
+    virtual ComplType exceptionType() const { return Terminated; }
+
+    virtual UString toString(TiExcState*) const { return "Ti execution terminated."; }
+};
+
+TiValue createTerminatedExecutionException(TiGlobalData* globalData)
+{
+    return new (globalData) TerminatedExecutionError(globalData);
+}
+
 static TiValue createError(TiExcState* exec, ErrorType e, const char* msg)
 {
-    return Error::create(exec, e, msg, -1, -1, 0);
+    return Error::create(exec, e, msg, -1, -1, UString());
 }
 
 TiValue createStackOverflowError(TiExcState* exec)
@@ -84,9 +101,7 @@ TiValue createUndefinedVariableError(TiExcState* exec, const Identifier& ident, 
     int endOffset = 0;
     int divotPoint = 0;
     int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    UString message = "Can't find variable: ";
-    message.append(ident.ustring());
-    TiObject* exception = Error::create(exec, ReferenceError, message, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
+    TiObject* exception = Error::create(exec, ReferenceError, makeString("Can't find variable: ", ident.ustring()), line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
     exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
     exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
     exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
@@ -95,59 +110,36 @@ TiValue createUndefinedVariableError(TiExcState* exec, const Identifier& ident, 
     
 static UString createErrorMessage(TiExcState* exec, CodeBlock* codeBlock, int, int expressionStart, int expressionStop, TiValue value, UString error)
 {
-    if (!expressionStop || expressionStart > codeBlock->source()->length()) {
-        UString errorText = value.toString(exec);
-        errorText.append(" is ");
-        errorText.append(error);
-        return errorText;
-    }
+    if (!expressionStop || expressionStart > codeBlock->source()->length())
+        return makeString(value.toString(exec), " is ", error);
+    if (expressionStart < expressionStop)
+        return makeString("Result of expression '", codeBlock->source()->getRange(expressionStart, expressionStop), "' [", value.toString(exec), "] is ", error, ".");
 
-    UString errorText = "Result of expression ";
-    
-    if (expressionStart < expressionStop) {
-        errorText.append('\'');
-        errorText.append(codeBlock->source()->getRange(expressionStart, expressionStop));
-        errorText.append("' [");
-        errorText.append(value.toString(exec));
-        errorText.append("] is ");
-    } else {
-        // No range information, so give a few characters of context
-        const UChar* data = codeBlock->source()->data();
-        int dataLength = codeBlock->source()->length();
-        int start = expressionStart;
-        int stop = expressionStart;
-        // Get up to 20 characters of context to the left and right of the divot, clamping to the line.
-        // then strip whitespace.
-        while (start > 0 && (expressionStart - start < 20) && data[start - 1] != '\n')
-            start--;
-        while (start < (expressionStart - 1) && isStrWhiteSpace(data[start]))
-            start++;
-        while (stop < dataLength && (stop - expressionStart < 20) && data[stop] != '\n')
-            stop++;
-        while (stop > expressionStart && isStrWhiteSpace(data[stop]))
-            stop--;
-        errorText.append("near '...");
-        errorText.append(codeBlock->source()->getRange(start, stop));
-        errorText.append("...' [");
-        errorText.append(value.toString(exec));
-        errorText.append("] is ");
-    }
-    errorText.append(error);
-    errorText.append(".");
-    return errorText;
+    // No range information, so give a few characters of context
+    const UChar* data = codeBlock->source()->data();
+    int dataLength = codeBlock->source()->length();
+    int start = expressionStart;
+    int stop = expressionStart;
+    // Get up to 20 characters of context to the left and right of the divot, clamping to the line.
+    // then strip whitespace.
+    while (start > 0 && (expressionStart - start < 20) && data[start - 1] != '\n')
+        start--;
+    while (start < (expressionStart - 1) && isStrWhiteSpace(data[start]))
+        start++;
+    while (stop < dataLength && (stop - expressionStart < 20) && data[stop] != '\n')
+        stop++;
+    while (stop > expressionStart && isStrWhiteSpace(data[stop]))
+        stop--;
+    return makeString("Result of expression near '...", codeBlock->source()->getRange(start, stop), "...' [", value.toString(exec), "] is ", error, ".");
 }
 
 TiObject* createInvalidParamError(TiExcState* exec, const char* op, TiValue value, unsigned bytecodeOffset, CodeBlock* codeBlock)
 {
-    UString message = "not a valid argument for '";
-    message.append(op);
-    message.append("'");
-    
     int startOffset = 0;
     int endOffset = 0;
     int divotPoint = 0;
     int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    UString errorMessage = createErrorMessage(exec, codeBlock, line, divotPoint, divotPoint + endOffset, value, message);
+    UString errorMessage = createErrorMessage(exec, codeBlock, line, divotPoint, divotPoint + endOffset, value, makeString("not a valid argument for '", op, "'"));
     TiObject* exception = Error::create(exec, TypeError, errorMessage, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
     exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
     exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
@@ -218,6 +210,11 @@ TiObject* createNotAnObjectError(TiExcState* exec, JSNotAnObjectErrorStub* error
     exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
     exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
     return exception;
+}
+
+TiValue throwOutOfMemoryError(TiExcState* exec)
+{
+    return throwError(exec, GeneralError, "Out of memory");
 }
 
 } // namespace TI

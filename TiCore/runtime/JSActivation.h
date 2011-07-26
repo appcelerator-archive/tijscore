@@ -38,7 +38,6 @@
 
 #include "CodeBlock.h"
 #include "JSVariableObject.h"
-#include "RegisterFile.h"
 #include "SymbolTable.h"
 #include "Nodes.h"
 
@@ -55,7 +54,7 @@ namespace TI {
 
         virtual void markChildren(MarkStack&);
 
-        virtual bool isDynamicScope() const;
+        virtual bool isDynamicScope(bool& requiresDynamicChecks) const;
 
         virtual bool isActivationObject() const { return true; }
 
@@ -73,7 +72,7 @@ namespace TI {
         virtual const ClassInfo* classInfo() const { return &info; }
         static const ClassInfo info;
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags)); }
+        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); }
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
@@ -96,7 +95,7 @@ namespace TI {
             RefPtr<FunctionExecutable> functionExecutable;
         };
         
-        static TiValue argumentsGetter(TiExcState*, const Identifier&, const PropertySlot&);
+        static TiValue argumentsGetter(TiExcState*, TiValue, const Identifier&);
         NEVER_INLINE PropertySlot::GetValueFunc getArgumentsGetter();
 
         JSActivationData* d() const { return static_cast<JSActivationData*>(JSVariableObject::d); }

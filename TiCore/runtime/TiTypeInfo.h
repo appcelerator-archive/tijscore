@@ -57,6 +57,8 @@ namespace TI {
         TypeInfo(TiType type, unsigned flags = 0)
             : m_type(type)
         {
+            ASSERT(flags <= 0xFF);
+            ASSERT(type <= 0xFF);
             // ImplementsDefaultHasInstance means (ImplementsHasInstance & !OverridesHasInstance)
             if ((flags & (ImplementsHasInstance | OverridesHasInstance)) == ImplementsHasInstance)
                 m_flags = flags | ImplementsDefaultHasInstance;
@@ -64,7 +66,7 @@ namespace TI {
                 m_flags = flags;
         }
 
-        TiType type() const { return m_type; }
+        TiType type() const { return (TiType)m_type; }
 
         bool masqueradesAsUndefined() const { return m_flags & MasqueradesAsUndefined; }
         bool implementsHasInstance() const { return m_flags & ImplementsHasInstance; }
@@ -76,8 +78,8 @@ namespace TI {
         unsigned flags() const { return m_flags; }
 
     private:
-        TiType m_type;
-        unsigned m_flags;
+        unsigned char m_type;
+        unsigned char m_flags;
     };
 
 }

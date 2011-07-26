@@ -36,6 +36,7 @@
 #ifndef TiGlobalData_h
 #define TiGlobalData_h
 
+#include "CachedTranscendentalFunction.h"
 #include "Collector.h"
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
@@ -44,6 +45,7 @@
 #include "MarkStack.h"
 #include "NumericStrings.h"
 #include "SmallStrings.h"
+#include "Terminator.h"
 #include "TimeoutChecker.h"
 #include "WeakRandom.h"
 #include <wtf/Forward.h>
@@ -63,13 +65,13 @@ namespace TI {
     class TiObject;
     class Lexer;
     class Parser;
+    class RegExpCache;
     class Stringifier;
     class Structure;
     class UString;
 
     struct HashTable;
     struct Instruction;    
-    struct VPtrSet;
 
     struct DSTOffsetCache {
         DSTOffsetCache()
@@ -91,17 +93,34 @@ namespace TI {
         double increment;
     };
 
+    enum ThreadStackType {
+        ThreadStackTypeLarge,
+        ThreadStackTypeSmall
+    };
+
     class TiGlobalData : public RefCounted<TiGlobalData> {
     public:
+        // WebCore has a one-to-one mapping of threads to TiGlobalDatas;
+        // either create() or createLeaked() should only be called once
+        // on a thread, this is the 'default' TiGlobalData (it uses the
+        // thread's default string uniquing table from wtfThreadData).
+        // API contexts created using the new context group aware interface
+        // create APIContextGroup objects which require less locking of JSC
+        // than the old singleton APIShared TiGlobalData created for use by
+        // the original API.
+        enum GlobalDataType { Default, APIContextGroup, APIShared };
+
         struct ClientData {
             virtual ~ClientData() = 0;
         };
 
+        bool isSharedInstance() { return globalDataType == APIShared; }
         static bool sharedInstanceExists();
         static TiGlobalData& sharedInstance();
 
-        static PassRefPtr<TiGlobalData> create(bool isShared = false);
-        static PassRefPtr<TiGlobalData> createLeaked();
+        static PassRefPtr<TiGlobalData> create(ThreadStackType);
+        static PassRefPtr<TiGlobalData> createLeaked(ThreadStackType);
+        static PassRefPtr<TiGlobalData> createContextGroup(ThreadStackType);
         ~TiGlobalData();
 
 #if ENABLE(JSC_MULTIPLE_THREADS)
@@ -109,7 +128,7 @@ namespace TI {
         void makeUsableFromMultipleThreads() { heap.makeUsableFromMultipleThreads(); }
 #endif
 
-        bool isSharedInstance;
+        GlobalDataType globalDataType;
         ClientData* clientData;
 
         const HashTable* arrayTable;
@@ -123,6 +142,7 @@ namespace TI {
         
         RefPtr<Structure> activationStructure;
         RefPtr<Structure> interruptedExecutionErrorStructure;
+        RefPtr<Structure> terminatedExecutionErrorStructure;
         RefPtr<Structure> staticScopeStructure;
         RefPtr<Structure> stringStructure;
         RefPtr<Structure> notAnObjectErrorStubStructure;
@@ -130,15 +150,17 @@ namespace TI {
         RefPtr<Structure> propertyNameIteratorStructure;
         RefPtr<Structure> getterSetterStructure;
         RefPtr<Structure> apiWrapperStructure;
+        RefPtr<Structure> dummyMarkableCellStructure;
 
 #if USE(JSVALUE32)
         RefPtr<Structure> numberStructure;
 #endif
 
-        void* jsArrayVPtr;
-        void* jsByteArrayVPtr;
-        void* jsStringVPtr;
-        void* jsFunctionVPtr;
+        static void storeVPtrs();
+        static JS_EXPORTDATA void* jsArrayVPtr;
+        static JS_EXPORTDATA void* jsByteArrayVPtr;
+        static JS_EXPORTDATA void* jsStringVPtr;
+        static JS_EXPORTDATA void* jsFunctionVPtr;
 
         IdentifierTable* identifierTable;
         CommonIdentifiers* propertyNames;
@@ -149,15 +171,28 @@ namespace TI {
         
 #if ENABLE(ASSEMBLER)
         ExecutableAllocator executableAllocator;
+        ExecutableAllocator regexAllocator;
 #endif
 
+#if ENABLE(JIT)
+#if ENABLE(INTERPRETER)
+        bool canUseJIT() { return m_canUseJIT; }
+#endif
+#else
+        bool canUseJIT() { return false; }
+#endif
         Lexer* lexer;
         Parser* parser;
         Interpreter* interpreter;
 #if ENABLE(JIT)
-        JITThunks jitStubs;
+        OwnPtr<JITThunks> jitStubs;
+        NativeExecutable* getThunk(ThunkGenerator generator)
+        {
+            return jitStubs->specializedThunk(this, generator);
+        }
 #endif
         TimeoutChecker timeoutChecker;
+        Terminator terminator;
         Heap heap;
 
         TiValue exception;
@@ -186,24 +221,33 @@ namespace TI {
         
         UString cachedDateString;
         double cachedDateStringValue;
-        
-        WeakRandom weakRandom;
+
+        int maxReentryDepth;
+
+        RegExpCache* m_regExpCache;
 
 #ifndef NDEBUG
-        bool mainThreadOnly;
+        ThreadIdentifier exclusiveThread;
 #endif
+
+        CachedTranscendentalFunction<sin> cachedSin;
 
         void resetDateCache();
 
         void startSampling();
         void stopSampling();
         void dumpSampleData(TiExcState* exec);
+        void recompileAllTiFunctions();
+        RegExpCache* regExpCache() { return m_regExpCache; }
     private:
-        TiGlobalData(bool isShared, const VPtrSet&);
+        TiGlobalData(GlobalDataType, ThreadStackType);
         static TiGlobalData*& sharedInstanceInternal();
         void createNativeThunk();
+#if ENABLE(JIT) && ENABLE(INTERPRETER)
+        bool m_canUseJIT;
+#endif
     };
-    
+
 } // namespace TI
 
 #endif // TiGlobalData_h

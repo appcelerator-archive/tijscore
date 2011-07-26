@@ -50,6 +50,7 @@ namespace TI {
     struct Instruction;
     
     TiValue createInterruptedExecutionException(TiGlobalData*);
+    TiValue createTerminatedExecutionException(TiGlobalData*);
     TiValue createStackOverflowError(TiExcState*);
     TiValue createTypeError(TiExcState*, const char* message);
     TiValue createUndefinedVariableError(TiExcState*, const Identifier&, unsigned bytecodeOffset, CodeBlock*);
@@ -58,6 +59,7 @@ namespace TI {
     TiObject* createNotAConstructorError(TiExcState*, TiValue, unsigned bytecodeOffset, CodeBlock*);
     TiValue createNotAFunctionError(TiExcState*, TiValue, unsigned bytecodeOffset, CodeBlock*);
     TiObject* createNotAnObjectError(TiExcState*, JSNotAnObjectErrorStub*, unsigned bytecodeOffset, CodeBlock*);
+    TiValue throwOutOfMemoryError(TiExcState*);
 
 } // namespace TI
 

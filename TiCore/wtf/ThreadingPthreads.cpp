@@ -44,6 +44,8 @@
 #include "MainThread.h"
 #include "RandomNumberSeed.h"
 #include "StdLibExtras.h"
+#include "ThreadIdentifierDataPthreads.h"
+#include "ThreadSpecific.h"
 #include "UnusedParam.h"
 #include <errno.h>
 
@@ -52,7 +54,7 @@
 #include <sys/time.h>
 #endif
 
-#if PLATFORM(ANDROID)
+#if OS(ANDROID)
 #include "jni_utility.h"
 #endif
 
@@ -62,9 +64,7 @@ typedef HashMap<ThreadIdentifier, pthread_t> ThreadMap;
 
 static Mutex* atomicallyInitializedStaticMutex;
 
-#if !PLATFORM(DARWIN) || PLATFORM(CHROMIUM)
-static ThreadIdentifier mainThreadIdentifier; // The thread that was the first to call initializeThreading(), which must be the main thread.
-#endif
+void clearPthreadHandleForIdentifier(ThreadIdentifier);
 
 static Mutex& threadMapMutex()
 {
@@ -74,15 +74,12 @@ static Mutex& threadMapMutex()
 
 void initializeThreading()
 {
-    if (!atomicallyInitializedStaticMutex) {
-        atomicallyInitializedStaticMutex = new Mutex;
-        threadMapMutex();
-        initializeRandomNumberGenerator();
-#if !PLATFORM(DARWIN) || PLATFORM(CHROMIUM)
-        mainThreadIdentifier = currentThread();
-#endif
-        initializeMainThread();
-    }
+    if (atomicallyInitializedStaticMutex)
+        return;
+
+    atomicallyInitializedStaticMutex = new Mutex;
+    threadMapMutex();
+    initializeRandomNumberGenerator();
 }
 
 void lockAtomicallyInitializedStaticMutex()
@@ -115,7 +112,7 @@ static ThreadIdentifier identifierByPthreadHandle(const pthread_t& pthreadHandle
     return 0;
 }
 
-static ThreadIdentifier establishIdentifierForPthreadHandle(pthread_t& pthreadHandle)
+static ThreadIdentifier establishIdentifierForPthreadHandle(const pthread_t& pthreadHandle)
 {
     ASSERT(!identifierByPthreadHandle(pthreadHandle));
 
@@ -135,7 +132,7 @@ static pthread_t pthreadHandleForIdentifier(ThreadIdentifier id)
     return threadMap().get(id);
 }
 
-static void clearPthreadHandleForIdentifier(ThreadIdentifier id)
+void clearPthreadHandleForIdentifier(ThreadIdentifier id)
 {
     MutexLocker locker(threadMapMutex());
 
@@ -144,7 +141,7 @@ static void clearPthreadHandleForIdentifier(ThreadIdentifier id)
     threadMap().remove(id);
 }
 
-#if PLATFORM(ANDROID)
+#if OS(ANDROID)
 // On the Android platform, threads must be registered with the VM before they run.
 struct ThreadData {
     ThreadFunction entryPoint;
@@ -192,13 +189,17 @@ ThreadIdentifier createThreadInternal(ThreadFunction entryPoint, void* data, con
 }
 #endif
 
-void setThreadNameInternal(const char* threadName)
+void initializeCurrentThreadInternal(const char* threadName)
 {
 #if HAVE(PTHREAD_SETNAME_NP)
     pthread_setname_np(threadName);
 #else
     UNUSED_PARAM(threadName);
 #endif
+
+    ThreadIdentifier id = identifierByPthreadHandle(pthread_self());
+    ASSERT(id);
+    ThreadIdentifierData::initialize(id);
 }
 
 int waitForThreadCompletion(ThreadIdentifier threadID, void** result)
@@ -206,12 +207,13 @@ int waitForThreadCompletion(ThreadIdentifier threadID, void** result)
     ASSERT(threadID);
 
     pthread_t pthreadHandle = pthreadHandleForIdentifier(threadID);
+    if (!pthreadHandle)
+        return 0;
 
     int joinResult = pthread_join(pthreadHandle, result);
     if (joinResult == EDEADLK)
         LOG_ERROR("ThreadIdentifier %u was found to be deadlocked trying to quit", threadID);
 
-    clearPthreadHandleForIdentifier(threadID);
     return joinResult;
 }
 
@@ -220,27 +222,22 @@ void detachThread(ThreadIdentifier threadID)
     ASSERT(threadID);
 
     pthread_t pthreadHandle = pthreadHandleForIdentifier(threadID);
+    if (!pthreadHandle)
+        return;
 
     pthread_detach(pthreadHandle);
-
-    clearPthreadHandleForIdentifier(threadID);
 }
 
 ThreadIdentifier currentThread()
 {
-    pthread_t currentThread = pthread_self();
-    if (ThreadIdentifier id = identifierByPthreadHandle(currentThread))
+    ThreadIdentifier id = ThreadIdentifierData::identifier();
+    if (id)
         return id;
-    return establishIdentifierForPthreadHandle(currentThread);
-}
 
-bool isMainThread()
-{
-#if PLATFORM(DARWIN) && !PLATFORM(CHROMIUM)
-    return pthread_main_np();
-#else
-    return currentThread() == mainThreadIdentifier;
-#endif
+    // Not a WTF-created thread, ThreadIdentifier is not established yet.
+    id = establishIdentifierForPthreadHandle(pthread_self());
+    ThreadIdentifierData::initialize(id);
+    return id;
 }
 
 Mutex::Mutex()

@@ -47,32 +47,32 @@ const ClassInfo* InternalFunction::classInfo() const
 InternalFunction::InternalFunction(TiGlobalData* globalData, NonNullPassRefPtr<Structure> structure, const Identifier& name)
     : TiObject(structure)
 {
-    putDirect(globalData->propertyNames->name, jsString(globalData, name.ustring()), DontDelete | ReadOnly | DontEnum);
+    putDirect(globalData->propertyNames->name, jsString(globalData, name.isNull() ? "" : name.ustring()), DontDelete | ReadOnly | DontEnum);
 }
 
-const UString& InternalFunction::name(TiGlobalData* globalData)
+const UString& InternalFunction::name(TiExcState* exec)
 {
-    return asString(getDirect(globalData->propertyNames->name))->value();
+    return asString(getDirect(exec->globalData().propertyNames->name))->tryGetValue();
 }
 
-const UString InternalFunction::displayName(TiGlobalData* globalData)
+const UString InternalFunction::displayName(TiExcState* exec)
 {
-    TiValue displayName = getDirect(globalData->propertyNames->displayName);
+    TiValue displayName = getDirect(exec->globalData().propertyNames->displayName);
     
-    if (displayName && isTiString(globalData, displayName))
-        return asString(displayName)->value();
+    if (displayName && isTiString(&exec->globalData(), displayName))
+        return asString(displayName)->tryGetValue();
     
     return UString::null();
 }
 
-const UString InternalFunction::calculatedDisplayName(TiGlobalData* globalData)
+const UString InternalFunction::calculatedDisplayName(TiExcState* exec)
 {
-    const UString explicitName = displayName(globalData);
+    const UString explicitName = displayName(exec);
     
     if (!explicitName.isEmpty())
         return explicitName;
     
-    return name(globalData);
+    return name(exec);
 }
 
 } // namespace TI

@@ -40,10 +40,28 @@
 #include <runtime/TiGlobalObject.h>
 #include <runtime/ObjectPrototype.h>
 #include <runtime/Identifier.h>
+#include <wtf/text/StringHash.h>
+#include <wtf/unicode/UTF8.h>
 
+using namespace std;
 using namespace TI;
+using namespace WTI::Unicode;
 
 const TiClassDefinition kTiClassDefinitionEmpty = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+
+static inline UString tryCreateStringFromUTF8(const char* string)
+{
+    if (!string)
+        return UString::null();
+
+    size_t length = strlen(string);
+    Vector<UChar, 1024> buffer(length);
+    UChar* p = buffer.data();
+    if (conversionOK != convertUTF8ToUTF16(&string, string + length, &p, p + length))
+        return UString::null();
+
+    return UString(buffer.data(), p - buffer.data());
+}
 
 OpaqueTiClass::OpaqueTiClass(const TiClassDefinition* definition, OpaqueTiClass* protoClass) 
     : parentClass(definition->parentClass)
@@ -59,7 +77,7 @@ OpaqueTiClass::OpaqueTiClass(const TiClassDefinition* definition, OpaqueTiClass*
     , callAsConstructor(definition->callAsConstructor)
     , hasInstance(definition->hasInstance)
     , convertToType(definition->convertToType)
-    , m_className(UString::Rep::createFromUTF8(definition->className))
+    , m_className(tryCreateStringFromUTF8(definition->className))
     , m_staticValues(0)
     , m_staticFunctions(0)
 {
@@ -68,8 +86,14 @@ OpaqueTiClass::OpaqueTiClass(const TiClassDefinition* definition, OpaqueTiClass*
     if (const TiStaticValue* staticValue = definition->staticValues) {
         m_staticValues = new OpaqueTiClassStaticValuesTable();
         while (staticValue->name) {
-            m_staticValues->add(UString::Rep::createFromUTF8(staticValue->name),
-                              new StaticValueEntry(staticValue->getProperty, staticValue->setProperty, staticValue->attributes));
+            UString valueName = tryCreateStringFromUTF8(staticValue->name);
+            if (!valueName.isNull()) {
+                // Use a local variable here to sidestep an RVCT compiler bug.
+                StaticValueEntry* entry = new StaticValueEntry(staticValue->getProperty, staticValue->setProperty, staticValue->attributes);
+                UStringImpl* impl = valueName.rep();
+                impl->ref();
+                m_staticValues->add(impl, entry);
+            }
             ++staticValue;
         }
     }
@@ -77,8 +101,14 @@ OpaqueTiClass::OpaqueTiClass(const TiClassDefinition* definition, OpaqueTiClass*
     if (const TiStaticFunction* staticFunction = definition->staticFunctions) {
         m_staticFunctions = new OpaqueTiClassStaticFunctionsTable();
         while (staticFunction->name) {
-            m_staticFunctions->add(UString::Rep::createFromUTF8(staticFunction->name),
-                                 new StaticFunctionEntry(staticFunction->callAsFunction, staticFunction->attributes));
+            UString functionName = tryCreateStringFromUTF8(staticFunction->name);
+            if (!functionName.isNull()) {
+                // Use a local variable here to sidestep an RVCT compiler bug.
+                StaticFunctionEntry* entry = new StaticFunctionEntry(staticFunction->callAsFunction, staticFunction->attributes);
+                UStringImpl* impl = functionName.rep();
+                impl->ref();
+                m_staticFunctions->add(impl, entry);
+            }
             ++staticFunction;
         }
     }
@@ -89,12 +119,13 @@ OpaqueTiClass::OpaqueTiClass(const TiClassDefinition* definition, OpaqueTiClass*
 
 OpaqueTiClass::~OpaqueTiClass()
 {
-    ASSERT(!m_className.rep()->identifierTable());
+    // The empty string is shared across threads & is an identifier, in all other cases we should have done a deep copy in className(), below. 
+    ASSERT(!m_className.size() || !m_className.rep()->isIdentifier());
 
     if (m_staticValues) {
         OpaqueTiClassStaticValuesTable::const_iterator end = m_staticValues->end();
         for (OpaqueTiClassStaticValuesTable::const_iterator it = m_staticValues->begin(); it != end; ++it) {
-            ASSERT(!it->first->identifierTable());
+            ASSERT(!it->first->isIdentifier());
             delete it->second;
         }
         delete m_staticValues;
@@ -103,7 +134,7 @@ OpaqueTiClass::~OpaqueTiClass()
     if (m_staticFunctions) {
         OpaqueTiClassStaticFunctionsTable::const_iterator end = m_staticFunctions->end();
         for (OpaqueTiClassStaticFunctionsTable::const_iterator it = m_staticFunctions->begin(); it != end; ++it) {
-            ASSERT(!it->first->identifierTable());
+            ASSERT(!it->first->isIdentifier());
             delete it->second;
         }
         delete m_staticFunctions;
@@ -122,55 +153,46 @@ static void clearReferenceToPrototype(TiObjectRef prototype)
 {
     OpaqueTiClassContextData* jsClassData = static_cast<OpaqueTiClassContextData*>(TiObjectGetPrivate(prototype));
     ASSERT(jsClassData);
-    jsClassData->cachedPrototype = 0;
+    jsClassData->cachedPrototype.clear(toJS(prototype));
 }
 
-PassRefPtr<OpaqueTiClass> OpaqueTiClass::create(const TiClassDefinition* definition)
+PassRefPtr<OpaqueTiClass> OpaqueTiClass::create(const TiClassDefinition* clientDefinition)
 {
-    if (const TiStaticFunction* staticFunctions = definition->staticFunctions) {
-        // copy functions into a prototype class
-        TiClassDefinition protoDefinition = kTiClassDefinitionEmpty;
-        protoDefinition.staticFunctions = staticFunctions;
-        protoDefinition.finalize = clearReferenceToPrototype;
-        
-        // We are supposed to use TiClassRetain/Release but since we know that we currently have
-        // the only reference to this class object we cheat and use a RefPtr instead.
-        RefPtr<OpaqueTiClass> protoClass = adoptRef(new OpaqueTiClass(&protoDefinition, 0));
+    TiClassDefinition definition = *clientDefinition; // Avoid modifying client copy.
 
-        // remove functions from the original class
-        TiClassDefinition objectDefinition = *definition;
-        objectDefinition.staticFunctions = 0;
-
-        return adoptRef(new OpaqueTiClass(&objectDefinition, protoClass.get()));
-    }
-
-    return adoptRef(new OpaqueTiClass(definition, 0));
+    TiClassDefinition protoDefinition = kTiClassDefinitionEmpty;
+    protoDefinition.finalize = clearReferenceToPrototype;
+    swap(definition.staticFunctions, protoDefinition.staticFunctions); // Move static functions to the prototype.
+    
+    // We are supposed to use TiClassRetain/Release but since we know that we currently have
+    // the only reference to this class object we cheat and use a RefPtr instead.
+    RefPtr<OpaqueTiClass> protoClass = adoptRef(new OpaqueTiClass(&protoDefinition, 0));
+    return adoptRef(new OpaqueTiClass(&definition, protoClass.get()));
 }
 
 OpaqueTiClassContextData::OpaqueTiClassContextData(OpaqueTiClass* jsClass)
     : m_class(jsClass)
-    , cachedPrototype(0)
 {
     if (jsClass->m_staticValues) {
         staticValues = new OpaqueTiClassStaticValuesTable;
         OpaqueTiClassStaticValuesTable::const_iterator end = jsClass->m_staticValues->end();
         for (OpaqueTiClassStaticValuesTable::const_iterator it = jsClass->m_staticValues->begin(); it != end; ++it) {
-            ASSERT(!it->first->identifierTable());
-            staticValues->add(UString::Rep::createCopying(it->first->data(), it->first->size()),
-                              new StaticValueEntry(it->second->getProperty, it->second->setProperty, it->second->attributes));
+            ASSERT(!it->first->isIdentifier());
+            // Use a local variable here to sidestep an RVCT compiler bug.
+            StaticValueEntry* entry = new StaticValueEntry(it->second->getProperty, it->second->setProperty, it->second->attributes);
+            staticValues->add(UString::Rep::create(it->first->characters(), it->first->length()), entry);
         }
-            
     } else
         staticValues = 0;
-        
 
     if (jsClass->m_staticFunctions) {
         staticFunctions = new OpaqueTiClassStaticFunctionsTable;
         OpaqueTiClassStaticFunctionsTable::const_iterator end = jsClass->m_staticFunctions->end();
         for (OpaqueTiClassStaticFunctionsTable::const_iterator it = jsClass->m_staticFunctions->begin(); it != end; ++it) {
-            ASSERT(!it->first->identifierTable());
-            staticFunctions->add(UString::Rep::createCopying(it->first->data(), it->first->size()),
-                              new StaticFunctionEntry(it->second->callAsFunction, it->second->attributes));
+            ASSERT(!it->first->isIdentifier());
+            // Use a local variable here to sidestep an RVCT compiler bug.
+            StaticFunctionEntry* entry = new StaticFunctionEntry(it->second->callAsFunction, it->second->attributes);
+            staticFunctions->add(UString::Rep::create(it->first->characters(), it->first->length()), entry);
         }
             
     } else
@@ -247,5 +269,5 @@ TiObject* OpaqueTiClass::prototype(TiExcState* exec)
                 jsClassData.cachedPrototype->setPrototype(prototype);
         }
     }
-    return jsClassData.cachedPrototype;
+    return jsClassData.cachedPrototype.get();
 }

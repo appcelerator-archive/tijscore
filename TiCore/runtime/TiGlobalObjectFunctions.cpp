@@ -34,14 +34,17 @@
 
 #include "CallFrame.h"
 #include "GlobalEvalFunction.h"
-#include "TiGlobalObject.h"
-#include "LiteralParser.h"
-#include "TiString.h"
 #include "Interpreter.h"
-#include "Parser.h"
-#include "dtoa.h"
+#include "TiGlobalObject.h"
+#include "TiString.h"
+#include "TiStringBuilder.h"
 #include "Lexer.h"
+#include "LiteralParser.h"
 #include "Nodes.h"
+#include "Parser.h"
+#include "StringBuilder.h"
+#include "StringExtras.h"
+#include "dtoa.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -59,27 +62,27 @@ static TiValue encode(TiExcState* exec, const ArgList& args, const char* doNotEs
 {
     UString str = args.at(0).toString(exec);
     CString cstr = str.UTF8String(true);
-    if (!cstr.c_str())
+    if (!cstr.data())
         return throwError(exec, URIError, "String contained an illegal UTF-16 sequence.");
 
-    UString result = "";
-    const char* p = cstr.c_str();
-    for (size_t k = 0; k < cstr.size(); k++, p++) {
+    TiStringBuilder builder;
+    const char* p = cstr.data();
+    for (size_t k = 0; k < cstr.length(); k++, p++) {
         char c = *p;
         if (c && strchr(doNotEscape, c))
-            result.append(c);
+            builder.append(c);
         else {
             char tmp[4];
-            sprintf(tmp, "%%%02X", static_cast<unsigned char>(c));
-            result += tmp;
+            snprintf(tmp, sizeof(tmp), "%%%02X", static_cast<unsigned char>(c));
+            builder.append(tmp);
         }
     }
-    return jsString(exec, result);
+    return builder.build(exec);
 }
 
 static TiValue decode(TiExcState* exec, const ArgList& args, const char* doNotUnescape, bool strict)
 {
-    UString result = "";
+    TiStringBuilder builder;
     UString str = args.at(0).toString(exec);
     int k = 0;
     int len = str.size();
@@ -113,7 +116,7 @@ static TiValue decode(TiExcState* exec, const ArgList& args, const char* doNotUn
                             charLen = 0;
                         else if (character >= 0x10000) {
                             // Convert to surrogate pair.
-                            result.append(static_cast<UChar>(0xD800 | ((character - 0x10000) >> 10)));
+                            builder.append(static_cast<UChar>(0xD800 | ((character - 0x10000) >> 10)));
                             u = static_cast<UChar>(0xDC00 | ((character - 0x10000) & 0x3FF));
                         } else
                             u = static_cast<UChar>(character);
@@ -138,9 +141,9 @@ static TiValue decode(TiExcState* exec, const ArgList& args, const char* doNotUn
             }
         }
         k++;
-        result.append(c);
+        builder.append(c);
     }
-    return jsString(exec, result);
+    return builder.build(exec);
 }
 
 bool isStrWhiteSpace(UChar c)
@@ -245,6 +248,7 @@ static double parseInt(const UString& s, int radix)
     }
 
     if (number >= mantissaOverflowLowerBound) {
+        // FIXME: It is incorrect to use UString::ascii() here because it's not thread-safe.
         if (radix == 10)
             number = WTI::strtod(s.substr(firstDigitPosition, p - firstDigitPosition).ascii(), 0);
         else if (radix == 2 || radix == 4 || radix == 8 || radix == 16 || radix == 32)
@@ -273,6 +277,8 @@ static double parseFloat(const UString& s)
     if (length - p >= 2 && data[p] == '0' && (data[p + 1] == 'x' || data[p + 1] == 'X'))
         return 0;
 
+    // FIXME: UString::toDouble will ignore leading ASCII spaces, but we need to ignore
+    // other StrWhiteSpaceChar values as well.
     return s.toDouble(true /*tolerant*/, false /* NaN for empty string */);
 }
 
@@ -383,32 +389,30 @@ TiValue JSC_HOST_CALL globalFuncEscape(TiExcState* exec, TiObject*, TiValue, con
         "0123456789"
         "*+-./@_";
 
-    UString result = "";
-    UString s;
+    TiStringBuilder builder;
     UString str = args.at(0).toString(exec);
     const UChar* c = str.data();
-    for (int k = 0; k < str.size(); k++, c++) {
+    for (unsigned k = 0; k < str.size(); k++, c++) {
         int u = c[0];
         if (u > 255) {
             char tmp[7];
-            sprintf(tmp, "%%u%04X", u);
-            s = UString(tmp);
+            snprintf(tmp, sizeof(tmp), "%%u%04X", u);
+            builder.append(tmp);
         } else if (u != 0 && strchr(do_not_escape, static_cast<char>(u)))
-            s = UString(c, 1);
+            builder.append(c, 1);
         else {
             char tmp[4];
-            sprintf(tmp, "%%%02X", u);
-            s = UString(tmp);
+            snprintf(tmp, sizeof(tmp), "%%%02X", u);
+            builder.append(tmp);
         }
-        result += s;
     }
 
-    return jsString(exec, result);
+    return builder.build(exec);
 }
 
 TiValue JSC_HOST_CALL globalFuncUnescape(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    UString result = "";
+    StringBuilder builder;
     UString str = args.at(0).toString(exec);
     int k = 0;
     int len = str.size();
@@ -427,17 +431,16 @@ TiValue JSC_HOST_CALL globalFuncUnescape(TiExcState* exec, TiObject*, TiValue, c
             k += 2;
         }
         k++;
-        result.append(*c);
+        builder.append(*c);
     }
 
-    return jsString(exec, result);
+    return jsString(exec, builder.build());
 }
 
 #ifndef NDEBUG
 TiValue JSC_HOST_CALL globalFuncJSCPrint(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
 {
-    CStringBuffer string;
-    args.at(0).toString(exec).getCString(string);
+    CString string = args.at(0).toString(exec).UTF8String();
     puts(string.data());
     return jsUndefined();
 }

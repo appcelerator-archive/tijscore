@@ -40,7 +40,7 @@
 #include "Interpreter.h"
 #include "Opcode.h"
 
-#if !PLATFORM(WIN_OS)
+#if !OS(WINDOWS)
 #include <unistd.h>
 #endif
 
@@ -50,7 +50,7 @@ namespace TI {
 
 void SamplingFlags::sample()
 {
-    uint32_t mask = 1 << 31;
+    uint32_t mask = static_cast<uint32_t>(1 << 31);
     unsigned index;
 
     for (index = 0; index < 32; ++index) {
@@ -98,7 +98,7 @@ void SamplingFlags::stop() {}
 uint32_t SamplingFlags::s_flags = 1 << 15;
 
 
-#if PLATFORM(WIN_OS)
+#if OS(WINDOWS)
 
 static void sleepForMicroseconds(unsigned us)
 {
@@ -344,7 +344,7 @@ void SamplingTool::dump(TiExcState* exec)
 
         if (blockPercent >= 1) {
             //Instruction* code = codeBlock->instructions().begin();
-            printf("#%d: %s:%d: %d / %lld (%.3f%%)\n", i + 1, record->m_executable->sourceURL().UTF8String().c_str(), codeBlock->lineNumberForBytecodeOffset(exec, 0), record->m_sampleCount, m_sampleCount, blockPercent);
+            printf("#%d: %s:%d: %d / %lld (%.3f%%)\n", i + 1, record->m_executable->sourceURL().ascii(), codeBlock->lineNumberForBytecodeOffset(exec, 0), record->m_sampleCount, m_sampleCount, blockPercent);
             if (i < 10) {
                 HashMap<unsigned,unsigned> lineCounts;
                 codeBlock->dump(exec);

@@ -34,29 +34,31 @@
 #include "TiArray.h"
 #include "TiFunction.h"
 #include "TiString.h"
+#include "Lookup.h"
 #include "ObjectPrototype.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpObject.h"
 #include "RegExpPrototype.h"
 #include "RegExp.h"
+#include "RegExpCache.h"
 
 namespace TI {
 
-static TiValue regExpConstructorInput(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorMultiline(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorLastMatch(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorLastParen(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorLeftContext(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorRightContext(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar1(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar2(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar3(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar4(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar5(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar6(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar7(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar8(TiExcState*, const Identifier&, const PropertySlot&);
-static TiValue regExpConstructorDollar9(TiExcState*, const Identifier&, const PropertySlot&);
+static TiValue regExpConstructorInput(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorMultiline(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorLastMatch(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorLastParen(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorLeftContext(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorRightContext(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar1(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar2(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar3(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar4(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar5(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar6(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar7(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar8(TiExcState*, TiValue, const Identifier&);
+static TiValue regExpConstructorDollar9(TiExcState*, TiValue, const Identifier&);
 
 static void setRegExpConstructorInput(TiExcState*, TiObject*, TiValue);
 static void setRegExpConstructorMultiline(TiExcState*, TiObject*, TiValue);
@@ -120,17 +122,17 @@ RegExpMatchesArray::RegExpMatchesArray(TiExcState* exec, RegExpConstructorPrivat
     memcpy(d->lastOvector().data(), data->lastOvector().data(), offsetVectorSize * sizeof(int));
     // d->multiline is not needed, and remains uninitialized
 
-    setLazyCreationData(d);
+    setSubclassData(d);
 }
 
 RegExpMatchesArray::~RegExpMatchesArray()
 {
-    delete static_cast<RegExpConstructorPrivate*>(lazyCreationData());
+    delete static_cast<RegExpConstructorPrivate*>(subclassData());
 }
 
 void RegExpMatchesArray::fillArrayInstance(TiExcState* exec)
 {
-    RegExpConstructorPrivate* d = static_cast<RegExpConstructorPrivate*>(lazyCreationData());
+    RegExpConstructorPrivate* d = static_cast<RegExpConstructorPrivate*>(subclassData());
     ASSERT(d);
 
     unsigned lastNumSubpatterns = d->lastNumSubPatterns;
@@ -139,6 +141,8 @@ void RegExpMatchesArray::fillArrayInstance(TiExcState* exec)
         int start = d->lastOvector()[2 * i];
         if (start >= 0)
             TiArray::put(exec, i, jsSubstring(exec, d->lastInput, start, d->lastOvector()[2 * i + 1] - start));
+        else
+            TiArray::put(exec, i, jsUndefined());
     }
 
     PutPropertySlot slot;
@@ -146,7 +150,7 @@ void RegExpMatchesArray::fillArrayInstance(TiExcState* exec)
     TiArray::put(exec, exec->propertyNames().input, jsString(exec, d->input), slot);
 
     delete d;
-    setLazyCreationData(0);
+    setSubclassData(0);
 }
 
 TiObject* RegExpConstructor::arrayOfMatches(TiExcState* exec) const
@@ -200,79 +204,79 @@ bool RegExpConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identif
     return getStaticValueDescriptor<RegExpConstructor, InternalFunction>(exec, TiExcState::regExpConstructorTable(exec), this, propertyName, descriptor);
 }
 
-TiValue regExpConstructorDollar1(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar1(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 1);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 1);
 }
 
-TiValue regExpConstructorDollar2(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar2(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 2);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 2);
 }
 
-TiValue regExpConstructorDollar3(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar3(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 3);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 3);
 }
 
-TiValue regExpConstructorDollar4(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar4(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 4);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 4);
 }
 
-TiValue regExpConstructorDollar5(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar5(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 5);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 5);
 }
 
-TiValue regExpConstructorDollar6(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar6(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 6);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 6);
 }
 
-TiValue regExpConstructorDollar7(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar7(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 7);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 7);
 }
 
-TiValue regExpConstructorDollar8(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar8(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 8);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 8);
 }
 
-TiValue regExpConstructorDollar9(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorDollar9(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 9);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 9);
 }
 
-TiValue regExpConstructorInput(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorInput(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return jsString(exec, asRegExpConstructor(slot.slotBase())->input());
+    return jsString(exec, asRegExpConstructor(slotBase)->input());
 }
 
-TiValue regExpConstructorMultiline(TiExcState*, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorMultiline(TiExcState*, TiValue slotBase, const Identifier&)
 {
-    return jsBoolean(asRegExpConstructor(slot.slotBase())->multiline());
+    return jsBoolean(asRegExpConstructor(slotBase)->multiline());
 }
 
-TiValue regExpConstructorLastMatch(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorLastMatch(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getBackref(exec, 0);
+    return asRegExpConstructor(slotBase)->getBackref(exec, 0);
 }
 
-TiValue regExpConstructorLastParen(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorLastParen(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getLastParen(exec);
+    return asRegExpConstructor(slotBase)->getLastParen(exec);
 }
 
-TiValue regExpConstructorLeftContext(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorLeftContext(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getLeftContext(exec);
+    return asRegExpConstructor(slotBase)->getLeftContext(exec);
 }
 
-TiValue regExpConstructorRightContext(TiExcState* exec, const Identifier&, const PropertySlot& slot)
+TiValue regExpConstructorRightContext(TiExcState* exec, TiValue slotBase, const Identifier&)
 {
-    return asRegExpConstructor(slot.slotBase())->getRightContext(exec);
+    return asRegExpConstructor(slotBase)->getRightContext(exec);
 }
 
 void RegExpConstructor::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
@@ -305,9 +309,9 @@ TiObject* constructRegExp(TiExcState* exec, const ArgList& args)
     UString pattern = arg0.isUndefined() ? UString("") : arg0.toString(exec);
     UString flags = arg1.isUndefined() ? UString("") : arg1.toString(exec);
 
-    RefPtr<RegExp> regExp = RegExp::create(&exec->globalData(), pattern, flags);
+    RefPtr<RegExp> regExp = exec->globalData().regExpCache()->lookupOrCreate(pattern, flags);
     if (!regExp->isValid())
-        return throwError(exec, SyntaxError, UString("Invalid regular expression: ").append(regExp->errorMessage()));
+        return throwError(exec, SyntaxError, makeString("Invalid regular expression: ", regExp->errorMessage()));
     return new (exec) RegExpObject(exec->lexicalGlobalObject()->regExpStructure(), regExp.release());
 }
 

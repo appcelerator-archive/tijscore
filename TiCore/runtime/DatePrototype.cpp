@@ -31,11 +31,12 @@
 #include "DatePrototype.h"
 
 #include "DateConversion.h"
+#include "DateInstance.h"
 #include "Error.h"
 #include "TiString.h"
+#include "TiStringBuilder.h"
+#include "Lookup.h"
 #include "ObjectPrototype.h"
-#include "DateInstance.h"
-#include <float.h>
 
 #if !PLATFORM(MAC) && HAVE(LANGINFO_H)
 #include <langinfo.h>
@@ -63,11 +64,9 @@
 #include <sys/timeb.h>
 #endif
 
-#if PLATFORM(MAC)
 #include <CoreFoundation/CoreFoundation.h>
-#endif
 
-#if PLATFORM(WINCE) && !PLATFORM(QT)
+#if OS(WINCE) && !PLATFORM(QT)
 extern "C" size_t strftime(char * const s, const size_t maxsize, const char * const format, const struct tm * const t); //provided by libce
 #endif
 
@@ -132,7 +131,6 @@ namespace TI {
 
 enum LocaleDateTimeFormat { LocaleDateAndTime, LocaleDate, LocaleTime };
  
-#if PLATFORM(MAC)
 
 // FIXME: Since this is superior to the strftime-based version, why limit this to PLATFORM(MAC)?
 // Instead we should consider using this whenever PLATFORM(CF) is true.
@@ -199,74 +197,6 @@ static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMi
     return jsNontrivialString(exec, UString(buffer, length));
 }
 
-#else // !PLATFORM(MAC)
-
-static TiCell* formatLocaleDate(TiExcState* exec, const GregorianDateTime& gdt, LocaleDateTimeFormat format)
-{
-#if HAVE(LANGINFO_H)
-    static const nl_item formats[] = { D_T_FMT, D_FMT, T_FMT };
-#elif (PLATFORM(WINCE) && !PLATFORM(QT)) || PLATFORM(SYMBIAN)
-     // strftime() does not support '#' on WinCE or Symbian
-    static const char* const formatStrings[] = { "%c", "%x", "%X" };
-#else
-    static const char* const formatStrings[] = { "%#c", "%#x", "%X" };
-#endif
- 
-    // Offset year if needed
-    struct tm localTM = gdt;
-    int year = gdt.year + 1900;
-    bool yearNeedsOffset = year < 1900 || year > 2038;
-    if (yearNeedsOffset)
-        localTM.tm_year = equivalentYearForDST(year) - 1900;
- 
-#if HAVE(LANGINFO_H)
-    // We do not allow strftime to generate dates with 2-digits years,
-    // both to avoid ambiguity, and a crash in strncpy, for years that
-    // need offset.
-    char* formatString = strdup(nl_langinfo(formats[format]));
-    char* yPos = strchr(formatString, 'y');
-    if (yPos)
-        *yPos = 'Y';
-#endif
-
-    // Do the formatting
-    const int bufsize = 128;
-    char timebuffer[bufsize];
-
-#if HAVE(LANGINFO_H)
-    size_t ret = strftime(timebuffer, bufsize, formatString, &localTM);
-    free(formatString);
-#else
-    size_t ret = strftime(timebuffer, bufsize, formatStrings[format], &localTM);
-#endif
- 
-    if (ret == 0)
-        return jsEmptyString(exec);
- 
-    // Copy original into the buffer
-    if (yearNeedsOffset && format != LocaleTime) {
-        static const int yearLen = 5;   // FIXME will be a problem in the year 10,000
-        char yearString[yearLen];
- 
-        snprintf(yearString, yearLen, "%d", localTM.tm_year + 1900);
-        char* yearLocation = strstr(timebuffer, yearString);
-        snprintf(yearString, yearLen, "%d", year);
- 
-        strncpy(yearLocation, yearString, yearLen - 1);
-    }
- 
-    return jsNontrivialString(exec, timebuffer);
-}
-
-static TiCell* formatLocaleDate(TiExcState* exec, DateInstance* dateObject, double, LocaleDateTimeFormat format, const ArgList&)
-{
-    const GregorianDateTime* gregorianDateTime = dateObject->gregorianDateTime(exec);
-    if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
-    return formatLocaleDate(exec, *gregorianDateTime, format);
-}
-
-#endif // !PLATFORM(MAC)
 
 // Converts a list of arguments sent to a Date member function into milliseconds, updating
 // ms (representing milliseconds) and t (representing the rest of the date structure) appropriately.
@@ -431,7 +361,11 @@ TiValue JSC_HOST_CALL dateProtoFuncToString(TiExcState* exec, TiObject*, TiValue
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
         return jsNontrivialString(exec, "Invalid Date");
-    return jsNontrivialString(exec, formatDate(*gregorianDateTime) + " " + formatTime(*gregorianDateTime));
+    DateConversionBuffer date;
+    DateConversionBuffer time;
+    formatDate(*gregorianDateTime, date);
+    formatTime(*gregorianDateTime, time);
+    return jsMakeNontrivialString(exec, date, " ", time);
 }
 
 TiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
@@ -444,7 +378,11 @@ TiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState* exec, TiObject*, TiVa
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
         return jsNontrivialString(exec, "Invalid Date");
-    return jsNontrivialString(exec, formatDateUTCVariant(*gregorianDateTime) + " " + formatTimeUTC(*gregorianDateTime));
+    DateConversionBuffer date;
+    DateConversionBuffer time;
+    formatDateUTCVariant(*gregorianDateTime, date);
+    formatTimeUTC(*gregorianDateTime, time);
+    return jsMakeNontrivialString(exec, date, " ", time);
 }
 
 TiValue JSC_HOST_CALL dateProtoFuncToISOString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
@@ -475,7 +413,9 @@ TiValue JSC_HOST_CALL dateProtoFuncToDateString(TiExcState* exec, TiObject*, TiV
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
         return jsNontrivialString(exec, "Invalid Date");
-    return jsNontrivialString(exec, formatDate(*gregorianDateTime));
+    DateConversionBuffer date;
+    formatDate(*gregorianDateTime, date);
+    return jsNontrivialString(exec, date);
 }
 
 TiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
@@ -488,7 +428,9 @@ TiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState* exec, TiObject*, TiV
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
         return jsNontrivialString(exec, "Invalid Date");
-    return jsNontrivialString(exec, formatTime(*gregorianDateTime));
+    DateConversionBuffer time;
+    formatTime(*gregorianDateTime, time);
+    return jsNontrivialString(exec, time);
 }
 
 TiValue JSC_HOST_CALL dateProtoFuncToLocaleString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
@@ -562,7 +504,11 @@ TiValue JSC_HOST_CALL dateProtoFuncToGMTString(TiExcState* exec, TiObject*, TiVa
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
         return jsNontrivialString(exec, "Invalid Date");
-    return jsNontrivialString(exec, formatDateUTCVariant(*gregorianDateTime) + " " + formatTimeUTC(*gregorianDateTime));
+    DateConversionBuffer date;
+    DateConversionBuffer time;
+    formatDateUTCVariant(*gregorianDateTime, date);
+    formatTimeUTC(*gregorianDateTime, time);
+    return jsMakeNontrivialString(exec, date, " ", time);
 }
 
 TiValue JSC_HOST_CALL dateProtoFuncGetMonth(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)

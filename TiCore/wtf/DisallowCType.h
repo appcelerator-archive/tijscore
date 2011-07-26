@@ -36,6 +36,10 @@
 #ifndef WTF_DisallowCType_h
 #define WTF_DisallowCType_h
 
+#include "Platform.h"
+
+#define _DONT_USE_CTYPE_INLINE_
+
 // The behavior of many of the functions in the <ctype.h> header is dependent
 // on the current locale. But almost all uses of these functions are for
 // locale-independent, ASCII-specific purposes. In WebKit code we use our own

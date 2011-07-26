@@ -47,6 +47,7 @@ namespace TI {
     class ArgumentListNode;
     class BytecodeGenerator;
     class FunctionBodyNode;
+    class Label;
     class PropertyListNode;
     class ReadModifyResolveNode;
     class RegisterID;
@@ -158,6 +159,9 @@ namespace TI {
         virtual bool isCommaNode() const { return false; }
         virtual bool isSimpleArray() const { return false; }
         virtual bool isAdd() const { return false; }
+        virtual bool hasConditionContextCodegen() const { return false; }
+
+        virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label*, Label*, bool) { ASSERT_NOT_REACHED(); }
 
         virtual ExpressionNode* stripUnaryPlus() { return this; }
 
@@ -764,6 +768,7 @@ namespace TI {
 
     protected:
         ExpressionNode* expr() { return m_expr; }
+        const ExpressionNode* expr() const { return m_expr; }
 
     private:
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
@@ -795,6 +800,9 @@ namespace TI {
     class LogicalNotNode : public UnaryOpNode {
     public:
         LogicalNotNode(TiGlobalData*, ExpressionNode*);
+    private:
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, bool fallThroughMeansTrue);
+        virtual bool hasConditionContextCodegen() const { return expr()->hasConditionContextCodegen(); }
     };
 
     class BinaryOpNode : public ExpressionNode {
@@ -959,6 +967,8 @@ namespace TI {
 
     private:
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
+        void emitBytecodeInConditionContext(BytecodeGenerator&, Label* trueTarget, Label* falseTarget, bool fallThroughMeansTrue);
+        virtual bool hasConditionContextCodegen() const { return true; }
 
         ExpressionNode* m_expr1;
         ExpressionNode* m_expr2;
@@ -1382,12 +1392,6 @@ namespace TI {
 
         using ParserArenaRefCounted::operator new;
 
-        void adoptData(std::auto_ptr<ScopeNodeData> data)
-        {
-            ASSERT(!data->m_arena.contains(this));
-            ASSERT(!m_data);
-            m_data.adopt(data);
-        }
         ScopeNodeData* data() const { return m_data.get(); }
         void destroyData() { m_data.clear(); }
 

@@ -32,24 +32,26 @@
 
 #include <wtf/Platform.h>
 
-#if PLATFORM(WIN_OS) && !defined(BUILDING_WX__) && !COMPILER(GCC)
+#if !PLATFORM(CHROMIUM) && OS(WINDOWS) && !defined(BUILDING_WX__) && !COMPILER(GCC)
 #if defined(BUILDING_TiCore) || defined(BUILDING_WTF)
 #define JS_EXPORTDATA __declspec(dllexport)
 #else
 #define JS_EXPORTDATA __declspec(dllimport)
 #endif
+#define JS_EXPORTCLASS JS_EXPORTDATA
 #else
 #define JS_EXPORTDATA
+#define JS_EXPORTCLASS
 #endif
 
-#if PLATFORM(WIN_OS)
+#if OS(WINDOWS)
 
 // If we don't define these, they get defined in windef.h. 
 // We want to use std::min and std::max
 #define max max
 #define min min
 
-#if !COMPILER(MSVC7) && !PLATFORM(WINCE)
+#if !COMPILER(MSVC7_OR_LOWER) && !OS(WINCE)
 // We need to define this before the first #include of stdlib.h or it won't contain rand_s.
 #ifndef _CRT_RAND_S
 #define _CRT_RAND_S
@@ -58,13 +60,12 @@
 
 #endif
 
-#if PLATFORM(FREEBSD) || PLATFORM(OPENBSD)
+#if OS(FREEBSD) || OS(OPENBSD)
 #define HAVE_PTHREAD_NP_H 1
 #endif
 
 /* FIXME: if all platforms have these, do they really need #defines? */
 #define HAVE_STDINT_H 1
-#define HAVE_STRING_H 1
 
 #define WTF_CHANGES 1
 
@@ -79,6 +80,12 @@
 // are used from wx headers. 
 #if !PLATFORM(QT) && !PLATFORM(WX)
 #include <wtf/DisallowCType.h>
+#endif
+
+#if COMPILER(MSVC)
+#define SKIP_STATIC_CONSTRUCTORS_ON_MSVC 1
+#else
+#define SKIP_STATIC_CONSTRUCTORS_ON_GCC 1
 #endif
 
 #if PLATFORM(CHROMIUM)

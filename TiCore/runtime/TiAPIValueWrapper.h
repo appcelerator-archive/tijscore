@@ -30,8 +30,6 @@
 #ifndef TiAPIValueWrapper_h
 #define TiAPIValueWrapper_h
 
-#include <wtf/Platform.h>
-
 #include "TiCell.h"
 #include "CallFrame.h"
 
@@ -46,7 +44,7 @@ namespace TI {
 
         static PassRefPtr<Structure> createStructure(TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren | OverridesGetPropertyNames));
+            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren | OverridesGetPropertyNames), AnonymousSlotCount);
         }
 
         

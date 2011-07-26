@@ -37,6 +37,7 @@
 #include "CodeBlock.h"
 #include "JIT.h"
 #include "Parser.h"
+#include "StringBuilder.h"
 #include "Vector.h"
 
 namespace TI {
@@ -145,6 +146,9 @@ void FunctionExecutable::compile(TiExcState*, ScopeChainNode* scopeChainNode)
 
 void EvalExecutable::generateJITCode(TiExcState* exec, ScopeChainNode* scopeChainNode)
 {
+#if ENABLE(INTERPRETER)
+    ASSERT(scopeChainNode->globalData->canUseJIT());
+#endif
     CodeBlock* codeBlock = &bytecode(exec, scopeChainNode);
     m_jitCode = JIT::compile(scopeChainNode->globalData, codeBlock);
 
@@ -156,6 +160,9 @@ void EvalExecutable::generateJITCode(TiExcState* exec, ScopeChainNode* scopeChai
 
 void ProgramExecutable::generateJITCode(TiExcState* exec, ScopeChainNode* scopeChainNode)
 {
+#if ENABLE(INTERPRETER)
+    ASSERT(scopeChainNode->globalData->canUseJIT());
+#endif
     CodeBlock* codeBlock = &bytecode(exec, scopeChainNode);
     m_jitCode = JIT::compile(scopeChainNode->globalData, codeBlock);
 
@@ -167,6 +174,9 @@ void ProgramExecutable::generateJITCode(TiExcState* exec, ScopeChainNode* scopeC
 
 void FunctionExecutable::generateJITCode(TiExcState* exec, ScopeChainNode* scopeChainNode)
 {
+#if ENABLE(INTERPRETER)
+    ASSERT(scopeChainNode->globalData->canUseJIT());
+#endif
     CodeBlock* codeBlock = &bytecode(exec, scopeChainNode);
     m_jitCode = JIT::compile(scopeChainNode->globalData, codeBlock);
 
@@ -204,8 +214,13 @@ ExceptionInfo* FunctionExecutable::reparseExceptionInfo(TiGlobalData* globalData
     ASSERT(newCodeBlock->instructionCount() == codeBlock->instructionCount());
 
 #if ENABLE(JIT)
-    JITCode newJITCode = JIT::compile(globalData, newCodeBlock.get());
-    ASSERT(newJITCode.size() == generatedJITCode().size());
+#if ENABLE(INTERPRETER)
+    if (globalData->canUseJIT())
+#endif
+    {
+        JITCode newJITCode = JIT::compile(globalData, newCodeBlock.get(), generatedJITCode().start());
+        ASSERT(newJITCode.size() == generatedJITCode().size());
+    }
 #endif
 
     globalData->functionCodeBlockBeingReparsed = 0;
@@ -229,14 +244,19 @@ ExceptionInfo* EvalExecutable::reparseExceptionInfo(TiGlobalData* globalData, Sc
     ASSERT(newCodeBlock->instructionCount() == codeBlock->instructionCount());
 
 #if ENABLE(JIT)
-    JITCode newJITCode = JIT::compile(globalData, newCodeBlock.get());
-    ASSERT(newJITCode.size() == generatedJITCode().size());
+#if ENABLE(INTERPRETER)
+    if (globalData->canUseJIT())
+#endif
+    {
+        JITCode newJITCode = JIT::compile(globalData, newCodeBlock.get(), generatedJITCode().start());
+        ASSERT(newJITCode.size() == generatedJITCode().size());
+    }
 #endif
 
     return newCodeBlock->extractExceptionInfo();
 }
 
-void FunctionExecutable::recompile(TiExcState*)
+void FunctionExecutable::recompile()
 {
     delete m_codeBlock;
     m_codeBlock = 0;
@@ -272,14 +292,13 @@ PassRefPtr<FunctionExecutable> FunctionExecutable::fromGlobalCode(const Identifi
 UString FunctionExecutable::paramString() const
 {
     FunctionParameters& parameters = *m_parameters;
-    UString s("");
+    StringBuilder builder;
     for (size_t pos = 0; pos < parameters.size(); ++pos) {
-        if (!s.isEmpty())
-            s += ", ";
-        s += parameters[pos].ustring();
+        if (!builder.isEmpty())
+            builder.append(", ");
+        builder.append(parameters[pos].ustring());
     }
-
-    return s;
+    return builder.build();
 }
 
 };

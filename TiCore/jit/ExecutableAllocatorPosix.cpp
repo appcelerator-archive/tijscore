@@ -34,15 +34,13 @@
 
 #include "ExecutableAllocator.h"
 
-#if ENABLE(ASSEMBLER)
+#if ENABLE(EXECUTABLE_ALLOCATOR_DEMAND) && !OS(WINDOWS) && !OS(SYMBIAN)
 
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wtf/VMTags.h>
 
 namespace TI {
-
-#if !(PLATFORM(MAC) && PLATFORM(X86_64))
 
 void ExecutableAllocator::intializePageSize()
 {
@@ -64,29 +62,31 @@ void ExecutablePool::systemRelease(const ExecutablePool::Allocation& alloc)
     ASSERT_UNUSED(result, !result);
 }
 
-#endif // !(PLATFORM(MAC) && PLATFORM(X86_64))
-
-#if ENABLE(ASSEMBLER_WX_EXCLUSIVE)
-void ExecutableAllocator::reprotectRegion(void* start, size_t size, ProtectionSeting setting)
+bool ExecutablePool::underMemoryPressure()
 {
-    if (!pageSize)
-        intializePageSize();
+    return false;
+}
 
-    // Calculate the start of the page containing this region,
-    // and account for this extra memory within size.
-    intptr_t startPtr = reinterpret_cast<intptr_t>(start);
-    intptr_t pageStartPtr = startPtr & ~(pageSize - 1);
-    void* pageStart = reinterpret_cast<void*>(pageStartPtr);
-    size += (startPtr - pageStartPtr);
+bool ExecutableAllocator::isValid() const
+{
+    return true;
+}
 
-    // Round size up
-    size += (pageSize - 1);
-    size &= ~(pageSize - 1);
-
-    mprotect(pageStart, size, (setting == Writable) ? PROTECTION_FLAGS_RW : PROTECTION_FLAGS_RX);
+#if CPU(ARM_TRADITIONAL) && OS(LINUX) && COMPILER(RVCT)
+__asm void ExecutableAllocator::cacheFlush(void* code, size_t size)
+{
+    ARM
+    push {r7}
+    add r1, r1, r0
+    mov r7, #0xf0000
+    add r7, r7, #0x2
+    mov r2, #0x0
+    svc #0x0
+    pop {r7}
+    bx lr
 }
 #endif
 
 }
 
-#endif // HAVE(ASSEMBLER)
+#endif

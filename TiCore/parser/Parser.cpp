@@ -34,9 +34,6 @@
 #include "Lexer.h"
 #include <wtf/HashSet.h>
 #include <wtf/Vector.h>
-#include <memory>
-
-using std::auto_ptr;
 
 #ifndef yyparse
 extern int jscyyparse(void*);
@@ -57,7 +54,7 @@ void Parser::parse(TiGlobalData* globalData, int* errLine, UString* errMsg)
         errMsg = &defaultErrMsg;
 
     *errLine = -1;
-    *errMsg = 0;
+    *errMsg = UString();
 
     Lexer& lexer = *globalData->lexer;
     lexer.setCode(*m_source, m_arena);

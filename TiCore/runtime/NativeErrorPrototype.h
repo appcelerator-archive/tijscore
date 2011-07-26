@@ -31,10 +31,11 @@
 #include "TiObject.h"
 
 namespace TI {
+    class NativeErrorConstructor;
 
     class NativeErrorPrototype : public TiObject {
     public:
-        NativeErrorPrototype(TiExcState*, NonNullPassRefPtr<Structure>, const UString& name, const UString& message);
+        NativeErrorPrototype(TiExcState*, NonNullPassRefPtr<Structure>, const UString&, NativeErrorConstructor*);
     };
 
 } // namespace TI
