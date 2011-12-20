@@ -2560,7 +2560,11 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_BIT)";
+				"ARCHS[sdk=iphoneos*]" = (
+					armv6,
+					"$(ARCHS_STANDARD_32_BIT)",
+				);
+				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_BIT) armv6";
 				COPY_PHASE_STRIP = NO;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_OPTIMIZATION_LEVEL = 0;
@@ -2572,6 +2576,7 @@
 					"$(GCC_PREPROCESSOR_DEFINITIONS)",
 					"UCONFIG_NO_COLLATION=1",
 				);
+				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"$(HEADER_SEARCH_PATHS)",
@@ -2582,6 +2587,7 @@
 				PRODUCT_NAME = iOSTiCore;
 				PUBLIC_HEADERS_FOLDER_PATH = TiCore;
 				SDKROOT = iphoneos;
+				VALID_ARCHS = "armv6 i386 $(ARCHS_STANDARD_32_64_BIT)";
 			};
 			name = Debug;
 		};
@@ -2590,7 +2596,11 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_64_BIT)";
+				"ARCHS[sdk=iphoneos*]" = (
+					armv6,
+					"$(ARCHS_STANDARD_32_BIT)",
+				);
+				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_64_BIT) armv6";
 				COPY_PHASE_STRIP = YES;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
 				GCC_ENABLE_FIX_AND_CONTINUE = NO;
@@ -2603,6 +2613,7 @@
 					"$(GCC_PREPROCESSOR_DEFINITIONS)",
 					"UCONFIG_NO_COLLATION=1",
 				);
+				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"$(HEADER_SEARCH_PATHS)",
@@ -2613,6 +2624,7 @@
 				PRODUCT_NAME = iOSTiCore;
 				PUBLIC_HEADERS_FOLDER_PATH = TiCore;
 				SDKROOT = iphoneos;
+				VALID_ARCHS = "armv6 i386 $(ARCHS_STANDARD_32_64_BIT)";
 				ZERO_LINK = NO;
 			};
 			name = Release;
@@ -2622,7 +2634,11 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
-				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_64_BIT)";
+				"ARCHS[sdk=iphoneos*]" = (
+					armv6,
+					"$(ARCHS_STANDARD_32_BIT)",
+				);
+				ARCHS_iphoneos = "$(ARCHS_STANDARD_32_64_BIT) armv6";
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(DEBUG_DEFINES)",
 					"HAVE_DTRACE=$(HAVE_DTRACE)",
@@ -2631,6 +2647,7 @@
 					"$(GCC_PREPROCESSOR_DEFINITIONS)",
 					"UCONFIG_NO_COLLATION=1",
 				);
+				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"$(HEADER_SEARCH_PATHS)",
@@ -2641,6 +2658,7 @@
 				PRODUCT_NAME = iOSTiCore;
 				PUBLIC_HEADERS_FOLDER_PATH = TiCore;
 				SDKROOT = iphoneos;
+				VALID_ARCHS = "armv6 i386 $(ARCHS_STANDARD_32_64_BIT)";
 			};
 			name = Profiling;
 		};
@@ -2649,6 +2667,10 @@
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				ARCHS = "$(ARCHS_STANDARD_32_BIT)";
+				"ARCHS[sdk=iphoneos*]" = (
+					armv6,
+					"$(ARCHS_STANDARD_32_BIT)",
+				);
 				GCC_OPTIMIZATION_LEVEL = s;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"$(DEBUG_DEFINES)",
@@ -2658,6 +2680,7 @@
 					"$(GCC_PREPROCESSOR_DEFINITIONS)",
 					"UCONFIG_NO_COLLATION=1",
 				);
+				GCC_VERSION = com.apple.compilers.llvmgcc42;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"$(HEADER_SEARCH_PATHS)",
@@ -2668,6 +2691,7 @@
 				PRODUCT_NAME = iOSTiCore;
 				PUBLIC_HEADERS_FOLDER_PATH = TiCore;
 				SDKROOT = iphoneos;
+				VALID_ARCHS = "armv6 i386 $(ARCHS_STANDARD_32_64_BIT)";
 			};
 			name = Production;
 		};
