@@ -49,7 +49,7 @@ GCC_WARN_ABOUT_MISSING_PROTOTYPES = YES;
 GCC_WARN_NON_VIRTUAL_DESTRUCTOR = YES;
 LINKER_DISPLAYS_MANGLED_NAMES = YES;
 PREBINDING = NO;
-VALID_ARCHS = i386 $(ARCHS_STANDARD_32_64_BIT);
+VALID_ARCHS = i386 $(ARCHS_STANDARD_32_64_BIT) armv6;
 WARNING_CFLAGS = $(WARNING_CFLAGS_$(CURRENT_ARCH));
 WARNING_CFLAGS_BASE = -Wall -Wextra -Wcast-align -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings;
 WARNING_CFLAGS_ = $(WARNING_CFLAGS_BASE) -Wshorten-64-to-32;
