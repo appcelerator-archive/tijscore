@@ -95,6 +95,7 @@ SECTORDER_FLAGS = -sectorder __TEXT __text TiCore.order;
 GCC_VERSION = $(GCC_VERSION_$(XCODE_VERSION_MINOR));
 GCC_VERSION_ = $(GCC_VERSION_$(XCODE_VERSION_ACTUAL));
 GCC_VERSION_0310 = 4.2;
+GCC_VERSION_0420 = com.apple.compilers.llvmgcc42
 
 
 // HAVE_DTRACE is disabled on Leopard due to <rdar://problem/5628149>
