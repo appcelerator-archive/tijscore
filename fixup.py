@@ -6,9 +6,12 @@
 # naming conventions, etc so as not to conflict with an
 # existing install of KJS
 #
-import os, shutil, sys
+import os, shutil, sys, re
 
-root_dir = "TiCore"
+if len(sys.argv) > 1:
+	root_dir = sys.argv[1]
+else:
+	root_dir = "TiCore"
 
 
 tokens = [
@@ -46,19 +49,24 @@ tokens = [
 
 #['jsAPIValueWrapper','TiAPIValueWrapper'],
 
+COPYRIGHT_NOW = "2012"
 COPYRIGHT = """/**
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-%s by Appcelerator, Inc.
  */
 
-"""
+""" % COPYRIGHT_NOW
 
 def fix_copyright(ext,content):
 	if ext in ('.h','.cpp','.c','.mm'):
 		if content.find('Appcelerator Titanium License')==-1:
 			content = COPYRIGHT + content
+		else:
+			# update the copyright information if necessary
+			content = re.sub('Copyright \(c\) 2009\S*', 'Copyright (c) 2009-%s' % COPYRIGHT_NOW, content)
+			
 	return content
 
 
