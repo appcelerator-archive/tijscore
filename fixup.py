@@ -16,6 +16,7 @@ else:
 
 tokens = [
 	['JSString','TiString'],
+	['JavaScriptCore', 'TiCore'],
 	['JavaScript','Ti'],
 	['JSRetain','TiRetain'],
 	['JSRelease','TiRelease'],
@@ -46,6 +47,22 @@ tokens = [
 	['JSChar','TiChar'],
 	['WTFMain','WTIMain'],
 ]
+
+extensions = (
+	'.c',
+	'.cpp',
+	'.mm',
+	'.h',
+	'.pbxproj',
+	'.exp',
+	'.xcconfig',
+	'.sh',
+	'.make',
+	'.y',
+	'.lut.h',
+	'.gypi',
+	'.gyp'
+)
 
 #['jsAPIValueWrapper','TiAPIValueWrapper'],
 
@@ -89,7 +106,7 @@ def fix_filename(fn):
 	dirname = os.path.dirname(fn)
 	path = os.path.basename(fn)
 	ext = os.path.splitext(path)[1]
-	if ext in ('.c','.cpp','.mm','.h','.pbxproj','.exp','.xcconfig','.sh','.make','.y','.lut.h') or path == 'create_hash_table':
+	if ext in extensions or path == 'create_hash_table':
 		found = False
 		content = fix_content(fn)
 		content = fix_copyright(ext,content)
@@ -114,10 +131,24 @@ def fix_filename(fn):
 
 
 for root, dirs, files in os.walk(os.path.abspath(root_dir)):
+	for index, dir in enumerate(dirs):
+		ext = os.path.splitext(dir)[1]
+		if ext in ('.gyp'):
+			for token in tokens:
+				if token[0] in dir:
+					newdir = os.path.join(root,dir.replace(token[0],token[1]))
+					shutil.move(os.path.join(root,dir), newdir)
+					
+					dirs[index] = newdir
+					break
+			
+			
+					
 	for file in files:
 		from_ = os.path.join(root, file)
 		#print from_			  
 		fix_filename(from_)
+	
 
 xcode = os.path.join(root_dir,'JavaScriptCore.xcodeproj')
 if os.path.exists(xcode):
