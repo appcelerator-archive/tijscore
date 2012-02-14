@@ -60,8 +60,14 @@ extensions = (
 	'.make',
 	'.y',
 	'.lut.h',
-	'.gypi',
-	'.gyp'
+	'.py'
+)
+
+copyright_ext = (
+	'.h',
+	'.cpp',
+	'.c',
+	'.mm'
 )
 
 #['jsAPIValueWrapper','TiAPIValueWrapper'],
@@ -77,7 +83,7 @@ COPYRIGHT = """/**
 """ % COPYRIGHT_NOW
 
 def fix_copyright(ext,content):
-	if ext in ('.h','.cpp','.c','.mm'):
+	if ext in copyright_ext:
 		if content.find('Appcelerator Titanium License')==-1:
 			content = COPYRIGHT + content
 		else:
@@ -130,20 +136,7 @@ def fix_filename(fn):
 
 
 
-for root, dirs, files in os.walk(os.path.abspath(root_dir)):
-	for index, dir in enumerate(dirs):
-		ext = os.path.splitext(dir)[1]
-		if ext in ('.gyp'):
-			for token in tokens:
-				if token[0] in dir:
-					newdir = os.path.join(root,dir.replace(token[0],token[1]))
-					shutil.move(os.path.join(root,dir), newdir)
-					
-					dirs[index] = newdir
-					break
-			
-			
-					
+for root, dirs, files in os.walk(os.path.abspath(root_dir)):				
 	for file in files:
 		from_ = os.path.join(root, file)
 		#print from_			  
