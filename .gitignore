@@ -1,3 +1,5 @@
 *~
 JavaScriptCore*
 .svn
+*.rej
+*.orig

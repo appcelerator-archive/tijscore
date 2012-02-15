@@ -111,12 +111,13 @@
 }
 
 @end
+*/
 
 namespace TI {
 
 void startProfilerServerIfNeeded()
 {
-    [ProfilerServer sharedProfileServer];
+//    [ProfilerServer sharedProfileServer];
 }
 
 } // namespace TI

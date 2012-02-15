@@ -35,6 +35,8 @@
 #ifndef WTF_Platform_h
 #define WTF_Platform_h
 
+#define PLATFORM_TITANIUM 1
+
 /* ==== PLATFORM handles OS, operating environment, graphics API, and
    CPU. This macro will be phased out in favor of platform adaptation
    macros, policy decision macros, and top-level port definitions. ==== */

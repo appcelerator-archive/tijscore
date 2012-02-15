@@ -880,7 +880,7 @@ EncodedTiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec)
     if (!(ored & ~0x7f))
         return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 
-    bool error;
+    bool error = 0;
     int length = Unicode::toLower(buffer.data(), sSize, sData, sSize, &error);
     if (error) {
         buffer.resize(length);
@@ -920,7 +920,7 @@ EncodedTiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec)
     if (!(ored & ~0x7f))
         return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 
-    bool error;
+    bool error = 0;
     int length = Unicode::toUpper(buffer.data(), sSize, sData, sSize, &error);
     if (error) {
         buffer.resize(length);

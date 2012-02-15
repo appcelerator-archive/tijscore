@@ -45,6 +45,7 @@
 #include <runtime/Protect.h>
 #include <runtime/UString.h>
 #include <runtime/TiValue.h>
+#include <runtime/DateInstance.h>
 
 #include <wtf/Assertions.h>
 #include <wtf/text/StringHash.h>
@@ -117,6 +118,24 @@ bool TiValueIsString(TiContextRef ctx, TiValueRef value)
 
     TiValue jsValue = toJS(exec, value);
     return jsValue.isString();
+}
+
+bool TiValueIsArray(TiContextRef ctx, TiValueRef value)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    
+    TiValue jsValue = toJS(exec, value);
+    return jsValue.inherits(&TiArray::s_info);
+}
+
+bool TiValueIsDate(TiContextRef ctx, TiValueRef value)
+{
+    TiExcState* exec = toJS(ctx);
+    APIEntryShim entryShim(exec);
+    
+    TiValue jsValue = toJS(exec, value);
+    return jsValue.inherits(&DateInstance::s_info);
 }
 
 bool TiValueIsObject(TiContextRef ctx, TiValueRef value)

@@ -95,6 +95,10 @@ inline void Recompiler::operator()(TiCell* cell)
 
 namespace TI {
 
+Debugger::Debugger()
+{
+}
+
 Debugger::~Debugger()
 {
     HashSet<TiGlobalObject*>::iterator end = m_globalObjects.end();

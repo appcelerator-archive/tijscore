@@ -44,6 +44,7 @@ namespace TI {
     class Debugger {
     public:
         virtual ~Debugger();
+		Debugger();
 
         void attach(TiGlobalObject*);
         virtual void detach(TiGlobalObject*);

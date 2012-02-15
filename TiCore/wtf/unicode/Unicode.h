@@ -43,7 +43,8 @@
 #elif USE(BREWMP_UNICODE)
 #include <wtf/unicode/brew/UnicodeBrew.h>
 #else
-#error "Unknown Unicode implementation"
+//#error "Unknown Unicode implementation"
+#include <wtf/unicode/foundation/UnicodeFoundation.h>
 #endif
 
 COMPILE_ASSERT(sizeof(UChar) == 2, UCharIsTwoBytes);

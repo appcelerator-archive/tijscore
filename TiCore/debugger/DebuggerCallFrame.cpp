@@ -41,6 +41,9 @@
 #include "Interpreter.h"
 #include "Parser.h"
 
+#include "Arguments.h"
+#include "TiLock.h"
+
 namespace TI {
 
 const UString* DebuggerCallFrame::functionName() const
@@ -68,6 +71,53 @@ UString DebuggerCallFrame::calculatedFunctionName() const
 
     return asFunction(function)->calculatedDisplayName(m_callFrame);
 }
+    
+TiValue DebuggerCallFrame::functionArguments() const
+{
+    // CallFrame === TiTiExcState, so we can grab the interpreter and the argument information directly
+    if (!m_callFrame->codeBlock())
+        return jsNull();
+    
+    TiObject* function = m_callFrame->callee();
+    if (!function || !function->inherits(&TiFunction::s_info))
+        return jsNull();
+    
+    return m_callFrame->interpreter()->retrieveArguments(m_callFrame, asFunction(function));
+}
+
+UString DebuggerCallFrame::functionArgumentList() const
+{
+    if (!m_callFrame->codeBlock())
+        return UString("");
+    
+    TiObject* function = m_callFrame->callee();
+    if (!function || !function->inherits(&TiFunction::s_info) || asFunction(function)->isHostFunction())
+        return UString("");
+    
+    FunctionExecutable* executable = asFunction(function)->jsExecutable();
+    return executable->paramString();
+}
+
+TiObject* DebuggerCallFrame::function() const
+{
+    if (!m_callFrame->codeBlock())
+        return 0;
+    
+    TiObject* function = m_callFrame->callee();
+    if (!function || !function->inherits(&TiFunction::s_info))
+        return 0;
+    
+    return asFunction(function);
+}
+
+bool DebuggerCallFrame::usingArguments() const
+{
+    if (!m_callFrame->codeBlock())
+        return false;
+    
+    return m_callFrame->codeBlock()->usesArguments();
+}
+     
 
 DebuggerCallFrame::Type DebuggerCallFrame::type() const
 {

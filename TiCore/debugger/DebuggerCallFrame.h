@@ -59,6 +59,10 @@ namespace TI {
         ScopeChainNode* scopeChain() const { return m_callFrame->scopeChain(); }
         const UString* functionName() const;
         UString calculatedFunctionName() const;
+        TiValue functionArguments() const;
+        UString functionArgumentList() const;
+        TiObject* function() const;
+        bool usingArguments() const;
         Type type() const;
         TiObject* thisObject() const;
         TiValue evaluate(const UString&, TiValue& exception) const;
