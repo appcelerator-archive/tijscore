@@ -2,11 +2,11 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
- * Copyright (C) 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2007, 2008, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2007 Eric Seidel <eric@webkit.org>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,10 +37,11 @@
 #include "TiObjectRef.h"
 #include "TiValueRef.h"
 #include "TiObject.h"
+#include <wtf/PassOwnPtr.h>
 
 namespace TI {
 
-struct TiCallbackObjectData {
+struct TiCallbackObjectData : WeakHandleOwner {
     TiCallbackObjectData(void* privateData, TiClassRef jsClass)
         : privateData(privateData)
         , jsClass(jsClass)
@@ -60,11 +61,11 @@ struct TiCallbackObjectData {
         return m_privateProperties->getPrivateProperty(propertyName);
     }
     
-    void setPrivateProperty(const Identifier& propertyName, TiValue value)
+    void setPrivateProperty(TiGlobalData& globalData, TiCell* owner, const Identifier& propertyName, TiValue value)
     {
         if (!m_privateProperties)
-            m_privateProperties.set(new JSPrivatePropertyMap);
-        m_privateProperties->setPrivateProperty(propertyName, value);
+            m_privateProperties = adoptPtr(new JSPrivatePropertyMap);
+        m_privateProperties->setPrivateProperty(globalData, owner, propertyName, value);
     }
     
     void deletePrivateProperty(const Identifier& propertyName)
@@ -74,11 +75,11 @@ struct TiCallbackObjectData {
         m_privateProperties->deletePrivateProperty(propertyName);
     }
 
-    void markChildren(MarkStack& markStack)
+    void visitChildren(SlotVisitor& visitor)
     {
         if (!m_privateProperties)
             return;
-        m_privateProperties->markChildren(markStack);
+        m_privateProperties->visitChildren(visitor);
     }
 
     void* privateData;
@@ -86,56 +87,57 @@ struct TiCallbackObjectData {
     struct JSPrivatePropertyMap {
         TiValue getPrivateProperty(const Identifier& propertyName) const
         {
-            PrivatePropertyMap::const_iterator location = m_propertyMap.find(propertyName.ustring().rep());
+            PrivatePropertyMap::const_iterator location = m_propertyMap.find(propertyName.impl());
             if (location == m_propertyMap.end())
                 return TiValue();
-            return location->second;
+            return location->second.get();
         }
         
-        void setPrivateProperty(const Identifier& propertyName, TiValue value)
+        void setPrivateProperty(TiGlobalData& globalData, TiCell* owner, const Identifier& propertyName, TiValue value)
         {
-            m_propertyMap.set(propertyName.ustring().rep(), value);
+            WriteBarrier<Unknown> empty;
+            m_propertyMap.add(propertyName.impl(), empty).first->second.set(globalData, owner, value);
         }
         
         void deletePrivateProperty(const Identifier& propertyName)
         {
-            m_propertyMap.remove(propertyName.ustring().rep());
+            m_propertyMap.remove(propertyName.impl());
         }
 
-        void markChildren(MarkStack& markStack)
+        void visitChildren(SlotVisitor& visitor)
         {
             for (PrivatePropertyMap::iterator ptr = m_propertyMap.begin(); ptr != m_propertyMap.end(); ++ptr) {
                 if (ptr->second)
-                    markStack.append(ptr->second);
+                    visitor.append(&ptr->second);
             }
         }
 
     private:
-        typedef HashMap<RefPtr<UString::Rep>, TiValue, IdentifierRepHash> PrivatePropertyMap;
+        typedef HashMap<RefPtr<StringImpl>, WriteBarrier<Unknown>, IdentifierRepHash> PrivatePropertyMap;
         PrivatePropertyMap m_propertyMap;
     };
     OwnPtr<JSPrivatePropertyMap> m_privateProperties;
+    virtual void finalize(Handle<Unknown>, void*);
 };
 
     
 template <class Base>
 class TiCallbackObject : public Base {
 public:
-    TiCallbackObject(TiExcState*, NonNullPassRefPtr<Structure>, TiClassRef, void* data);
-    TiCallbackObject(TiClassRef);
-    virtual ~TiCallbackObject();
+    TiCallbackObject(TiExcState*, TiGlobalObject*, Structure*, TiClassRef, void* data);
+    TiCallbackObject(TiGlobalData&, TiClassRef, Structure*);
 
     void setPrivate(void* data);
     void* getPrivate();
 
-    static const ClassInfo info;
+    static const ClassInfo s_info;
 
     TiClassRef classRef() const { return m_callbackObjectData->jsClass; }
     bool inherits(TiClassRef) const;
 
-    static PassRefPtr<Structure> createStructure(TiValue proto) 
+    static Structure* createStructure(TiGlobalData& globalData, TiValue proto) 
     { 
-        return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), Base::AnonymousSlotCount); 
+        return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), Base::AnonymousSlotCount, &s_info); 
     }
     
     TiValue getPrivateProperty(const Identifier& propertyName) const
@@ -143,9 +145,9 @@ public:
         return m_callbackObjectData->getPrivateProperty(propertyName);
     }
     
-    void setPrivateProperty(const Identifier& propertyName, TiValue value)
+    void setPrivateProperty(TiGlobalData& globalData, const Identifier& propertyName, TiValue value)
     {
-        m_callbackObjectData->setPrivateProperty(propertyName, value);
+        m_callbackObjectData->setPrivateProperty(globalData, this, propertyName, value);
     }
     
     void deletePrivateProperty(const Identifier& propertyName)
@@ -154,13 +156,12 @@ public:
     }
 
 protected:
-    static const unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesHasInstance | OverridesMarkChildren | OverridesGetPropertyNames | Base::StructureFlags;
+    static const unsigned StructureFlags = ProhibitsPropertyCaching | OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | Base::StructureFlags;
 
 private:
     virtual UString className() const;
 
     virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
-    virtual bool getOwnPropertySlot(TiExcState*, unsigned, PropertySlot&);
     virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
     
     virtual void put(TiExcState*, const Identifier&, TiValue, PutPropertySlot&);
@@ -177,22 +178,21 @@ private:
 
     virtual ConstructType getConstructData(ConstructData&);
     virtual CallType getCallData(CallData&);
-    virtual const ClassInfo* classInfo() const { return &info; }
 
-    virtual void markChildren(MarkStack& markStack)
+    virtual void visitChildren(SlotVisitor& visitor)
     {
-        Base::markChildren(markStack);
-        m_callbackObjectData->markChildren(markStack);
+        Base::visitChildren(visitor);
+        m_callbackObjectData->visitChildren(visitor);
     }
 
     void init(TiExcState*);
  
     static TiCallbackObject* asCallbackObject(TiValue);
  
-    static TiValue JSC_HOST_CALL call(TiExcState*, TiObject* functionObject, TiValue thisValue, const ArgList&);
-    static TiObject* construct(TiExcState*, TiObject* constructor, const ArgList&);
+    static EncodedTiValue JSC_HOST_CALL call(TiExcState*);
+    static EncodedTiValue JSC_HOST_CALL construct(TiExcState*);
    
-    static TiValue staticValueGetter(TiExcState*, TiValue, const Identifier&);
+    TiValue getStaticValue(TiExcState*, const Identifier&);
     static TiValue staticFunctionGetter(TiExcState*, TiValue, const Identifier&);
     static TiValue callbackGetter(TiExcState*, TiValue, const Identifier&);
 

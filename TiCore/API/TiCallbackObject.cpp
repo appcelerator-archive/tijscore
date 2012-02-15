@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,16 +34,28 @@
 #include "config.h"
 #include "TiCallbackObject.h"
 
-#include "Collector.h"
+#include "Heap.h"
 #include <wtf/text/StringHash.h>
 
 namespace TI {
 
-ASSERT_CLASS_FITS_IN_CELL(TiCallbackObject<TiObject>);
+ASSERT_CLASS_FITS_IN_CELL(TiCallbackObject<TiObjectWithGlobalObject>);
 ASSERT_CLASS_FITS_IN_CELL(TiCallbackObject<TiGlobalObject>);
 
 // Define the two types of TiCallbackObjects we support.
-template <> const ClassInfo TiCallbackObject<TiObject>::info = { "CallbackObject", 0, 0, 0 };
-template <> const ClassInfo TiCallbackObject<TiGlobalObject>::info = { "CallbackGlobalObject", 0, 0, 0 };
+template <> const ClassInfo TiCallbackObject<TiObjectWithGlobalObject>::s_info = { "CallbackObject", &TiObjectWithGlobalObject::s_info, 0, 0 };
+template <> const ClassInfo TiCallbackObject<TiGlobalObject>::s_info = { "CallbackGlobalObject", &TiGlobalObject::s_info, 0, 0 };
 
+void TiCallbackObjectData::finalize(Handle<Unknown> handle, void* context)
+{
+    TiClassRef jsClass = static_cast<TiClassRef>(context);
+    TiObjectRef thisRef = toRef(asObject(handle.get()));
+    
+    for (; jsClass; jsClass = jsClass->parentClass)
+        if (TiObjectFinalizeCallback finalize = jsClass->finalize)
+            finalize(thisRef);
+    HandleSlot slot = handle.slot();
+    HandleHeap::heapFor(slot)->deallocate(slot);
+}
+    
 } // namespace TI

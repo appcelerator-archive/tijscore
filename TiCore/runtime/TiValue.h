@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,8 +30,6 @@
 #ifndef TiValue_h
 #define TiValue_h
 
-#include "CallData.h"
-#include "ConstructData.h"
 #include <math.h>
 #include <stddef.h> // for size_t
 #include <stdint.h>
@@ -39,13 +37,18 @@
 #include <wtf/Assertions.h>
 #include <wtf/HashTraits.h>
 #include <wtf/MathExtras.h>
+#include <wtf/StdLibExtras.h>
 
 namespace TI {
 
+    extern const double NaN;
+    extern const double Inf;
+
+    class TiExcState;
     class Identifier;
     class TiCell;
     class TiGlobalData;
-    class JSImmediate;
+    class TiGlobalObject;
     class TiObject;
     class TiString;
     class PropertySlot;
@@ -55,20 +58,52 @@ namespace TI {
     struct ClassInfo;
     struct Instruction;
 
+    template <class T> class WriteBarrierBase;
+
     enum PreferredPrimitiveType { NoPreference, PreferNumber, PreferString };
+
 
 #if USE(JSVALUE32_64)
     typedef int64_t EncodedTiValue;
 #else
     typedef void* EncodedTiValue;
 #endif
+    
+    union EncodedValueDescriptor {
+        int64_t asInt64;
+#if USE(JSVALUE32_64)
+        double asDouble;
+#elif USE(JSVALUE64)
+        TiCell* ptr;
+#endif
+        
+#if CPU(BIG_ENDIAN)
+        struct {
+            int32_t tag;
+            int32_t payload;
+        } asBits;
+#else
+        struct {
+            int32_t payload;
+            int32_t tag;
+        } asBits;
+#endif
+    };
 
     double nonInlineNaN();
-    int32_t toInt32SlowCase(double, bool& ok);
-    uint32_t toUInt32SlowCase(double, bool& ok);
+
+    // This implements ToInt32, defined in ECMA-262 9.5.
+    int32_t toInt32(double);
+
+    // This implements ToUInt32, defined in ECMA-262 9.6.
+    inline uint32_t toUInt32(double number)
+    {
+        // As commented in the spec, the operation of ToInt32 and ToUint32 only differ
+        // in how the result is interpreted; see NOTEs in sections 9.5 and 9.6.
+        return toInt32(number);
+    }
 
     class TiValue {
-        friend class JSImmediate;
         friend struct EncodedTiValueHashTraits;
         friend class JIT;
         friend class JITStubs;
@@ -77,14 +112,9 @@ namespace TI {
         friend class SpecializedThunkJIT;
 
     public:
-        static EncodedTiValue encode(TiValue value);
-        static TiValue decode(EncodedTiValue ptr);
-#if !USE(JSVALUE32_64)
-    private:
-        static TiValue makeImmediate(intptr_t value);
-        intptr_t immediateValue();
-    public:
-#endif
+        static EncodedTiValue encode(TiValue);
+        static TiValue decode(EncodedTiValue);
+
         enum JSNullTag { JSNull };
         enum JSUndefinedTag { JSUndefined };
         enum JSTrueTag { JSTrue };
@@ -100,21 +130,18 @@ namespace TI {
         TiValue(const TiCell* ptr);
 
         // Numbers
-        TiValue(EncodeAsDoubleTag, TiExcState*, double);
-        TiValue(TiExcState*, double);
-        TiValue(TiExcState*, char);
-        TiValue(TiExcState*, unsigned char);
-        TiValue(TiExcState*, short);
-        TiValue(TiExcState*, unsigned short);
-        TiValue(TiExcState*, int);
-        TiValue(TiExcState*, unsigned);
-        TiValue(TiExcState*, long);
-        TiValue(TiExcState*, unsigned long);
-        TiValue(TiExcState*, long long);
-        TiValue(TiExcState*, unsigned long long);
-        TiValue(TiGlobalData*, double);
-        TiValue(TiGlobalData*, int);
-        TiValue(TiGlobalData*, unsigned);
+        TiValue(EncodeAsDoubleTag, double);
+        explicit TiValue(double);
+        explicit TiValue(char);
+        explicit TiValue(unsigned char);
+        explicit TiValue(short);
+        explicit TiValue(unsigned short);
+        explicit TiValue(int);
+        explicit TiValue(unsigned);
+        explicit TiValue(long);
+        explicit TiValue(unsigned long);
+        explicit TiValue(long long);
+        explicit TiValue(unsigned long long);
 
         operator bool() const;
         bool operator==(const TiValue& other) const;
@@ -150,9 +177,6 @@ namespace TI {
         UString getString(TiExcState* exec) const; // null string if not a string
         TiObject* getObject() const; // 0 if not an object
 
-        CallType getCallData(CallData&);
-        ConstructType getConstructData(ConstructData&);
-
         // Extracting integer values.
         bool getUInt32(uint32_t&) const;
         
@@ -169,14 +193,13 @@ namespace TI {
         UString toString(TiExcState*) const;
         UString toPrimitiveString(TiExcState*) const;
         TiObject* toObject(TiExcState*) const;
+        TiObject* toObject(TiExcState*, TiGlobalObject*) const;
 
         // Integer conversions.
         double toInteger(TiExcState*) const;
         double toIntegerPreserveNaN(TiExcState*) const;
         int32_t toInt32(TiExcState*) const;
-        int32_t toInt32(TiExcState*, bool& ok) const;
         uint32_t toUInt32(TiExcState*) const;
-        uint32_t toUInt32(TiExcState*, bool& ok) const;
 
 #if ENABLE(JSC_ZOMBIES)
         bool isZombie() const;
@@ -197,6 +220,7 @@ namespace TI {
 
         bool needsThisConversion() const;
         TiObject* toThisObject(TiExcState*) const;
+        TiValue toStrictThisObject(TiExcState*) const;
         UString toThisString(TiExcState*) const;
         TiString* toThisTiString(TiExcState*) const;
 
@@ -211,55 +235,140 @@ namespace TI {
 
         bool isCell() const;
         TiCell* asCell() const;
+        bool isValidCallee();
 
 #ifndef NDEBUG
         char* description();
 #endif
 
     private:
+        template <class T> TiValue(WriteBarrierBase<T>);
+
         enum HashTableDeletedValueTag { HashTableDeletedValue };
         TiValue(HashTableDeletedValueTag);
 
         inline const TiValue asValue() const { return *this; }
-        TiObject* toObjectSlowCase(TiExcState*) const;
+        TiObject* toObjectSlowCase(TiExcState*, TiGlobalObject*) const;
         TiObject* toThisObjectSlowCase(TiExcState*) const;
 
         TiObject* synthesizePrototype(TiExcState*) const;
         TiObject* synthesizeObject(TiExcState*) const;
 
 #if USE(JSVALUE32_64)
+        /*
+         * On 32-bit platforms USE(JSVALUE32_64) should be defined, and we use a NaN-encoded
+         * form for immediates.
+         *
+         * The encoding makes use of unused NaN space in the IEEE754 representation.  Any value
+         * with the top 13 bits set represents a QNaN (with the sign bit set).  QNaN values
+         * can encode a 51-bit payload.  Hardware produced and C-library payloads typically
+         * have a payload of zero.  We assume that non-zero payloads are available to encode
+         * pointer and integer values.  Since any 64-bit bit pattern where the top 15 bits are
+         * all set represents a NaN with a non-zero payload, we can use this space in the NaN
+         * ranges to encode other values (however there are also other ranges of NaN space that
+         * could have been selected).
+         *
+         * For TiValues that do not contain a double value, the high 32 bits contain the tag
+         * values listed in the enums below, which all correspond to NaN-space. In the case of
+         * cell, integer and bool values the lower 32 bits (the 'payload') contain the pointer
+         * integer or boolean value; in the case of all other tags the payload is 0.
+         */
         enum { Int32Tag =        0xffffffff };
-        enum { CellTag =         0xfffffffe };
-        enum { TrueTag =         0xfffffffd };
-        enum { FalseTag =        0xfffffffc };
-        enum { NullTag =         0xfffffffb };
-        enum { UndefinedTag =    0xfffffffa };
-        enum { EmptyValueTag =   0xfffffff9 };
-        enum { DeletedValueTag = 0xfffffff8 };
-        
+        enum { BooleanTag =      0xfffffffe };
+        enum { NullTag =         0xfffffffd };
+        enum { UndefinedTag =    0xfffffffc };
+        enum { CellTag =         0xfffffffb };
+        enum { EmptyValueTag =   0xfffffffa };
+        enum { DeletedValueTag = 0xfffffff9 };
+
         enum { LowestTag =  DeletedValueTag };
-        
+
         uint32_t tag() const;
         int32_t payload() const;
+#elif USE(JSVALUE64)
+        /*
+         * On 64-bit platforms USE(JSVALUE64) should be defined, and we use a NaN-encoded
+         * form for immediates.
+         *
+         * The encoding makes use of unused NaN space in the IEEE754 representation.  Any value
+         * with the top 13 bits set represents a QNaN (with the sign bit set).  QNaN values
+         * can encode a 51-bit payload.  Hardware produced and C-library payloads typically
+         * have a payload of zero.  We assume that non-zero payloads are available to encode
+         * pointer and integer values.  Since any 64-bit bit pattern where the top 15 bits are
+         * all set represents a NaN with a non-zero payload, we can use this space in the NaN
+         * ranges to encode other values (however there are also other ranges of NaN space that
+         * could have been selected).
+         *
+         * This range of NaN space is represented by 64-bit numbers begining with the 16-bit
+         * hex patterns 0xFFFE and 0xFFFF - we rely on the fact that no valid double-precision
+         * numbers will begin fall in these ranges.
+         *
+         * The top 16-bits denote the type of the encoded TiValue:
+         *
+         *     Pointer {  0000:PPPP:PPPP:PPPP
+         *              / 0001:****:****:****
+         *     Double  {         ...
+         *              \ FFFE:****:****:****
+         *     Integer {  FFFF:0000:IIII:IIII
+         *
+         * The scheme we have implemented encodes double precision values by performing a
+         * 64-bit integer addition of the value 2^48 to the number. After this manipulation
+         * no encoded double-precision value will begin with the pattern 0x0000 or 0xFFFF.
+         * Values must be decoded by reversing this operation before subsequent floating point
+         * operations my be peformed.
+         *
+         * 32-bit signed integers are marked with the 16-bit tag 0xFFFF.
+         *
+         * The tag 0x0000 denotes a pointer, or another form of tagged immediate. Boolean,
+         * null and undefined values are represented by specific, invalid pointer values:
+         *
+         *     False:     0x06
+         *     True:      0x07
+         *     Undefined: 0x0a
+         *     Null:      0x02
+         *
+         * These values have the following properties:
+         * - Bit 1 (TagBitTypeOther) is set for all four values, allowing real pointers to be
+         *   quickly distinguished from all immediate values, including these invalid pointers.
+         * - With bit 3 is masked out (TagBitUndefined) Undefined and Null share the
+         *   same value, allowing null & undefined to be quickly detected.
+         *
+         * No valid TiValue will have the bit pattern 0x0, this is used to represent array
+         * holes, and as a C++ 'no value' result (e.g. TiValue() has an internal value of 0).
+         */
 
-        union {
-            EncodedTiValue asEncodedTiValue;
-            double asDouble;
-#if CPU(BIG_ENDIAN)
-            struct {
-                int32_t tag;
-                int32_t payload;
-            } asBits;
-#else
-            struct {
-                int32_t payload;
-                int32_t tag;
-            } asBits;
+        // These values are #defines since using static const integers here is a ~1% regression!
+
+        // This value is 2^48, used to encode doubles such that the encoded value will begin
+        // with a 16-bit pattern within the range 0x0001..0xFFFE.
+        #define DoubleEncodeOffset 0x1000000000000ll
+        // If all bits in the mask are set, this indicates an integer number,
+        // if any but not all are set this value is a double precision number.
+        #define TagTypeNumber 0xffff000000000000ll
+
+        // All non-numeric (bool, null, undefined) immediates have bit 2 set.
+        #define TagBitTypeOther 0x2ll
+        #define TagBitBool      0x4ll
+        #define TagBitUndefined 0x8ll
+        // Combined integer value for non-numeric immediates.
+        #define ValueFalse     (TagBitTypeOther | TagBitBool | false)
+        #define ValueTrue      (TagBitTypeOther | TagBitBool | true)
+        #define ValueUndefined (TagBitTypeOther | TagBitUndefined)
+        #define ValueNull      (TagBitTypeOther)
+
+        // TagMask is used to check for all types of immediate values (either number or 'other').
+        #define TagMask (TagTypeNumber | TagBitTypeOther)
+
+        // These special values are never visible to Ti code; Empty is used to represent
+        // Array holes, and for uninitialized TiValues. Deleted is used in hash table code.
+        // These values would map to cell types in the TiValue encoding, but not valid GC cell
+        // pointer should have either of these values (Empty is null, deleted is at an invalid
+        // alignment for a GC cell, and in the zero page).
+        #define ValueEmpty   0x0ll
+        #define ValueDeleted 0x4ll
 #endif
-        } u;
-#else // USE(JSVALUE32_64)
-        TiCell* m_ptr;
-#endif // USE(JSVALUE32_64)
+
+        EncodedValueDescriptor u;
     };
 
 #if USE(JSVALUE32_64)
@@ -296,79 +405,64 @@ namespace TI {
         return b ? TiValue(TiValue::JSTrue) : TiValue(TiValue::JSFalse);
     }
 
-    ALWAYS_INLINE TiValue jsDoubleNumber(TiExcState* exec, double d)
+    ALWAYS_INLINE TiValue jsDoubleNumber(double d)
     {
-        return TiValue(TiValue::EncodeAsDouble, exec, d);
+        return TiValue(TiValue::EncodeAsDouble, d);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, double d)
+    ALWAYS_INLINE TiValue jsNumber(double d)
     {
-        return TiValue(exec, d);
+        return TiValue(d);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, char i)
+    ALWAYS_INLINE TiValue jsNumber(char i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, unsigned char i)
+    ALWAYS_INLINE TiValue jsNumber(unsigned char i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, short i)
+    ALWAYS_INLINE TiValue jsNumber(short i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, unsigned short i)
+    ALWAYS_INLINE TiValue jsNumber(unsigned short i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, int i)
+    ALWAYS_INLINE TiValue jsNumber(int i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, unsigned i)
+    ALWAYS_INLINE TiValue jsNumber(unsigned i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, long i)
+    ALWAYS_INLINE TiValue jsNumber(long i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, unsigned long i)
+    ALWAYS_INLINE TiValue jsNumber(unsigned long i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, long long i)
+    ALWAYS_INLINE TiValue jsNumber(long long i)
     {
-        return TiValue(exec, i);
+        return TiValue(i);
     }
 
-    ALWAYS_INLINE TiValue jsNumber(TiExcState* exec, unsigned long long i)
+    ALWAYS_INLINE TiValue jsNumber(unsigned long long i)
     {
-        return TiValue(exec, i);
-    }
-
-    ALWAYS_INLINE TiValue jsNumber(TiGlobalData* globalData, double d)
-    {
-        return TiValue(globalData, d);
-    }
-
-    ALWAYS_INLINE TiValue jsNumber(TiGlobalData* globalData, int i)
-    {
-        return TiValue(globalData, i);
-    }
-
-    ALWAYS_INLINE TiValue jsNumber(TiGlobalData* globalData, unsigned i)
-    {
-        return TiValue(globalData, i);
+        return TiValue(i);
     }
 
     inline bool operator==(const TiValue a, const TiCell* b) { return a == TiValue(b); }
@@ -377,486 +471,8 @@ namespace TI {
     inline bool operator!=(const TiValue a, const TiCell* b) { return a != TiValue(b); }
     inline bool operator!=(const TiCell* a, const TiValue b) { return TiValue(a) != b; }
 
-    inline int32_t toInt32(double val)
-    {
-        if (!(val >= -2147483648.0 && val < 2147483648.0)) {
-            bool ignored;
-            return toInt32SlowCase(val, ignored);
-        }
-        return static_cast<int32_t>(val);
-    }
+    bool isZombie(const TiCell*);
 
-    inline uint32_t toUInt32(double val)
-    {
-        if (!(val >= 0.0 && val < 4294967296.0)) {
-            bool ignored;
-            return toUInt32SlowCase(val, ignored);
-        }
-        return static_cast<uint32_t>(val);
-    }
-
-    // FIXME: We should deprecate this and just use TiValue::asCell() instead.
-    TiCell* asCell(TiValue);
-
-    inline TiCell* asCell(TiValue value)
-    {
-        return value.asCell();
-    }
-
-    ALWAYS_INLINE int32_t TiValue::toInt32(TiExcState* exec) const
-    {
-        if (isInt32())
-            return asInt32();
-        bool ignored;
-        return toInt32SlowCase(toNumber(exec), ignored);
-    }
-
-    inline uint32_t TiValue::toUInt32(TiExcState* exec) const
-    {
-        if (isUInt32())
-            return asInt32();
-        bool ignored;
-        return toUInt32SlowCase(toNumber(exec), ignored);
-    }
-
-    inline int32_t TiValue::toInt32(TiExcState* exec, bool& ok) const
-    {
-        if (isInt32()) {
-            ok = true;
-            return asInt32();
-        }
-        return toInt32SlowCase(toNumber(exec), ok);
-    }
-
-    inline uint32_t TiValue::toUInt32(TiExcState* exec, bool& ok) const
-    {
-        if (isUInt32()) {
-            ok = true;
-            return asInt32();
-        }
-        return toUInt32SlowCase(toNumber(exec), ok);
-    }
-
-#if USE(JSVALUE32_64)
-    inline TiValue jsNaN(TiExcState* exec)
-    {
-        return TiValue(exec, nonInlineNaN());
-    }
-
-    // TiValue member functions.
-    inline EncodedTiValue TiValue::encode(TiValue value)
-    {
-        return value.u.asEncodedTiValue;
-    }
-
-    inline TiValue TiValue::decode(EncodedTiValue encodedTiValue)
-    {
-        TiValue v;
-        v.u.asEncodedTiValue = encodedTiValue;
-#if ENABLE(JSC_ZOMBIES)
-        ASSERT(!v.isZombie());
-#endif
-        return v;
-    }
-
-    inline TiValue::TiValue()
-    {
-        u.asBits.tag = EmptyValueTag;
-        u.asBits.payload = 0;
-    }
-
-    inline TiValue::TiValue(JSNullTag)
-    {
-        u.asBits.tag = NullTag;
-        u.asBits.payload = 0;
-    }
-    
-    inline TiValue::TiValue(JSUndefinedTag)
-    {
-        u.asBits.tag = UndefinedTag;
-        u.asBits.payload = 0;
-    }
-    
-    inline TiValue::TiValue(JSTrueTag)
-    {
-        u.asBits.tag = TrueTag;
-        u.asBits.payload = 0;
-    }
-    
-    inline TiValue::TiValue(JSFalseTag)
-    {
-        u.asBits.tag = FalseTag;
-        u.asBits.payload = 0;
-    }
-
-    inline TiValue::TiValue(HashTableDeletedValueTag)
-    {
-        u.asBits.tag = DeletedValueTag;
-        u.asBits.payload = 0;
-    }
-
-    inline TiValue::TiValue(TiCell* ptr)
-    {
-        if (ptr)
-            u.asBits.tag = CellTag;
-        else
-            u.asBits.tag = EmptyValueTag;
-        u.asBits.payload = reinterpret_cast<int32_t>(ptr);
-#if ENABLE(JSC_ZOMBIES)
-        ASSERT(!isZombie());
-#endif
-    }
-
-    inline TiValue::TiValue(const TiCell* ptr)
-    {
-        if (ptr)
-            u.asBits.tag = CellTag;
-        else
-            u.asBits.tag = EmptyValueTag;
-        u.asBits.payload = reinterpret_cast<int32_t>(const_cast<TiCell*>(ptr));
-#if ENABLE(JSC_ZOMBIES)
-        ASSERT(!isZombie());
-#endif
-    }
-
-    inline TiValue::operator bool() const
-    {
-        ASSERT(tag() != DeletedValueTag);
-        return tag() != EmptyValueTag;
-    }
-
-    inline bool TiValue::operator==(const TiValue& other) const
-    {
-        return u.asEncodedTiValue == other.u.asEncodedTiValue;
-    }
-
-    inline bool TiValue::operator!=(const TiValue& other) const
-    {
-        return u.asEncodedTiValue != other.u.asEncodedTiValue;
-    }
-
-    inline bool TiValue::isUndefined() const
-    {
-        return tag() == UndefinedTag;
-    }
-
-    inline bool TiValue::isNull() const
-    {
-        return tag() == NullTag;
-    }
-
-    inline bool TiValue::isUndefinedOrNull() const
-    {
-        return isUndefined() || isNull();
-    }
-
-    inline bool TiValue::isCell() const
-    {
-        return tag() == CellTag;
-    }
-
-    inline bool TiValue::isInt32() const
-    {
-        return tag() == Int32Tag;
-    }
-
-    inline bool TiValue::isUInt32() const
-    {
-        return tag() == Int32Tag && asInt32() > -1;
-    }
-
-    inline bool TiValue::isDouble() const
-    {
-        return tag() < LowestTag;
-    }
-
-    inline bool TiValue::isTrue() const
-    {
-        return tag() == TrueTag;
-    }
-
-    inline bool TiValue::isFalse() const
-    {
-        return tag() == FalseTag;
-    }
-
-    inline uint32_t TiValue::tag() const
-    {
-        return u.asBits.tag;
-    }
-    
-    inline int32_t TiValue::payload() const
-    {
-        return u.asBits.payload;
-    }
-    
-    inline int32_t TiValue::asInt32() const
-    {
-        ASSERT(isInt32());
-        return u.asBits.payload;
-    }
-    
-    inline uint32_t TiValue::asUInt32() const
-    {
-        ASSERT(isUInt32());
-        return u.asBits.payload;
-    }
-    
-    inline double TiValue::asDouble() const
-    {
-        ASSERT(isDouble());
-        return u.asDouble;
-    }
-    
-    ALWAYS_INLINE TiCell* TiValue::asCell() const
-    {
-        ASSERT(isCell());
-        return reinterpret_cast<TiCell*>(u.asBits.payload);
-    }
-
-    ALWAYS_INLINE TiValue::TiValue(EncodeAsDoubleTag, TiExcState*, double d)
-    {
-        u.asDouble = d;
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, double d)
-    {
-        const int32_t asInt32 = static_cast<int32_t>(d);
-        if (asInt32 != d || (!asInt32 && signbit(d))) { // true for -0.0
-            u.asDouble = d;
-            return;
-        }
-        *this = TiValue(exec, static_cast<int32_t>(d));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, char i)
-    {
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, unsigned char i)
-    {
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, short i)
-    {
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, unsigned short i)
-    {
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState*, int i)
-    {
-        u.asBits.tag = Int32Tag;
-        u.asBits.payload = i;
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, unsigned i)
-    {
-        if (static_cast<int32_t>(i) < 0) {
-            *this = TiValue(exec, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, long i)
-    {
-        if (static_cast<int32_t>(i) != i) {
-            *this = TiValue(exec, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, unsigned long i)
-    {
-        if (static_cast<uint32_t>(i) != i) {
-            *this = TiValue(exec, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(exec, static_cast<uint32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, long long i)
-    {
-        if (static_cast<int32_t>(i) != i) {
-            *this = TiValue(exec, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(exec, static_cast<int32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiExcState* exec, unsigned long long i)
-    {
-        if (static_cast<uint32_t>(i) != i) {
-            *this = TiValue(exec, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(exec, static_cast<uint32_t>(i));
-    }
-
-    inline TiValue::TiValue(TiGlobalData* globalData, double d)
-    {
-        const int32_t asInt32 = static_cast<int32_t>(d);
-        if (asInt32 != d || (!asInt32 && signbit(d))) { // true for -0.0
-            u.asDouble = d;
-            return;
-        }
-        *this = TiValue(globalData, static_cast<int32_t>(d));
-    }
-    
-    inline TiValue::TiValue(TiGlobalData*, int i)
-    {
-        u.asBits.tag = Int32Tag;
-        u.asBits.payload = i;
-    }
-    
-    inline TiValue::TiValue(TiGlobalData* globalData, unsigned i)
-    {
-        if (static_cast<int32_t>(i) < 0) {
-            *this = TiValue(globalData, static_cast<double>(i));
-            return;
-        }
-        *this = TiValue(globalData, static_cast<int32_t>(i));
-    }
-
-    inline bool TiValue::isNumber() const
-    {
-        return isInt32() || isDouble();
-    }
-
-    inline bool TiValue::isBoolean() const
-    {
-        return isTrue() || isFalse();
-    }
-
-    inline bool TiValue::getBoolean(bool& v) const
-    {
-        if (isTrue()) {
-            v = true;
-            return true;
-        }
-        if (isFalse()) {
-            v = false;
-            return true;
-        }
-        
-        return false;
-    }
-
-    inline bool TiValue::getBoolean() const
-    {
-        ASSERT(isBoolean());
-        return tag() == TrueTag;
-    }
-
-    inline double TiValue::uncheckedGetNumber() const
-    {
-        ASSERT(isNumber());
-        return isInt32() ? asInt32() : asDouble();
-    }
-
-    ALWAYS_INLINE TiValue TiValue::toJSNumber(TiExcState* exec) const
-    {
-        return isNumber() ? asValue() : jsNumber(exec, this->toNumber(exec));
-    }
-
-    inline bool TiValue::getNumber(double& result) const
-    {
-        if (isInt32()) {
-            result = asInt32();
-            return true;
-        }
-        if (isDouble()) {
-            result = asDouble();
-            return true;
-        }
-        return false;
-    }
-
-#else // USE(JSVALUE32_64)
-
-    // TiValue member functions.
-    inline EncodedTiValue TiValue::encode(TiValue value)
-    {
-        return reinterpret_cast<EncodedTiValue>(value.m_ptr);
-    }
-
-    inline TiValue TiValue::decode(EncodedTiValue ptr)
-    {
-        return TiValue(reinterpret_cast<TiCell*>(ptr));
-    }
-
-    inline TiValue TiValue::makeImmediate(intptr_t value)
-    {
-        return TiValue(reinterpret_cast<TiCell*>(value));
-    }
-
-    inline intptr_t TiValue::immediateValue()
-    {
-        return reinterpret_cast<intptr_t>(m_ptr);
-    }
-    
-    // 0x0 can never occur naturally because it has a tag of 00, indicating a pointer value, but a payload of 0x0, which is in the (invalid) zero page.
-    inline TiValue::TiValue()
-        : m_ptr(0)
-    {
-    }
-
-    // 0x4 can never occur naturally because it has a tag of 00, indicating a pointer value, but a payload of 0x4, which is in the (invalid) zero page.
-    inline TiValue::TiValue(HashTableDeletedValueTag)
-        : m_ptr(reinterpret_cast<TiCell*>(0x4))
-    {
-    }
-
-    inline TiValue::TiValue(TiCell* ptr)
-        : m_ptr(ptr)
-    {
-#if ENABLE(JSC_ZOMBIES)
-        ASSERT(!isZombie());
-#endif
-    }
-
-    inline TiValue::TiValue(const TiCell* ptr)
-        : m_ptr(const_cast<TiCell*>(ptr))
-    {
-#if ENABLE(JSC_ZOMBIES)
-        ASSERT(!isZombie());
-#endif
-    }
-
-    inline TiValue::operator bool() const
-    {
-        return m_ptr;
-    }
-
-    inline bool TiValue::operator==(const TiValue& other) const
-    {
-        return m_ptr == other.m_ptr;
-    }
-
-    inline bool TiValue::operator!=(const TiValue& other) const
-    {
-        return m_ptr != other.m_ptr;
-    }
-
-    inline bool TiValue::isUndefined() const
-    {
-        return asValue() == jsUndefined();
-    }
-
-    inline bool TiValue::isNull() const
-    {
-        return asValue() == jsNull();
-    }
-#endif // USE(JSVALUE32_64)
-    
-    typedef std::pair<TiValue, UString> ValueStringPair;
 } // namespace TI
 
 #endif // TiValue_h

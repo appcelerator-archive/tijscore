@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -53,15 +53,20 @@
 
 #include <stdbool.h>
 
-#if COMPILER(MSVC)
 #include <stddef.h>
-#else
+
+#if !COMPILER(MSVC)
 #include <inttypes.h>
 #endif
 
 #if OS(SYMBIAN)
 #include <e32def.h>
 #include <e32debug.h>
+#endif
+
+#if PLATFORM(BREWMP)
+#include <AEEError.h>
+#include <AEEdbg.h>
 #endif
 
 #ifdef NDEBUG
@@ -75,6 +80,10 @@
 #define HAVE_VARIADIC_MACRO 0
 #else
 #define HAVE_VARIADIC_MACRO 1
+#endif
+
+#ifndef BACKTRACE_DISABLED
+#define BACKTRACE_DISABLED ASSERTIONS_DISABLED_DEFAULT
 #endif
 
 #ifndef ASSERT_DISABLED
@@ -138,6 +147,10 @@
 #else
 #define CLANG_ANALYZER_NORETURN
 #endif
+/* For project uses WTF but has no config.h, we need to explicitly set the export defines here. */
+#ifndef WTF_EXPORT_PRIVATE
+#define WTF_EXPORT_PRIVATE
+#endif
 
 /* These helper functions are always declared, but not necessarily always defined if the corresponding function is disabled. */
 
@@ -153,13 +166,14 @@ typedef struct {
     WTFLogChannelState state;
 } WTFLogChannel;
 
-void WTFReportAssertionFailure(const char* file, int line, const char* function, const char* assertion) CLANG_ANALYZER_NORETURN;
-void WTFReportAssertionFailureWithMessage(const char* file, int line, const char* function, const char* assertion, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(5, 6);
-void WTFReportArgumentAssertionFailure(const char* file, int line, const char* function, const char* argName, const char* assertion) CLANG_ANALYZER_NORETURN;
-void WTFReportFatalError(const char* file, int line, const char* function, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(4, 5);
-void WTFReportError(const char* file, int line, const char* function, const char* format, ...) WTF_ATTRIBUTE_PRINTF(4, 5);
-void WTFLog(WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(2, 3);
-void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
+WTF_EXPORT_PRIVATE void WTFReportAssertionFailure(const char* file, int line, const char* function, const char* assertion) CLANG_ANALYZER_NORETURN;
+WTF_EXPORT_PRIVATE void WTFReportAssertionFailureWithMessage(const char* file, int line, const char* function, const char* assertion, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(5, 6);
+WTF_EXPORT_PRIVATE void WTFReportArgumentAssertionFailure(const char* file, int line, const char* function, const char* argName, const char* assertion) CLANG_ANALYZER_NORETURN;
+WTF_EXPORT_PRIVATE void WTFReportBacktrace();
+WTF_EXPORT_PRIVATE void WTFReportFatalError(const char* file, int line, const char* function, const char* format, ...) CLANG_ANALYZER_NORETURN WTF_ATTRIBUTE_PRINTF(4, 5);
+WTF_EXPORT_PRIVATE void WTFReportError(const char* file, int line, const char* function, const char* format, ...) WTF_ATTRIBUTE_PRINTF(4, 5);
+WTF_EXPORT_PRIVATE void WTFLog(WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(2, 3);
+WTF_EXPORT_PRIVATE void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChannel* channel, const char* format, ...) WTF_ATTRIBUTE_PRINTF(5, 6);
 
 #ifdef __cplusplus
 }
@@ -179,12 +193,36 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
     __DEBUGGER(); \
     User::Panic(_L("Webkit CRASH"),0); \
     } while(false)
+#elif PLATFORM(BREWMP)
+#define CRASH() do { \
+    dbg_Message("WebKit CRASH", DBG_MSG_LEVEL_FATAL, __FILE__, __LINE__); \
+    *(int *)(uintptr_t)0xbbadbeef = 0; \
+    ((void(*)())0)(); /* More reliable, but doesn't say BBADBEEF */ \
+} while(false)
 #else
 #define CRASH() do { \
+    WTFReportBacktrace(); \
     *(int *)(uintptr_t)0xbbadbeef = 0; \
     ((void(*)())0)(); /* More reliable, but doesn't say BBADBEEF */ \
 } while(false)
 #endif
+#endif
+
+/* BACKTRACE
+
+  Print a backtrace to the same location as ASSERT messages.
+*/
+
+#if BACKTRACE_DISABLED
+
+#define BACKTRACE() ((void)0)
+
+#else
+
+#define BACKTRACE() do { \
+    WTFReportBacktrace(); \
+} while(false)
+
 #endif
 
 /* ASSERT, ASSERT_NOT_REACHED, ASSERT_UNUSED
@@ -218,7 +256,14 @@ void WTFLogVerbose(const char* file, int line, const char* function, WTFLogChann
 
 #define ASSERT(assertion) ((void)0)
 #define ASSERT_NOT_REACHED() ((void)0)
+
+#if COMPILER(INTEL) && !OS(WINDOWS) || COMPILER(RVCT)
+template<typename T>
+inline void assertUnused(T& x) { (void)x; }
+#define ASSERT_UNUSED(variable, assertion) (assertUnused(variable))
+#else
 #define ASSERT_UNUSED(variable, assertion) ((void)variable)
+#endif
 
 #else
 
@@ -248,6 +293,29 @@ while (0)
 #define ASSERT_WITH_MESSAGE(assertion, ...) ((void)0)
 #else
 #define ASSERT_WITH_MESSAGE(assertion, ...) do \
+    if (!(assertion)) { \
+        WTFReportAssertionFailureWithMessage(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion, __VA_ARGS__); \
+        CRASH(); \
+    } \
+while (0)
+#endif
+
+/* ASSERT_WITH_MESSAGE_UNUSED */
+
+#if COMPILER(MSVC7_OR_LOWER)
+#define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion) ((void)0)
+#elif COMPILER(WINSCW)
+#define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion, arg...) ((void)0)
+#elif ASSERT_MSG_DISABLED
+#if COMPILER(INTEL) && !OS(WINDOWS) || COMPILER(RVCT)
+template<typename T>
+inline void assertWithMessageUnused(T& x) { (void)x; }
+#define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion, ...) (assertWithMessageUnused(variable))
+#else
+#define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion, ...) ((void)variable)
+#endif
+#else
+#define ASSERT_WITH_MESSAGE_UNUSED(variable, assertion, ...) do \
     if (!(assertion)) { \
         WTFReportAssertionFailureWithMessage(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, #assertion, __VA_ARGS__); \
         CRASH(); \
@@ -329,6 +397,25 @@ while (0)
 #define LOG_VERBOSE(channel, ...) ((void)0)
 #else
 #define LOG_VERBOSE(channel, ...) WTFLogVerbose(__FILE__, __LINE__, WTF_PRETTY_FUNCTION, &JOIN_LOG_CHANNEL_WITH_PREFIX(LOG_CHANNEL_PREFIX, channel), __VA_ARGS__)
+#endif
+
+#if ENABLE(GC_VALIDATION)
+#define ASSERT_GC_OBJECT_LOOKS_VALID(cell) do { \
+    if (!(cell))\
+        CRASH();\
+    if (cell->unvalidatedStructure()->unvalidatedStructure() != cell->unvalidatedStructure()->unvalidatedStructure()->unvalidatedStructure())\
+        CRASH();\
+} while (0)
+
+#define ASSERT_GC_OBJECT_INHERITS(object, classInfo) do {\
+    ASSERT_GC_OBJECT_LOOKS_VALID(object); \
+    if (!object->inherits(classInfo)) \
+        CRASH();\
+} while (0)
+
+#else
+#define ASSERT_GC_OBJECT_LOOKS_VALID(cell) do { (void)cell; } while (0)
+#define ASSERT_GC_OBJECT_INHERITS(object, classInfo) do { (void)object; (void)classInfo; } while (0)
 #endif
 
 #endif /* WTF_Assertions_h */

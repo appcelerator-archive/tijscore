@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -83,6 +83,8 @@ extern const double Inf = NaNInf.doubles.Inf_Double;
  
 #endif // !(defined NAN && defined INFINITY)
 
+const ClassInfo TiCell::s_dummyCellInfo = { "DummyCell", 0, 0, 0 };
+
 bool TiCell::getUInt32(uint32_t&) const
 {
     return false;
@@ -126,7 +128,7 @@ bool TiCell::getOwnPropertySlot(TiExcState* exec, const Identifier& identifier, 
     // This is not a general purpose implementation of getOwnPropertySlot.
     // It should only be called by TiValue::get.
     // It calls getPropertySlot, not getOwnPropertySlot.
-    TiObject* object = toObject(exec);
+    TiObject* object = toObject(exec, exec->lexicalGlobalObject());
     slot.setBase(object);
     if (!object->getPropertySlot(exec, identifier, slot))
         slot.setUndefined();
@@ -138,7 +140,7 @@ bool TiCell::getOwnPropertySlot(TiExcState* exec, unsigned identifier, PropertyS
     // This is not a general purpose implementation of getOwnPropertySlot.
     // It should only be called by TiValue::get.
     // It calls getPropertySlot, not getOwnPropertySlot.
-    TiObject* object = toObject(exec);
+    TiObject* object = toObject(exec, exec->lexicalGlobalObject());
     slot.setBase(object);
     if (!object->getPropertySlot(exec, identifier, slot))
         slot.setUndefined();
@@ -147,32 +149,27 @@ bool TiCell::getOwnPropertySlot(TiExcState* exec, unsigned identifier, PropertyS
 
 void TiCell::put(TiExcState* exec, const Identifier& identifier, TiValue value, PutPropertySlot& slot)
 {
-    toObject(exec)->put(exec, identifier, value, slot);
+    toObject(exec, exec->lexicalGlobalObject())->put(exec, identifier, value, slot);
 }
 
 void TiCell::put(TiExcState* exec, unsigned identifier, TiValue value)
 {
-    toObject(exec)->put(exec, identifier, value);
+    toObject(exec, exec->lexicalGlobalObject())->put(exec, identifier, value);
 }
 
 bool TiCell::deleteProperty(TiExcState* exec, const Identifier& identifier)
 {
-    return toObject(exec)->deleteProperty(exec, identifier);
+    return toObject(exec, exec->lexicalGlobalObject())->deleteProperty(exec, identifier);
 }
 
 bool TiCell::deleteProperty(TiExcState* exec, unsigned identifier)
 {
-    return toObject(exec)->deleteProperty(exec, identifier);
+    return toObject(exec, exec->lexicalGlobalObject())->deleteProperty(exec, identifier);
 }
 
 TiObject* TiCell::toThisObject(TiExcState* exec) const
 {
-    return toObject(exec);
-}
-
-const ClassInfo* TiCell::classInfo() const
-{
-    return 0;
+    return toObject(exec, exec->lexicalGlobalObject());
 }
 
 TiValue TiCell::getJSNumber()
@@ -215,10 +212,25 @@ UString TiCell::toString(TiExcState*) const
     return UString();
 }
 
-TiObject* TiCell::toObject(TiExcState*) const
+TiObject* TiCell::toObject(TiExcState*, TiGlobalObject*) const
 {
     ASSERT_NOT_REACHED();
     return 0;
+}
+
+bool isZombie(const TiCell* cell)
+{
+#if ENABLE(JSC_ZOMBIES)
+    return cell && cell->isZombie();
+#else
+    UNUSED_PARAM(cell);
+    return false;
+#endif
+}
+
+void slowValidateCell(TiCell* cell)
+{
+    ASSERT_GC_OBJECT_LOOKS_VALID(cell);
 }
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,6 +36,7 @@
 #ifndef WTF_Collator_h
 #define WTF_Collator_h
 
+#include <wtf/FastAllocBase.h>
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/unicode/Unicode.h>
@@ -46,7 +47,8 @@ struct UCollator;
 
 namespace WTI {
 
-    class Collator : public Noncopyable {
+    class Collator {
+        WTF_MAKE_NONCOPYABLE(Collator); WTF_MAKE_FAST_ALLOCATED;
     public:
         enum Result { Equal = 0, Greater = 1, Less = -1 };
 

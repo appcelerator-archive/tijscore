@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,24 +39,20 @@ using namespace WTI;
 
 namespace TI {
 
-const ClassInfo DateInstance::info = {"Date", 0, 0, 0};
+const ClassInfo DateInstance::s_info = {"Date", &JSWrapperObject::s_info, 0, 0};
 
-DateInstance::DateInstance(TiExcState* exec, NonNullPassRefPtr<Structure> structure)
-    : JSWrapperObject(structure)
+DateInstance::DateInstance(TiExcState* exec, Structure* structure)
+    : JSWrapperObject(exec->globalData(), structure)
 {
-    setInternalValue(jsNaN(exec));
+    ASSERT(inherits(&s_info));
+    setInternalValue(exec->globalData(), jsNaN());
 }
 
-DateInstance::DateInstance(TiExcState* exec, NonNullPassRefPtr<Structure> structure, double time)
-    : JSWrapperObject(structure)
+DateInstance::DateInstance(TiExcState* exec, Structure* structure, double time)
+    : JSWrapperObject(exec->globalData(), structure)
 {
-    setInternalValue(jsNumber(exec, timeClip(time)));
-}
-
-DateInstance::DateInstance(TiExcState* exec, double time)
-    : JSWrapperObject(exec->lexicalGlobalObject()->dateStructure())
-{
-    setInternalValue(jsNumber(exec, timeClip(time)));
+    ASSERT(inherits(&s_info));
+    setInternalValue(exec->globalData(), jsNumber(timeClip(time)));
 }
 
 const GregorianDateTime* DateInstance::calculateGregorianDateTime(TiExcState* exec) const

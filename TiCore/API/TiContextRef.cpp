@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,11 +36,15 @@
 
 #include "APICast.h"
 #include "InitializeThreading.h"
+#include <interpreter/CallFrame.h>
+#include <interpreter/Interpreter.h>
 #include "TiCallbackObject.h"
 #include "TiClassRef.h"
 #include "TiGlobalObject.h"
 #include "TiObject.h"
+#include "UStringBuilder.h"
 #include <wtf/text/StringHash.h>
+
 
 #if OS(DARWIN)
 #include <mach-o/dyld.h>
@@ -53,7 +57,7 @@ using namespace TI;
 TiContextGroupRef TiContextGroupCreate()
 {
     initializeThreading();
-    return toRef(TiGlobalData::createContextGroup(ThreadStackTypeSmall).releaseRef());
+    return toRef(TiGlobalData::createContextGroup(ThreadStackTypeSmall).leakRef());
 }
 
 TiContextGroupRef TiContextGroupRetain(TiContextGroupRef group)
@@ -73,7 +77,7 @@ TiGlobalContextRef TiGlobalContextCreate(TiClassRef globalObjectClass)
 #if OS(DARWIN)
     // When running on Tiger or Leopard, or if the application was linked before TiGlobalContextCreate was changed
     // to use a unique TiGlobalData, we use a shared one for compatibility.
-#if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD)
+#ifndef BUILDING_ON_LEOPARD
     if (NSVersionOfLinkTimeLibrary("TiCore") <= webkitFirstVersionWithConcurrentGlobalContexts) {
 #else
     {
@@ -100,16 +104,16 @@ TiGlobalContextRef TiGlobalContextCreateInGroup(TiContextGroupRef group, TiClass
 #endif
 
     if (!globalObjectClass) {
-        TiGlobalObject* globalObject = new (globalData.get()) TiGlobalObject;
+        TiGlobalObject* globalObject = new (globalData.get()) TiGlobalObject(*globalData, TiGlobalObject::createStructure(*globalData, jsNull()));
         return TiGlobalContextRetain(toGlobalRef(globalObject->globalExec()));
     }
 
-    TiGlobalObject* globalObject = new (globalData.get()) TiCallbackObject<TiGlobalObject>(globalObjectClass);
+    TiGlobalObject* globalObject = new (globalData.get()) TiCallbackObject<TiGlobalObject>(*globalData, globalObjectClass, TiCallbackObject<TiGlobalObject>::createStructure(*globalData, jsNull()));
     TiExcState* exec = globalObject->globalExec();
     TiValue prototype = globalObjectClass->prototype(exec);
     if (!prototype)
         prototype = jsNull();
-    globalObject->resetPrototype(prototype);
+    globalObject->resetPrototype(*globalData, prototype);
     return TiGlobalContextRetain(toGlobalRef(exec));
 }
 
@@ -145,13 +149,17 @@ void TiGlobalContextRelease(TiGlobalContextRef ctx)
     // * If this is the last reference to any contexts in the given context group,
     //   call destroy on the heap (the global data is being  freed).
     // * If this was the last reference to the global object, then unprotecting
-    //   it may  release a lot of GC memory - run the garbage collector now.
+    //   it may release a lot of GC memory - tickle the activity callback to
+    //   garbage collect soon.
     // * If there are more references remaining the the global object, then do nothing
     //   (specifically that is more protects, which we assume come from other TiGlobalContextRefs).
-    if (releasingContextGroup)
+    if (releasingContextGroup) {
+        globalData.clearBuiltinStructures();
         globalData.heap.destroy();
-    else if (releasingGlobalObject)
-        globalData.heap.collectAllGarbage();
+    } else if (releasingGlobalObject) {
+        globalData.heap.activityCallback()->synchronize();
+        (*globalData.heap.activityCallback())();
+    }
 
     globalData.deref();
 
@@ -180,3 +188,60 @@ TiGlobalContextRef TiContextGetGlobalContext(TiContextRef ctx)
 
     return toGlobalRef(exec->lexicalGlobalObject()->globalExec());
 }
+    
+TiStringRef TiContextCreateBacktrace(TiContextRef ctx, unsigned maxStackSize)
+{
+    TiExcState* exec = toJS(ctx);
+    TiLock lock(exec);
+
+    unsigned count = 0;
+    UStringBuilder builder;
+    CallFrame* callFrame = exec;
+    UString functionName;
+    if (exec->callee()) {
+        if (asObject(exec->callee())->inherits(&InternalFunction::s_info)) {
+            functionName = asInternalFunction(exec->callee())->name(exec);
+            builder.append("#0 ");
+            builder.append(functionName);
+            builder.append("() ");
+            count++;
+        }
+    }
+    while (true) {
+        ASSERT(callFrame);
+        int signedLineNumber;
+        intptr_t sourceID;
+        UString urlString;
+        TiValue function;
+        
+        UString levelStr = UString::number(count);
+        
+        exec->interpreter()->retrieveLastCaller(callFrame, signedLineNumber, sourceID, urlString, function);
+
+        if (function)
+            functionName = asFunction(function)->name(exec);
+        else {
+            // Caller is unknown, but if frame is empty we should still add the frame, because
+            // something called us, and gave us arguments.
+            if (count)
+                break;
+        }
+        unsigned lineNumber = signedLineNumber >= 0 ? signedLineNumber : 0;
+        if (!builder.isEmpty())
+            builder.append("\n");
+        builder.append("#");
+        builder.append(levelStr);
+        builder.append(" ");
+        builder.append(functionName);
+        builder.append("() at ");
+        builder.append(urlString);
+        builder.append(":");
+        builder.append(UString::number(lineNumber));
+        if (!function || ++count == maxStackSize)
+            break;
+        callFrame = callFrame->callerFrame();
+    }
+    return OpaqueTiString::create(builder.toUString()).leakRef();
+}
+
+

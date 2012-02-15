@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,56 +29,91 @@
 #include "ObjectConstructor.h"
 
 #include "Error.h"
+#include "ExceptionHelpers.h"
 #include "TiFunction.h"
 #include "TiArray.h"
 #include "TiGlobalObject.h"
+#include "Lookup.h"
 #include "ObjectPrototype.h"
 #include "PropertyDescriptor.h"
 #include "PropertyNameArray.h"
-#include "PrototypeFunction.h"
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(ObjectConstructor);
 
-static TiValue JSC_HOST_CALL objectConstructorGetPrototypeOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorKeys(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorDefineProperty(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorDefineProperties(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectConstructorCreate(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL objectConstructorGetPrototypeOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorKeys(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorDefineProperty(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorDefineProperties(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorCreate(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorSeal(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorFreeze(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorPreventExtensions(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorIsSealed(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorIsFrozen(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectConstructorIsExtensible(TiExcState*);
 
-ObjectConstructor::ObjectConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, ObjectPrototype* objectPrototype, Structure* prototypeFunctionStructure)
-: InternalFunction(&exec->globalData(), structure, Identifier(exec, "Object"))
+}
+
+#include "ObjectConstructor.lut.h"
+
+namespace TI {
+
+const ClassInfo ObjectConstructor::s_info = { "Function", &InternalFunction::s_info, 0, TiExcState::objectConstructorTable };
+
+/* Source for ObjectConstructor.lut.h
+@begin objectConstructorTable
+  getPrototypeOf            objectConstructorGetPrototypeOf             DontEnum|Function 1
+  getOwnPropertyDescriptor  objectConstructorGetOwnPropertyDescriptor   DontEnum|Function 2
+  getOwnPropertyNames       objectConstructorGetOwnPropertyNames        DontEnum|Function 1
+  keys                      objectConstructorKeys                       DontEnum|Function 1
+  defineProperty            objectConstructorDefineProperty             DontEnum|Function 3
+  defineProperties          objectConstructorDefineProperties           DontEnum|Function 2
+  create                    objectConstructorCreate                     DontEnum|Function 2
+  seal                      objectConstructorSeal                       DontEnum|Function 1
+  freeze                    objectConstructorFreeze                     DontEnum|Function 1
+  preventExtensions         objectConstructorPreventExtensions          DontEnum|Function 1
+  isSealed                  objectConstructorIsSealed                   DontEnum|Function 1
+  isFrozen                  objectConstructorIsFrozen                   DontEnum|Function 1
+  isExtensible              objectConstructorIsExtensible               DontEnum|Function 1
+@end
+*/
+
+ObjectConstructor::ObjectConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, ObjectPrototype* objectPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, "Object"))
 {
     // ECMA 15.2.3.1
-    putDirectWithoutTransition(exec->propertyNames().prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
-    
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, objectPrototype, DontEnum | DontDelete | ReadOnly);
     // no. of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontEnum | DontDelete);
-    
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().getPrototypeOf, objectConstructorGetPrototypeOf), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().getOwnPropertyDescriptor, objectConstructorGetOwnPropertyDescriptor), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().getOwnPropertyNames, objectConstructorGetOwnPropertyNames), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().keys, objectConstructorKeys), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 3, exec->propertyNames().defineProperty, objectConstructorDefineProperty), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().defineProperties, objectConstructorDefineProperties), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().create, objectConstructorCreate), DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+}
+
+bool ObjectConstructor::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<TiObject>(exec, TiExcState::objectConstructorTable(exec), this, propertyName, slot);
+}
+
+bool ObjectConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<TiObject>(exec, TiExcState::objectConstructorTable(exec), this, propertyName, descriptor);
 }
 
 // ECMA 15.2.2
-static ALWAYS_INLINE TiObject* constructObject(TiExcState* exec, const ArgList& args)
+static ALWAYS_INLINE TiObject* constructObject(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args)
 {
     TiValue arg = args.at(0);
     if (arg.isUndefinedOrNull())
-        return new (exec) TiObject(exec->lexicalGlobalObject()->emptyObjectStructure());
-    return arg.toObject(exec);
+        return constructEmptyObject(exec, globalObject);
+    return arg.toObject(exec, globalObject);
 }
 
-static TiObject* constructWithObjectConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithObjectConstructor(TiExcState* exec)
 {
-    return constructObject(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructObject(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 ConstructType ObjectConstructor::getConstructData(ConstructData& constructData)
@@ -87,9 +122,10 @@ ConstructType ObjectConstructor::getConstructData(ConstructData& constructData)
     return ConstructTypeHost;
 }
 
-static TiValue JSC_HOST_CALL callObjectConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callObjectConstructor(TiExcState* exec)
 {
-    return constructObject(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructObject(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 CallType ObjectConstructor::getCallData(CallData& callData)
@@ -98,75 +134,75 @@ CallType ObjectConstructor::getCallData(CallData& callData)
     return CallTypeHost;
 }
 
-TiValue JSC_HOST_CALL objectConstructorGetPrototypeOf(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorGetPrototypeOf(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Requested prototype of a value that is not an object.");
-    return asObject(args.at(0))->prototype();
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Requested prototype of a value that is not an object."));
+    return TiValue::encode(asObject(exec->argument(0))->prototype());
 }
 
-TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorGetOwnPropertyDescriptor(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Requested property descriptor of a value that is not an object.");
-    UString propertyName = args.at(1).toString(exec);
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Requested property descriptor of a value that is not an object."));
+    UString propertyName = exec->argument(1).toString(exec);
     if (exec->hadException())
-        return jsNull();
-    TiObject* object = asObject(args.at(0));
+        return TiValue::encode(jsNull());
+    TiObject* object = asObject(exec->argument(0));
     PropertyDescriptor descriptor;
     if (!object->getOwnPropertyDescriptor(exec, Identifier(exec, propertyName), descriptor))
-        return jsUndefined();
+        return TiValue::encode(jsUndefined());
     if (exec->hadException())
-        return jsUndefined();
+        return TiValue::encode(jsUndefined());
 
     TiObject* description = constructEmptyObject(exec);
     if (!descriptor.isAccessorDescriptor()) {
-        description->putDirect(exec->propertyNames().value, descriptor.value() ? descriptor.value() : jsUndefined(), 0);
-        description->putDirect(exec->propertyNames().writable, jsBoolean(descriptor.writable()), 0);
+        description->putDirect(exec->globalData(), exec->propertyNames().value, descriptor.value() ? descriptor.value() : jsUndefined(), 0);
+        description->putDirect(exec->globalData(), exec->propertyNames().writable, jsBoolean(descriptor.writable()), 0);
     } else {
-        description->putDirect(exec->propertyNames().get, descriptor.getter() ? descriptor.getter() : jsUndefined(), 0);
-        description->putDirect(exec->propertyNames().set, descriptor.setter() ? descriptor.setter() : jsUndefined(), 0);
+        description->putDirect(exec->globalData(), exec->propertyNames().get, descriptor.getter() ? descriptor.getter() : jsUndefined(), 0);
+        description->putDirect(exec->globalData(), exec->propertyNames().set, descriptor.setter() ? descriptor.setter() : jsUndefined(), 0);
     }
     
-    description->putDirect(exec->propertyNames().enumerable, jsBoolean(descriptor.enumerable()), 0);
-    description->putDirect(exec->propertyNames().configurable, jsBoolean(descriptor.configurable()), 0);
+    description->putDirect(exec->globalData(), exec->propertyNames().enumerable, jsBoolean(descriptor.enumerable()), 0);
+    description->putDirect(exec->globalData(), exec->propertyNames().configurable, jsBoolean(descriptor.configurable()), 0);
 
-    return description;
+    return TiValue::encode(description);
 }
 
 // FIXME: Use the enumeration cache.
-TiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorGetOwnPropertyNames(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Requested property names of a value that is not an object.");
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Requested property names of a value that is not an object."));
     PropertyNameArray properties(exec);
-    asObject(args.at(0))->getOwnPropertyNames(exec, properties, IncludeDontEnumProperties);
+    asObject(exec->argument(0))->getOwnPropertyNames(exec, properties, IncludeDontEnumProperties);
     TiArray* names = constructEmptyArray(exec);
     size_t numProperties = properties.size();
     for (size_t i = 0; i < numProperties; i++)
         names->push(exec, jsOwnedString(exec, properties[i].ustring()));
-    return names;
+    return TiValue::encode(names);
 }
 
 // FIXME: Use the enumeration cache.
-TiValue JSC_HOST_CALL objectConstructorKeys(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorKeys(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Requested keys of a value that is not an object.");
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Requested keys of a value that is not an object."));
     PropertyNameArray properties(exec);
-    asObject(args.at(0))->getOwnPropertyNames(exec, properties);
+    asObject(exec->argument(0))->getOwnPropertyNames(exec, properties);
     TiArray* keys = constructEmptyArray(exec);
     size_t numProperties = properties.size();
     for (size_t i = 0; i < numProperties; i++)
         keys->push(exec, jsOwnedString(exec, properties[i].ustring()));
-    return keys;
+    return TiValue::encode(keys);
 }
 
 // ES5 8.10.5 ToPropertyDescriptor
 static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescriptor& desc)
 {
     if (!in.isObject()) {
-        throwError(exec, TypeError, "Property description must be an object.");
+        throwError(exec, createTypeError(exec, "Property description must be an object."));
         return false;
     }
     TiObject* description = asObject(in);
@@ -207,8 +243,8 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
             return false;
         if (!get.isUndefined()) {
             CallData callData;
-            if (get.getCallData(callData) == CallTypeNone) {
-                throwError(exec, TypeError, "Getter must be a function.");
+            if (getCallData(get, callData) == CallTypeNone) {
+                throwError(exec, createTypeError(exec, "Getter must be a function."));
                 return false;
             }
         } else
@@ -223,8 +259,8 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
             return false;
         if (!set.isUndefined()) {
             CallData callData;
-            if (set.getCallData(callData) == CallTypeNone) {
-                throwError(exec, TypeError, "Setter must be a function.");
+            if (getCallData(set, callData) == CallTypeNone) {
+                throwError(exec, createTypeError(exec, "Setter must be a function."));
                 return false;
             }
         } else
@@ -237,32 +273,32 @@ static bool toPropertyDescriptor(TiExcState* exec, TiValue in, PropertyDescripto
         return true;
 
     if (desc.value()) {
-        throwError(exec, TypeError, "Invalid property.  'value' present on property with getter or setter.");
+        throwError(exec, createTypeError(exec, "Invalid property.  'value' present on property with getter or setter."));
         return false;
     }
 
     if (desc.writablePresent()) {
-        throwError(exec, TypeError, "Invalid property.  'writable' present on property with getter or setter.");
+        throwError(exec, createTypeError(exec, "Invalid property.  'writable' present on property with getter or setter."));
         return false;
     }
     return true;
 }
 
-TiValue JSC_HOST_CALL objectConstructorDefineProperty(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorDefineProperty(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Properties can only be defined on Objects.");
-    TiObject* O = asObject(args.at(0));
-    UString propertyName = args.at(1).toString(exec);
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Properties can only be defined on Objects."));
+    TiObject* O = asObject(exec->argument(0));
+    UString propertyName = exec->argument(1).toString(exec);
     if (exec->hadException())
-        return jsNull();
+        return TiValue::encode(jsNull());
     PropertyDescriptor descriptor;
-    if (!toPropertyDescriptor(exec, args.at(2), descriptor))
-        return jsNull();
+    if (!toPropertyDescriptor(exec, exec->argument(2), descriptor))
+        return TiValue::encode(jsNull());
     ASSERT((descriptor.attributes() & (Getter | Setter)) || (!descriptor.isAccessorDescriptor()));
     ASSERT(!exec->hadException());
     O->defineOwnProperty(exec, Identifier(exec, propertyName), descriptor, true);
-    return O;
+    return TiValue::encode(O);
 }
 
 static TiValue defineProperties(TiExcState* exec, TiObject* object, TiObject* properties)
@@ -299,26 +335,77 @@ static TiValue defineProperties(TiExcState* exec, TiObject* object, TiObject* pr
     return object;
 }
 
-TiValue JSC_HOST_CALL objectConstructorDefineProperties(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorDefineProperties(TiExcState* exec)
 {
-    if (!args.at(0).isObject())
-        return throwError(exec, TypeError, "Properties can only be defined on Objects.");
-    if (!args.at(1).isObject())
-        return throwError(exec, TypeError, "Property descriptor list must be an Object.");
-    return defineProperties(exec, asObject(args.at(0)), asObject(args.at(1)));
+    if (!exec->argument(0).isObject())
+        return throwVMError(exec, createTypeError(exec, "Properties can only be defined on Objects."));
+    if (!exec->argument(1).isObject())
+        return throwVMError(exec, createTypeError(exec, "Property descriptor list must be an Object."));
+    return TiValue::encode(defineProperties(exec, asObject(exec->argument(0)), asObject(exec->argument(1))));
 }
 
-TiValue JSC_HOST_CALL objectConstructorCreate(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectConstructorCreate(TiExcState* exec)
 {
-    if (!args.at(0).isObject() && !args.at(0).isNull())
-        return throwError(exec, TypeError, "Object prototype may only be an Object or null.");
-    TiObject* newObject = constructEmptyObject(exec);
-    newObject->setPrototype(args.at(0));
-    if (args.at(1).isUndefined())
-        return newObject;
-    if (!args.at(1).isObject())
-        return throwError(exec, TypeError, "Property descriptor list must be an Object.");
-    return defineProperties(exec, newObject, asObject(args.at(1)));
+    if (!exec->argument(0).isObject() && !exec->argument(0).isNull())
+        return throwVMError(exec, createTypeError(exec, "Object prototype may only be an Object or null."));
+    TiValue proto = exec->argument(0);
+    TiObject* newObject = proto.isObject() ? constructEmptyObject(exec, asObject(proto)->inheritorID(exec->globalData())) : constructEmptyObject(exec, exec->lexicalGlobalObject()->nullPrototypeObjectStructure());
+    if (exec->argument(1).isUndefined())
+        return TiValue::encode(newObject);
+    if (!exec->argument(1).isObject())
+        return throwVMError(exec, createTypeError(exec, "Property descriptor list must be an Object."));
+    return TiValue::encode(defineProperties(exec, newObject, asObject(exec->argument(1))));
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorSeal(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.seal can only be called on Objects."));
+    asObject(obj)->seal(exec->globalData());
+    return TiValue::encode(obj);
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorFreeze(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.freeze can only be called on Objects."));
+    asObject(obj)->freeze(exec->globalData());
+    return TiValue::encode(obj);
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorPreventExtensions(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.preventExtensions can only be called on Objects."));
+    asObject(obj)->preventExtensions(exec->globalData());
+    return TiValue::encode(obj);
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorIsSealed(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.isSealed can only be called on Objects."));
+    return TiValue::encode(jsBoolean(asObject(obj)->isSealed(exec->globalData())));
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorIsFrozen(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.isFrozen can only be called on Objects."));
+    return TiValue::encode(jsBoolean(asObject(obj)->isFrozen(exec->globalData())));
+}
+
+EncodedTiValue JSC_HOST_CALL objectConstructorIsExtensible(TiExcState* exec)
+{
+    TiValue obj = exec->argument(0);
+    if (!obj.isObject())
+        return throwVMError(exec, createTypeError(exec, "Object.isExtensible can only be called on Objects."));
+    return TiValue::encode(jsBoolean(asObject(obj)->isExtensible()));
 }
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,6 +34,7 @@
 #define NumericStrings_h
 
 #include "UString.h"
+#include <wtf/FixedArray.h>
 #include <wtf/HashFunctions.h>
 
 namespace TI {
@@ -46,7 +47,7 @@ namespace TI {
             if (d == entry.key && !entry.value.isNull())
                 return entry.value;
             entry.key = d;
-            entry.value = UString::from(d);
+            entry.value = UString::number(d);
             return entry.value;
         }
 
@@ -58,7 +59,7 @@ namespace TI {
             if (i == entry.key && !entry.value.isNull())
                 return entry.value;
             entry.key = i;
-            entry.value = UString::from(i);
+            entry.value = UString::number(i);
             return entry.value;
         }
 
@@ -70,7 +71,7 @@ namespace TI {
             if (i == entry.key && !entry.value.isNull())
                 return entry.value;
             entry.key = i;
-            entry.value = UString::from(i);
+            entry.value = UString::number(i);
             return entry.value;
         }
     private:
@@ -89,14 +90,14 @@ namespace TI {
         {
             ASSERT(i < cacheSize);
             if (smallIntCache[i].isNull())
-                smallIntCache[i] = UString::from(i);
+                smallIntCache[i] = UString::number(i);
             return smallIntCache[i];
         }
 
-        CacheEntry<double> doubleCache[cacheSize];
-        CacheEntry<int> intCache[cacheSize];
-        CacheEntry<unsigned> unsignedCache[cacheSize];
-        UString smallIntCache[cacheSize];
+        FixedArray<CacheEntry<double>, cacheSize> doubleCache;
+        FixedArray<CacheEntry<int>, cacheSize> intCache;
+        FixedArray<CacheEntry<unsigned>, cacheSize> unsignedCache;
+        FixedArray<UString, cacheSize> smallIntCache;
     };
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,16 +28,21 @@
 #include "config.h"
 #include "TiLock.h"
 
-#include "Collector.h"
+#include "Heap.h"
 #include "CallFrame.h"
+#include "TiObject.h"
+#include "ScopeChain.h"
 
-#if ENABLE(JSC_MULTIPLE_THREADS)
+#if USE(PTHREADS)
 #include <pthread.h>
 #endif
 
 namespace TI {
 
-#if ENABLE(JSC_MULTIPLE_THREADS)
+// TiLock is only needed to support an obsolete execution model where TiCore
+// automatically protected against concurrent access from multiple threads.
+// So it's safe to disable it on non-mac platforms where we don't have native pthreads.
+#if ENABLE(JSC_MULTIPLE_THREADS) && (OS(DARWIN) || USE(PTHREADS))
 
 // Acquire this mutex before accessing lock-related data.
 static pthread_mutex_t JSMutex = PTHREAD_MUTEX_INITIALIZER;
@@ -72,6 +77,12 @@ TiLock::TiLock(TiExcState* exec)
     lock(m_lockBehavior);
 }
 
+TiLock::TiLock(TiGlobalData* globalData)
+    : m_lockBehavior(globalData->isSharedInstance() ? LockForReal : SilenceAssertionsOnly)
+{
+    lock(m_lockBehavior);
+}
+
 void TiLock::lock(TiLockBehavior lockBehavior)
 {
 #ifdef NDEBUG
@@ -102,12 +113,12 @@ void TiLock::unlock(TiLockBehavior lockBehavior)
 #endif
 
     intptr_t newLockCount = lockCount() - 1;
+    setLockCount(newLockCount);
     if (!newLockCount && lockBehavior == LockForReal) {
         int result;
         result = pthread_mutex_unlock(&JSMutex);
         ASSERT(!result);
     }
-    setLockCount(newLockCount);
 }
 
 void TiLock::lock(TiExcState* exec)
@@ -209,7 +220,7 @@ TiLock::DropAllLocks::~DropAllLocks()
     --lockDropDepth;
 }
 
-#else
+#else // ENABLE(JSC_MULTIPLE_THREADS) && (OS(DARWIN) || USE(PTHREADS))
 
 TiLock::TiLock(TiExcState*)
     : m_lockBehavior(SilenceAssertionsOnly)
@@ -256,6 +267,6 @@ TiLock::DropAllLocks::~DropAllLocks()
 {
 }
 
-#endif // USE(MULTIPLE_THREADS)
+#endif // ENABLE(JSC_MULTIPLE_THREADS) && (OS(DARWIN) || USE(PTHREADS))
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,13 +36,14 @@
 #ifndef ConstructData_h
 #define ConstructData_h
 
+#include "TiValue.h"
+
 namespace TI {
 
     class ArgList;
     class TiExcState;
     class FunctionExecutable;
     class TiObject;
-    class TiValue;
     class ScopeChainNode;
 
     enum ConstructType {
@@ -51,7 +52,7 @@ namespace TI {
         ConstructTypeJS
     };
 
-    typedef TiObject* (*NativeConstructor)(TiExcState*, TiObject*, const ArgList&);
+    typedef EncodedTiValue (JSC_HOST_CALL *NativeConstructor)(TiExcState*);
 
     union ConstructData {
         struct {

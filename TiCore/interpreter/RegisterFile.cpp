@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,48 +36,73 @@
 #include "config.h"
 #include "RegisterFile.h"
 
+#include "ConservativeRoots.h"
+#include "Interpreter.h"
+#include "TiGlobalData.h"
 #include "TiGlobalObject.h"
 
 namespace TI {
 
+static size_t committedBytesCount = 0;
+
+static Mutex& registerFileStatisticsMutex()
+{
+    DEFINE_STATIC_LOCAL(Mutex, staticMutex, ());
+    return staticMutex;
+}    
+    
 RegisterFile::~RegisterFile()
 {
-#if HAVE(MMAP)
-    munmap(m_buffer, ((m_max - m_start) + m_maxGlobals) * sizeof(Register));
-#elif HAVE(VIRTUALALLOC)
-#if OS(WINCE)
-    VirtualFree(m_buffer, DWORD(m_commitEnd) - DWORD(m_buffer), MEM_DECOMMIT);
-#endif
-    VirtualFree(m_buffer, 0, MEM_RELEASE);
-#else
-    fastFree(m_buffer);
-#endif
+    void* base = m_reservation.base();
+    m_reservation.decommit(base, reinterpret_cast<intptr_t>(m_commitEnd) - reinterpret_cast<intptr_t>(base));
+    addToCommittedByteCount(-(reinterpret_cast<intptr_t>(m_commitEnd) - reinterpret_cast<intptr_t>(base)));
+    m_reservation.deallocate();
+}
+
+void RegisterFile::gatherConservativeRoots(ConservativeRoots& conservativeRoots)
+{
+    for (Register* it = start(); it != end(); ++it) {
+        TiValue v = it->jsValue();
+        if (!v.isCell())
+            continue;
+        conservativeRoots.add(v.asCell());
+    }
 }
 
 void RegisterFile::releaseExcessCapacity()
 {
-#if HAVE(MMAP) && HAVE(MADV_FREE) && !HAVE(VIRTUALALLOC)
-    while (madvise(m_start, (m_max - m_start) * sizeof(Register), MADV_FREE) == -1 && errno == EAGAIN) { }
-#elif HAVE(VIRTUALALLOC)
-    VirtualFree(m_start, (m_max - m_start) * sizeof(Register), MEM_DECOMMIT);
+    m_reservation.decommit(m_start, reinterpret_cast<intptr_t>(m_commitEnd) - reinterpret_cast<intptr_t>(m_start));
+    addToCommittedByteCount(-(reinterpret_cast<intptr_t>(m_commitEnd) - reinterpret_cast<intptr_t>(m_start)));
     m_commitEnd = m_start;
-#endif
     m_maxUsed = m_start;
 }
 
 void RegisterFile::setGlobalObject(TiGlobalObject* globalObject)
 {
-    m_globalObject = globalObject;
-}
-
-bool RegisterFile::clearGlobalObject(TiGlobalObject* globalObject)
-{
-    return m_globalObject.clear(globalObject);
+    m_globalObject.set(globalObject->globalData(), globalObject, &m_globalObjectOwner, this);
 }
 
 TiGlobalObject* RegisterFile::globalObject()
 {
     return m_globalObject.get();
+}
+
+void RegisterFile::initializeThreading()
+{
+    registerFileStatisticsMutex();
+}
+
+size_t RegisterFile::committedByteCount()
+{
+    MutexLocker locker(registerFileStatisticsMutex());
+    return committedBytesCount;
+}
+
+void RegisterFile::addToCommittedByteCount(long byteCount)
+{
+    MutexLocker locker(registerFileStatisticsMutex());
+    ASSERT(static_cast<long>(committedBytesCount) + byteCount > -1);
+    committedBytesCount += byteCount;
 }
 
 } // namespace TI

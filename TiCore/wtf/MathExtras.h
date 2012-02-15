@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,8 +33,10 @@
 #ifndef WTF_MathExtras_h
 #define WTF_MathExtras_h
 
+#include <algorithm>
 #include <cmath>
 #include <float.h>
+#include <limits>
 #include <stdlib.h>
 
 #if OS(SOLARIS)
@@ -59,6 +61,14 @@ const float piFloat = 3.14159265358979323846f;
 #else
 const double piDouble = M_PI;
 const float piFloat = static_cast<float>(M_PI);
+#endif
+
+#ifndef M_PI_2
+const double piOverTwoDouble = 1.57079632679489661923;
+const float piOverTwoFloat = 1.57079632679489661923f;
+#else
+const double piOverTwoDouble = M_PI_2;
+const float piOverTwoFloat = static_cast<float>(M_PI_2);
 #endif
 
 #ifndef M_PI_4
@@ -87,7 +97,7 @@ inline bool isfinite(double x) { return finite(x) && !isnand(x); }
 inline bool isinf(double x) { return !finite(x) && !isnand(x); }
 #endif
 #ifndef signbit
-inline bool signbit(double x) { return x < 0.0; } // FIXME: Wrong for negative 0.
+inline bool signbit(double x) { return copysign(1.0, x) < 0; }
 #endif
 
 #endif
@@ -103,7 +113,7 @@ inline bool signbit(double x) { struct ieee_double *p = (struct ieee_double *)&x
 
 #endif
 
-#if COMPILER(MSVC) || COMPILER(RVCT)
+#if COMPILER(MSVC) || (COMPILER(RVCT) && !(RVCT_VERSION_AT_LEAST(3, 0, 0, 0)))
 
 // We must not do 'num + 0.5' or 'num - 0.5' because they can cause precision loss.
 static double round(double num)
@@ -143,6 +153,13 @@ inline float nextafterf(float x, float y) { return x > y ? x - FLT_EPSILON : x +
 
 inline double copysign(double x, double y) { return _copysign(x, y); }
 inline int isfinite(double x) { return _finite(x); }
+
+// MSVC's math.h does not currently supply log2.
+inline double log2(double num)
+{
+    // This constant is roughly M_LN2, which is not provided by default on Windows.
+    return log(num) / 0.693147180559945309417232121458176568;
+}
 
 // Work around a bug in Win, where atan2(+-infinity, +-infinity) yields NaN instead of specific values.
 inline double wtf_atan2(double x, double y)
@@ -197,7 +214,74 @@ inline float deg2turn(float d) { return d / 360.0f; }
 inline float rad2grad(float r) { return r * 200.0f / piFloat; }
 inline float grad2rad(float g) { return g * piFloat / 200.0f; }
 
-#if !COMPILER(MSVC) && !COMPILER(WINSCW) && !(COMPILER(RVCT) && OS(SYMBIAN))
+inline int clampToInteger(double x)
+{
+    const double intMax = static_cast<double>(std::numeric_limits<int>::max());
+    const double intMin = static_cast<double>(std::numeric_limits<int>::min());
+    
+    if (x >= intMax)
+        return std::numeric_limits<int>::max();
+    if (x <= intMin)
+        return std::numeric_limits<int>::min();
+    return static_cast<int>(x);
+}
+
+inline float clampToFloat(double x)
+{
+    const double floatMax = static_cast<double>(std::numeric_limits<float>::max());
+    const double floatMin = -static_cast<double>(std::numeric_limits<float>::max());
+    
+    if (x >= floatMax)
+        return std::numeric_limits<float>::max();
+    if (x <= floatMin)
+        return -std::numeric_limits<float>::max();
+    return static_cast<float>(x);
+}
+
+inline int clampToPositiveInteger(double x)
+{
+    const double intMax = static_cast<double>(std::numeric_limits<int>::max());
+    
+    if (x >= intMax)
+        return std::numeric_limits<int>::max();
+    if (x <= 0)
+        return 0;
+    return static_cast<int>(x);
+}
+
+inline int clampToInteger(float x)
+{
+    const float intMax = static_cast<float>(std::numeric_limits<int>::max());
+    const float intMin = static_cast<float>(std::numeric_limits<int>::min());
+    
+    if (x >= intMax)
+        return std::numeric_limits<int>::max();
+    if (x <= intMin)
+        return std::numeric_limits<int>::min();
+    return static_cast<int>(x);
+}
+
+inline int clampToPositiveInteger(float x)
+{
+    const float intMax = static_cast<float>(std::numeric_limits<int>::max());
+    
+    if (x >= intMax)
+        return std::numeric_limits<int>::max();
+    if (x <= 0)
+        return 0;
+    return static_cast<int>(x);
+}
+
+inline int clampToInteger(unsigned x)
+{
+    const unsigned intMax = static_cast<unsigned>(std::numeric_limits<int>::max());
+    
+    if (x >= intMax)
+        return std::numeric_limits<int>::max();
+    return static_cast<int>(x);
+}
+
+#if !COMPILER(MSVC) && !(COMPILER(RVCT) && PLATFORM(BREWMP)) && !OS(SOLARIS) && !OS(SYMBIAN)
 using std::isfinite;
 using std::isinf;
 using std::isnan;

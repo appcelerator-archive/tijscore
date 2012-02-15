@@ -2,11 +2,11 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,13 +37,16 @@
 #include "config.h"
 #include "CodeBlock.h"
 
-#include "JIT.h"
-#include "TiValue.h"
+#include "BytecodeGenerator.h"
+#include "Debugger.h"
 #include "Interpreter.h"
+#include "JIT.h"
+#include "JSActivation.h"
 #include "TiFunction.h"
 #include "TiStaticScopeObject.h"
-#include "Debugger.h"
-#include "BytecodeGenerator.h"
+#include "TiValue.h"
+#include "RepatchBuffer.h"
+#include "UStringConcatenate.h"
 #include <stdio.h>
 #include <wtf/StringExtras.h>
 
@@ -56,9 +59,9 @@ namespace TI {
 static UString escapeQuotes(const UString& str)
 {
     UString result = str;
-    unsigned pos = 0;
-    while ((pos = result.find('\"', pos)) != UString::NotFound) {
-        result = makeString(result.substr(0, pos), "\"\\\"\"", result.substr(pos + 1));
+    size_t pos = 0;
+    while ((pos = result.find('\"', pos)) != notFound) {
+        result = makeUString(result.substringSharingImpl(0, pos), "\"\\\"\"", result.substringSharingImpl(pos + 1));
         pos += 4;
     }
     return result;
@@ -70,19 +73,19 @@ static UString valueToSourceString(TiExcState* exec, TiValue val)
         return "0";
 
     if (val.isString())
-        return makeString("\"", escapeQuotes(val.toString(exec)), "\"");
+        return makeUString("\"", escapeQuotes(val.toString(exec)), "\"");
 
     return val.toString(exec);
 }
 
 static CString constantName(TiExcState* exec, int k, TiValue value)
 {
-    return makeString(valueToSourceString(exec, value), "(@k", UString::from(k - FirstConstantRegisterIndex), ")").UTF8String();
+    return makeUString(valueToSourceString(exec, value), "(@k", UString::number(k - FirstConstantRegisterIndex), ")").utf8();
 }
 
 static CString idName(int id0, const Identifier& ident)
 {
-    return makeString(ident.ustring(), "(@id", UString::from(id0), ")").UTF8String();
+    return makeUString(ident.ustring(), "(@id", UString::number(id0), ")").utf8();
 }
 
 CString CodeBlock::registerName(TiExcState* exec, int r) const
@@ -93,7 +96,7 @@ CString CodeBlock::registerName(TiExcState* exec, int r) const
     if (isConstantRegisterIndex(r))
         return constantName(exec, r, getConstant(r));
 
-    return makeString("r", UString::from(r)).UTF8String();
+    return makeUString("r", UString::number(r)).utf8();
 }
 
 static UString regexpToSourceString(RegExp* regExp)
@@ -107,12 +110,12 @@ static UString regexpToSourceString(RegExp* regExp)
     if (regExp->multiline())
         postfix[index] = 'm';
 
-    return makeString("/", regExp->pattern(), postfix);
+    return makeUString("/", regExp->pattern(), postfix);
 }
 
 static CString regexpName(int re, RegExp* regexp)
 {
-    return makeString(regexpToSourceString(regexp), "(@re", UString::from(re), ")").UTF8String();
+    return makeUString(regexpToSourceString(regexp), "(@re", UString::number(re), ")").utf8();
 }
 
 static UString pointerToSourceString(void* p)
@@ -181,7 +184,7 @@ void CodeBlock::printPutByIdOp(TiExcState* exec, int location, Vector<Instructio
     int id0 = (++it)->u.operand;
     int r1 = (++it)->u.operand;
     printf("[%4d] %s\t %s, %s, %s\n", location, op, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data(), registerName(exec, r1).data());
-    it += 4;
+    it += 5;
 }
 
 #if ENABLE(JIT)
@@ -230,32 +233,32 @@ static unsigned instructionOffsetForNth(TiExcState* exec, const Vector<Instructi
 
 static void printGlobalResolveInfo(const GlobalResolveInfo& resolveInfo, unsigned instructionOffset)
 {
-    printf("  [%4d] %s: %s\n", instructionOffset, "resolve_global", pointerToSourceString(resolveInfo.structure).UTF8String().data());
+    printf("  [%4d] %s: %s\n", instructionOffset, "resolve_global", pointerToSourceString(resolveInfo.structure).utf8().data());
 }
 
 static void printStructureStubInfo(const StructureStubInfo& stubInfo, unsigned instructionOffset)
 {
     switch (stubInfo.accessType) {
     case access_get_by_id_self:
-        printf("  [%4d] %s: %s\n", instructionOffset, "get_by_id_self", pointerToSourceString(stubInfo.u.getByIdSelf.baseObjectStructure).UTF8String().data());
+        printf("  [%4d] %s: %s\n", instructionOffset, "get_by_id_self", pointerToSourceString(stubInfo.u.getByIdSelf.baseObjectStructure).utf8().data());
         return;
     case access_get_by_id_proto:
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(stubInfo.u.getByIdProto.baseObjectStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.getByIdProto.prototypeStructure).UTF8String().data());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(stubInfo.u.getByIdProto.baseObjectStructure).utf8().data(), pointerToSourceString(stubInfo.u.getByIdProto.prototypeStructure).utf8().data());
         return;
     case access_get_by_id_chain:
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(stubInfo.u.getByIdChain.baseObjectStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.getByIdChain.chain).UTF8String().data());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(stubInfo.u.getByIdChain.baseObjectStructure).utf8().data(), pointerToSourceString(stubInfo.u.getByIdChain.chain).utf8().data());
         return;
     case access_get_by_id_self_list:
-        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_self_list", pointerToSourceString(stubInfo.u.getByIdSelfList.structureList).UTF8String().data(), stubInfo.u.getByIdSelfList.listSize);
+        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_self_list", pointerToSourceString(stubInfo.u.getByIdSelfList.structureList).utf8().data(), stubInfo.u.getByIdSelfList.listSize);
         return;
     case access_get_by_id_proto_list:
-        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_proto_list", pointerToSourceString(stubInfo.u.getByIdProtoList.structureList).UTF8String().data(), stubInfo.u.getByIdProtoList.listSize);
+        printf("  [%4d] %s: %s (%d)\n", instructionOffset, "op_get_by_id_proto_list", pointerToSourceString(stubInfo.u.getByIdProtoList.structureList).utf8().data(), stubInfo.u.getByIdProtoList.listSize);
         return;
     case access_put_by_id_transition:
-        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(stubInfo.u.putByIdTransition.previousStructure).UTF8String().data(), pointerToSourceString(stubInfo.u.putByIdTransition.structure).UTF8String().data(), pointerToSourceString(stubInfo.u.putByIdTransition.chain).UTF8String().data());
+        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(stubInfo.u.putByIdTransition.previousStructure).utf8().data(), pointerToSourceString(stubInfo.u.putByIdTransition.structure).utf8().data(), pointerToSourceString(stubInfo.u.putByIdTransition.chain).utf8().data());
         return;
     case access_put_by_id_replace:
-        printf("  [%4d] %s: %s\n", instructionOffset, "put_by_id_replace", pointerToSourceString(stubInfo.u.putByIdReplace.baseObjectStructure).UTF8String().data());
+        printf("  [%4d] %s: %s\n", instructionOffset, "put_by_id_replace", pointerToSourceString(stubInfo.u.putByIdReplace.baseObjectStructure).utf8().data());
         return;
     case access_get_by_id:
         printf("  [%4d] %s\n", instructionOffset, "get_by_id");
@@ -284,7 +287,7 @@ static void printStructureStubInfo(const StructureStubInfo& stubInfo, unsigned i
 void CodeBlock::printStructure(const char* name, const Instruction* vPC, int operand) const
 {
     unsigned instructionOffset = vPC - m_instructions.begin();
-    printf("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).UTF8String().data());
+    printf("  [%4d] %s: %s\n", instructionOffset, name, pointerToSourceString(vPC[operand].u.structure).utf8().data());
 }
 
 void CodeBlock::printStructures(const Instruction* vPC) const
@@ -301,15 +304,15 @@ void CodeBlock::printStructures(const Instruction* vPC) const
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto)) {
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structure).UTF8String().data());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_proto", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
-        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structure).UTF8String().data(), pointerToSourceString(vPC[6].u.structureChain).UTF8String().data());
+        printf("  [%4d] %s: %s, %s, %s\n", instructionOffset, "put_by_id_transition", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structure).utf8().data(), pointerToSourceString(vPC[6].u.structureChain).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain)) {
-        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).UTF8String().data(), pointerToSourceString(vPC[5].u.structureChain).UTF8String().data());
+        printf("  [%4d] %s: %s, %s\n", instructionOffset, "get_by_id_chain", pointerToSourceString(vPC[4].u.structure).utf8().data(), pointerToSourceString(vPC[5].u.structureChain).utf8().data());
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id)) {
@@ -359,7 +362,7 @@ void CodeBlock::dump(TiExcState* exec) const
         printf("\nIdentifiers:\n");
         size_t i = 0;
         do {
-            printf("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].ascii());
+            printf("  id%u = %s\n", static_cast<unsigned>(i), m_identifiers[i].ustring().utf8().data());
             ++i;
         } while (i != m_identifiers.size());
     }
@@ -369,7 +372,7 @@ void CodeBlock::dump(TiExcState* exec) const
         unsigned registerIndex = m_numVars;
         size_t i = 0;
         do {
-            printf("   k%u = %s\n", registerIndex, valueToSourceString(exec, m_constantRegisters[i].jsValue()).ascii());
+            printf("   k%u = %s\n", registerIndex, valueToSourceString(exec, m_constantRegisters[i].get()).utf8().data());
             ++i;
             ++registerIndex;
         } while (i < m_constantRegisters.size());
@@ -379,7 +382,7 @@ void CodeBlock::dump(TiExcState* exec) const
         printf("\nm_regexps:\n");
         size_t i = 0;
         do {
-            printf("  re%u = %s\n", static_cast<unsigned>(i), regexpToSourceString(m_rareData->m_regexps[i].get()).ascii());
+            printf("  re%u = %s\n", static_cast<unsigned>(i), regexpToSourceString(m_rareData->m_regexps[i].get()).utf8().data());
             ++i;
         } while (i < m_rareData->m_regexps.size());
     }
@@ -402,7 +405,8 @@ void CodeBlock::dump(TiExcState* exec) const
              ++i;
         } while (i < m_structureStubInfos.size());
     }
-#else
+#endif
+#if ENABLE(INTERPRETER)
     if (!m_globalResolveInstructions.isEmpty() || !m_propertyAccessInstructions.isEmpty())
         printf("\nStructures:\n");
 
@@ -460,7 +464,7 @@ void CodeBlock::dump(TiExcState* exec) const
                     continue;
                 ASSERT(!((i + m_rareData->m_characterSwitchJumpTables[i].min) & ~0xFFFF));
                 UChar ch = static_cast<UChar>(entry + m_rareData->m_characterSwitchJumpTables[i].min);
-                printf("\t\t\"%s\" => %04d\n", UString(&ch, 1).ascii(), *iter);
+                printf("\t\t\"%s\" => %04d\n", UString(&ch, 1).utf8().data(), *iter);
         }
             printf("      }\n");
             ++i;
@@ -474,7 +478,7 @@ void CodeBlock::dump(TiExcState* exec) const
             printf("  %1d = {\n", i);
             StringJumpTable::StringOffsetTable::const_iterator end = m_rareData->m_stringSwitchJumpTables[i].offsetTable.end();
             for (StringJumpTable::StringOffsetTable::const_iterator iter = m_rareData->m_stringSwitchJumpTables[i].offsetTable.begin(); iter != end; ++iter)
-                printf("\t\t\"%s\" => %04d\n", UString(iter->first).ascii(), iter->second.branchOffset);
+                printf("\t\t\"%s\" => %04d\n", UString(iter->first).utf8().data(), iter->second.branchOffset);
             printf("      }\n");
             ++i;
         } while (i < m_rareData->m_stringSwitchJumpTables.size());
@@ -491,22 +495,40 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printf("[%4d] enter\n", location);
             break;
         }
-        case op_enter_with_activation: {
+        case op_create_activation: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] enter_with_activation %s\n", location, registerName(exec, r0).data());
+            printf("[%4d] create_activation %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_create_arguments: {
-            printf("[%4d] create_arguments\n", location);
+            int r0 = (++it)->u.operand;
+            printf("[%4d] create_arguments\t %s\n", location, registerName(exec, r0).data());
             break;
         }
-        case op_init_arguments: {
-            printf("[%4d] init_arguments\n", location);
+        case op_init_lazy_reg: {
+            int r0 = (++it)->u.operand;
+            printf("[%4d] init_lazy_reg\t %s\n", location, registerName(exec, r0).data());
+            break;
+        }
+        case op_get_callee: {
+            int r0 = (++it)->u.operand;
+            printf("[%4d] op_get_callee %s\n", location, registerName(exec, r0).data());
+            break;
+        }
+        case op_create_this: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            printf("[%4d] create_this %s %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_convert_this: {
             int r0 = (++it)->u.operand;
             printf("[%4d] convert_this %s\n", location, registerName(exec, r0).data());
+            break;
+        }
+        case op_convert_this_strict: {
+            int r0 = (++it)->u.operand;
+            printf("[%4d] convert_this_strict %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_new_object: {
@@ -519,6 +541,13 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int argv = (++it)->u.operand;
             int argc = (++it)->u.operand;
             printf("[%4d] new_array\t %s, %s, %d\n", location, registerName(exec, dst).data(), registerName(exec, argv).data(), argc);
+            break;
+        }
+        case op_new_array_buffer: {
+            int dst = (++it)->u.operand;
+            int argv = (++it)->u.operand;
+            int argc = (++it)->u.operand;
+            printf("[%4d] new_array_buffer %s, %d, %d\n", location, registerName(exec, dst).data(), argv, argc);
             break;
         }
         case op_new_regexp: {
@@ -650,6 +679,11 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printUnaryOp(exec, location, it, "bitnot");
             break;
         }
+        case op_check_has_instance: {
+            int base = (++it)->u.operand;
+            printf("[%4d] check_has_instance\t\t %s\n", location, registerName(exec, base).data());
+            break;
+        }
         case op_instanceof: {
             int r0 = (++it)->u.operand;
             int r1 = (++it)->u.operand;
@@ -705,19 +739,18 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_resolve_global: {
             int r0 = (++it)->u.operand;
-            TiValue scope = TiValue((++it)->u.jsCell);
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve_global\t %s, %s, %s\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), idName(id0, m_identifiers[id0]).data());
+            printf("[%4d] resolve_global\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
             it += 2;
             break;
         }
         case op_resolve_global_dynamic: {
             int r0 = (++it)->u.operand;
-            TiValue scope = TiValue((++it)->u.jsCell);
             int id0 = (++it)->u.operand;
-            int depth = it[2].u.operand;
-            printf("[%4d] resolve_global_dynamic\t %s, %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), idName(id0, m_identifiers[id0]).data(), depth);
-            it += 3;
+            TiValue scope = TiValue((++it)->u.jsCell.get());
+            ++it;
+            int depth = (++it)->u.operand;
+            printf("[%4d] resolve_global_dynamic\t %s, %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).utf8().data(), idName(id0, m_identifiers[id0]).data(), depth);
             break;
         }
         case op_get_scoped_var: {
@@ -736,22 +769,27 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_get_global_var: {
             int r0 = (++it)->u.operand;
-            TiValue scope = TiValue((++it)->u.jsCell);
             int index = (++it)->u.operand;
-            printf("[%4d] get_global_var\t %s, %s, %d\n", location, registerName(exec, r0).data(), valueToSourceString(exec, scope).ascii(), index);
+            printf("[%4d] get_global_var\t %s, %d\n", location, registerName(exec, r0).data(), index);
             break;
         }
         case op_put_global_var: {
-            TiValue scope = TiValue((++it)->u.jsCell);
             int index = (++it)->u.operand;
             int r0 = (++it)->u.operand;
-            printf("[%4d] put_global_var\t %s, %d, %s\n", location, valueToSourceString(exec, scope).ascii(), index, registerName(exec, r0).data());
+            printf("[%4d] put_global_var\t %d, %s\n", location, index, registerName(exec, r0).data());
             break;
         }
         case op_resolve_base: {
             int r0 = (++it)->u.operand;
             int id0 = (++it)->u.operand;
-            printf("[%4d] resolve_base\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
+            int isStrict = (++it)->u.operand;
+            printf("[%4d] resolve_base%s\t %s, %s\n", location, isStrict ? "_strict" : "", registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
+            break;
+        }
+        case op_ensure_property_exists: {
+            int r0 = (++it)->u.operand;
+            int id0 = (++it)->u.operand;
+            printf("[%4d] ensure_property_exists\t %s, %s\n", location, registerName(exec, r0).data(), idName(id0, m_identifiers[id0]).data());
             break;
         }
         case op_resolve_with_base: {
@@ -837,6 +875,11 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printGetByIdOp(exec, location, it, "get_string_length");
             break;
         }
+        case op_get_arguments_length: {
+            printUnaryOp(exec, location, it, "get_arguments_length");
+            it++;
+            break;
+        }
         case op_put_by_id: {
             printPutByIdOp(exec, location, it, "put_by_id");
             break;
@@ -883,6 +926,13 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             int r1 = (++it)->u.operand;
             int r2 = (++it)->u.operand;
             printf("[%4d] get_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
+            break;
+        }
+        case op_get_argument_by_val: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            int r2 = (++it)->u.operand;
+            printf("[%4d] get_argument_by_val\t %s, %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data(), registerName(exec, r2).data());
             break;
         }
         case op_get_by_pname: {
@@ -1023,7 +1073,8 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         case op_new_func: {
             int r0 = (++it)->u.operand;
             int f0 = (++it)->u.operand;
-            printf("[%4d] new_func\t\t %s, f%d\n", location, registerName(exec, r0).data(), f0);
+            int shouldCheck = (++it)->u.operand;
+            printf("[%4d] new_func\t\t %s, f%d, %s\n", location, registerName(exec, r0).data(), f0, shouldCheck ? "<Checked>" : "<Unchecked>");
             break;
         }
         case op_new_func_exp: {
@@ -1033,27 +1084,24 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             break;
         }
         case op_call: {
-            int dst = (++it)->u.operand;
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call\t\t %s, %s, %d, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset);
+            printf("[%4d] call\t\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
             break;
         }
         case op_call_eval: {
-            int dst = (++it)->u.operand;
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_eval\t %s, %s, %d, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset);
+            printf("[%4d] call_eval\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
             break;
         }
         case op_call_varargs: {
-            int dst = (++it)->u.operand;
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            printf("[%4d] call_varargs\t %s, %s, %s, %d\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), registerName(exec, argCount).data(), registerOffset);
+            printf("[%4d] call_varargs\t %s, %s, %d\n", location, registerName(exec, func).data(), registerName(exec, argCount).data(), registerOffset);
             break;
         }
         case op_load_varargs: {
@@ -1062,11 +1110,13 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_tear_off_activation: {
             int r0 = (++it)->u.operand;
-            printf("[%4d] tear_off_activation\t %s\n", location, registerName(exec, r0).data());
+            int r1 = (++it)->u.operand;
+            printf("[%4d] tear_off_activation\t %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
             break;
         }
         case op_tear_off_arguments: {
-            printf("[%4d] tear_off_arguments\n", location);
+            int r0 = (++it)->u.operand;
+            printf("[%4d] tear_off_arguments\t %s\n", location, registerName(exec, r0).data());
             break;
         }
         case op_ret: {
@@ -1074,20 +1124,22 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printf("[%4d] ret\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
+        case op_call_put_result: {
+            int r0 = (++it)->u.operand;
+            printf("[%4d] op_call_put_result\t\t %s\n", location, registerName(exec, r0).data());
+            break;
+        }
+        case op_ret_object_or_this: {
+            int r0 = (++it)->u.operand;
+            int r1 = (++it)->u.operand;
+            printf("[%4d] constructor_ret\t\t %s %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
+            break;
+        }
         case op_construct: {
-            int dst = (++it)->u.operand;
             int func = (++it)->u.operand;
             int argCount = (++it)->u.operand;
             int registerOffset = (++it)->u.operand;
-            int proto = (++it)->u.operand;
-            int thisRegister = (++it)->u.operand;
-            printf("[%4d] construct\t %s, %s, %d, %d, %s, %s\n", location, registerName(exec, dst).data(), registerName(exec, func).data(), argCount, registerOffset, registerName(exec, proto).data(), registerName(exec, thisRegister).data());
-            break;
-        }
-        case op_construct_verify: {
-            int r0 = (++it)->u.operand;
-            int r1 = (++it)->u.operand;
-            printf("[%4d] construct_verify\t %s, %s\n", location, registerName(exec, r0).data(), registerName(exec, r1).data());
+            printf("[%4d] construct\t %s, %d, %d\n", location, registerName(exec, func).data(), argCount, registerOffset);
             break;
         }
         case op_strcat: {
@@ -1115,9 +1167,12 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
         }
         case op_next_pname: {
             int dest = it[1].u.operand;
-            int iter = it[4].u.operand;
-            int offset = it[5].u.operand;
-            printf("[%4d] next_pname\t %s, %s, %d(->%d)\n", location, registerName(exec, dest).data(), registerName(exec, iter).data(), offset, location + offset);
+            int base = it[2].u.operand;
+            int i = it[3].u.operand;
+            int size = it[4].u.operand;
+            int iter = it[5].u.operand;
+            int offset = it[6].u.operand;
+            printf("[%4d] next_pname\t %s, %s, %s, %s, %s, %d(->%d)\n", location, registerName(exec, dest).data(), registerName(exec, base).data(), registerName(exec, i).data(), registerName(exec, size).data(), registerName(exec, iter).data(), offset, location + offset);
             it += OPCODE_LENGTH(op_next_pname) - 1;
             break;
         }
@@ -1153,11 +1208,9 @@ void CodeBlock::dump(TiExcState* exec, const Vector<Instruction>::const_iterator
             printf("[%4d] throw\t\t %s\n", location, registerName(exec, r0).data());
             break;
         }
-        case op_new_error: {
-            int r0 = (++it)->u.operand;
-            int errorType = (++it)->u.operand;
+        case op_throw_reference_error: {
             int k0 = (++it)->u.operand;
-            printf("[%4d] new_error\t %s, %d, %s\n", location, registerName(exec, r0).data(), errorType, constantName(exec, k0, getConstant(k0)).data());
+            printf("[%4d] throw_reference_error\t %s\n", location, constantName(exec, k0, getConstant(k0)).data());
             break;
         }
         case op_jsr: {
@@ -1219,13 +1272,10 @@ static HashSet<CodeBlock*> liveCodeBlockSet;
     macro(immediateSwitchJumpTables) \
     macro(characterSwitchJumpTables) \
     macro(stringSwitchJumpTables) \
-    macro(functionRegisterInfos)
-
-#define FOR_EACH_MEMBER_VECTOR_EXCEPTION_INFO(macro) \
+    macro(evalCodeCache) \
     macro(expressionInfo) \
     macro(lineInfo) \
-    macro(getByIdExceptionInfo) \
-    macro(pcVector)
+    macro(callReturnIndexVector)
 
 template<typename T>
 static size_t sizeInBytes(const Vector<T>& vector)
@@ -1239,7 +1289,6 @@ void CodeBlock::dumpStatistics()
     #define DEFINE_VARS(name) size_t name##IsNotEmpty = 0; size_t name##TotalSize = 0;
         FOR_EACH_MEMBER_VECTOR(DEFINE_VARS)
         FOR_EACH_MEMBER_VECTOR_RARE_DATA(DEFINE_VARS)
-        FOR_EACH_MEMBER_VECTOR_EXCEPTION_INFO(DEFINE_VARS)
     #undef DEFINE_VARS
 
     // Non-vector data members
@@ -1248,7 +1297,6 @@ void CodeBlock::dumpStatistics()
     size_t symbolTableIsNotEmpty = 0;
     size_t symbolTableTotalSize = 0;
 
-    size_t hasExceptionInfo = 0;
     size_t hasRareData = 0;
 
     size_t isFunctionCode = 0;
@@ -1266,13 +1314,6 @@ void CodeBlock::dumpStatistics()
         if (!codeBlock->m_symbolTable.isEmpty()) {
             symbolTableIsNotEmpty++;
             symbolTableTotalSize += (codeBlock->m_symbolTable.capacity() * (sizeof(SymbolTable::KeyType) + sizeof(SymbolTable::MappedType)));
-        }
-
-        if (codeBlock->m_exceptionInfo) {
-            hasExceptionInfo++;
-            #define GET_STATS(name) if (!codeBlock->m_exceptionInfo->m_##name.isEmpty()) { name##IsNotEmpty++; name##TotalSize += sizeInBytes(codeBlock->m_exceptionInfo->m_##name); }
-                FOR_EACH_MEMBER_VECTOR_EXCEPTION_INFO(GET_STATS)
-            #undef GET_STATS
         }
 
         if (codeBlock->m_rareData) {
@@ -1303,7 +1344,6 @@ void CodeBlock::dumpStatistics()
     #define GET_TOTAL_SIZE(name) totalSize += name##TotalSize;
         FOR_EACH_MEMBER_VECTOR(GET_TOTAL_SIZE)
         FOR_EACH_MEMBER_VECTOR_RARE_DATA(GET_TOTAL_SIZE)
-        FOR_EACH_MEMBER_VECTOR_EXCEPTION_INFO(GET_TOTAL_SIZE)
     #undef GET_TOTAL_SIZE
 
     totalSize += symbolTableTotalSize;
@@ -1318,13 +1358,11 @@ void CodeBlock::dumpStatistics()
     printf("Number of GlobalCode CodeBlocks: %zu (%.3f%%)\n", isGlobalCode, static_cast<double>(isGlobalCode) * 100.0 / liveCodeBlockSet.size());
     printf("Number of EvalCode CodeBlocks: %zu (%.3f%%)\n", isEvalCode, static_cast<double>(isEvalCode) * 100.0 / liveCodeBlockSet.size());
 
-    printf("Number of CodeBlocks with exception info: %zu (%.3f%%)\n", hasExceptionInfo, static_cast<double>(hasExceptionInfo) * 100.0 / liveCodeBlockSet.size());
     printf("Number of CodeBlocks with rare data: %zu (%.3f%%)\n", hasRareData, static_cast<double>(hasRareData) * 100.0 / liveCodeBlockSet.size());
 
     #define PRINT_STATS(name) printf("Number of CodeBlocks with " #name ": %zu\n", name##IsNotEmpty); printf("Size of all " #name ": %zu\n", name##TotalSize); 
         FOR_EACH_MEMBER_VECTOR(PRINT_STATS)
         FOR_EACH_MEMBER_VECTOR_RARE_DATA(PRINT_STATS)
-        FOR_EACH_MEMBER_VECTOR_EXCEPTION_INFO(PRINT_STATS)
     #undef PRINT_STATS
 
     printf("Number of CodeBlocks with evalCodeCache: %zu\n", evalCodeCacheIsNotEmpty);
@@ -1337,24 +1375,27 @@ void CodeBlock::dumpStatistics()
 #endif
 }
 
-CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, SymbolTable* symTab)
-    : m_numCalleeRegisters(0)
+CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, TiGlobalObject *globalObject, PassRefPtr<SourceProvider> sourceProvider, unsigned sourceOffset, SymbolTable* symTab, bool isConstructor)
+    : m_globalObject(globalObject->globalData(), ownerExecutable, globalObject)
+    , m_heap(&m_globalObject->globalData().heap)
+    , m_numCalleeRegisters(0)
     , m_numVars(0)
     , m_numParameters(0)
-    , m_ownerExecutable(ownerExecutable)
+    , m_isConstructor(isConstructor)
+    , m_ownerExecutable(globalObject->globalData(), ownerExecutable, ownerExecutable)
     , m_globalData(0)
 #ifndef NDEBUG
     , m_instructionCount(0)
 #endif
+    , m_argumentsRegister(-1)
     , m_needsFullScopeChain(ownerExecutable->needsActivation())
     , m_usesEval(ownerExecutable->usesEval())
-    , m_usesArguments(false)
     , m_isNumericCompareFunction(false)
+    , m_isStrictMode(ownerExecutable->isStrictMode())
     , m_codeType(codeType)
     , m_source(sourceProvider)
     , m_sourceOffset(sourceOffset)
     , m_symbolTable(symTab)
-    , m_exceptionInfo(new ExceptionInfo)
 {
     ASSERT(m_source);
 
@@ -1365,41 +1406,9 @@ CodeBlock::CodeBlock(ScriptExecutable* ownerExecutable, CodeType codeType, PassR
 
 CodeBlock::~CodeBlock()
 {
-#if ENABLE(INTERPRETER)
-    for (size_t size = m_globalResolveInstructions.size(), i = 0; i < size; ++i)
-        derefStructures(&m_instructions[m_globalResolveInstructions[i]]);
-
-    for (size_t size = m_propertyAccessInstructions.size(), i = 0; i < size; ++i)
-        derefStructures(&m_instructions[m_propertyAccessInstructions[i]]);
-#endif
 #if ENABLE(JIT)
-    for (size_t size = m_globalResolveInfos.size(), i = 0; i < size; ++i) {
-        if (m_globalResolveInfos[i].structure)
-            m_globalResolveInfos[i].structure->deref();
-    }
-
     for (size_t size = m_structureStubInfos.size(), i = 0; i < size; ++i)
         m_structureStubInfos[i].deref();
-
-    for (size_t size = m_callLinkInfos.size(), i = 0; i < size; ++i) {
-        CallLinkInfo* callLinkInfo = &m_callLinkInfos[i];
-        if (callLinkInfo->isLinked())
-            callLinkInfo->callee->removeCaller(callLinkInfo);
-    }
-
-    for (size_t size = m_methodCallLinkInfos.size(), i = 0; i < size; ++i) {
-        if (Structure* structure = m_methodCallLinkInfos[i].cachedStructure) {
-            structure->deref();
-            // Both members must be filled at the same time
-            ASSERT(!!m_methodCallLinkInfos[i].cachedPrototypeStructure);
-            m_methodCallLinkInfos[i].cachedPrototypeStructure->deref();
-        }
-    }
-
-#if ENABLE(JIT_OPTIMIZE_CALL)
-    unlinkCallers();
-#endif
-
 #endif // ENABLE(JIT)
 
 #if DUMP_CODE_BLOCK_STATISTICS
@@ -1407,50 +1416,46 @@ CodeBlock::~CodeBlock()
 #endif
 }
 
-#if ENABLE(JIT_OPTIMIZE_CALL)
-void CodeBlock::unlinkCallers()
-{
-    size_t size = m_linkedCallerList.size();
-    for (size_t i = 0; i < size; ++i) {
-        CallLinkInfo* currentCaller = m_linkedCallerList[i];
-        JIT::unlinkCall(currentCaller);
-        currentCaller->setUnlinked();
-    }
-    m_linkedCallerList.clear();
-}
-#endif
-
-void CodeBlock::derefStructures(Instruction* vPC) const
+void CodeBlock::visitStructures(SlotVisitor& visitor, Instruction* vPC) const
 {
     Interpreter* interpreter = m_globalData->interpreter;
 
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id) && vPC[4].u.structure) {
+        visitor.append(&vPC[4].u.structure);
+        return;
+    }
+
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self)) {
-        vPC[4].u.structure->deref();
+        visitor.append(&vPC[4].u.structure);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto)) {
-        vPC[4].u.structure->deref();
-        vPC[5].u.structure->deref();
+        visitor.append(&vPC[4].u.structure);
+        visitor.append(&vPC[5].u.structure);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_chain)) {
-        vPC[4].u.structure->deref();
-        vPC[5].u.structureChain->deref();
+        visitor.append(&vPC[4].u.structure);
+        visitor.append(&vPC[5].u.structureChain);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
-        vPC[4].u.structure->deref();
-        vPC[5].u.structure->deref();
-        vPC[6].u.structureChain->deref();
+        visitor.append(&vPC[4].u.structure);
+        visitor.append(&vPC[5].u.structure);
+        visitor.append(&vPC[6].u.structureChain);
+        return;
+    }
+    if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id) && vPC[4].u.structure) {
+        visitor.append(&vPC[4].u.structure);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_replace)) {
-        vPC[4].u.structure->deref();
+        visitor.append(&vPC[4].u.structure);
         return;
     }
     if (vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global) || vPC[0].u.opcode == interpreter->getOpcode(op_resolve_global_dynamic)) {
-        if(vPC[4].u.structure)
-            vPC[4].u.structure->deref();
+        if (vPC[3].u.structure)
+            visitor.append(&vPC[3].u.structure);
         return;
     }
     if ((vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto_list))
@@ -1460,7 +1465,7 @@ void CodeBlock::derefStructures(Instruction* vPC) const
         || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto_list))
         || (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self_list))) {
         PolymorphicAccessStructureList* polymorphicStructures = vPC[4].u.polymorphicStructures;
-        polymorphicStructures->derefStructures(vPC[5].u.operand);
+        polymorphicStructures->visitAggregate(visitor, vPC[5].u.operand);
         delete polymorphicStructures;
         return;
     }
@@ -1469,68 +1474,62 @@ void CodeBlock::derefStructures(Instruction* vPC) const
     ASSERT(vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id) || vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_generic) || vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_generic) || vPC[0].u.opcode == interpreter->getOpcode(op_get_array_length) || vPC[0].u.opcode == interpreter->getOpcode(op_get_string_length));
 }
 
-void CodeBlock::refStructures(Instruction* vPC) const
+void EvalCodeCache::visitAggregate(SlotVisitor& visitor)
 {
-    Interpreter* interpreter = m_globalData->interpreter;
-
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_self) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_self)) {
-        vPC[4].u.structure->ref();
-        return;
-    }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_proto) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_proto)) {
-        vPC[4].u.structure->ref();
-        vPC[5].u.structure->ref();
-        return;
-    }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_getter_chain) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_custom_chain)) {
-        vPC[4].u.structure->ref();
-        vPC[5].u.structureChain->ref();
-        return;
-    }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_transition)) {
-        vPC[4].u.structure->ref();
-        vPC[5].u.structure->ref();
-        vPC[6].u.structureChain->ref();
-        return;
-    }
-    if (vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_replace)) {
-        vPC[4].u.structure->ref();
-        return;
-    }
-    
-    // These instructions don't ref their Structures.
-    ASSERT(vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id) || vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id) || vPC[0].u.opcode == interpreter->getOpcode(op_get_by_id_generic) || vPC[0].u.opcode == interpreter->getOpcode(op_put_by_id_generic));
+    EvalCacheMap::iterator end = m_cacheMap.end();
+    for (EvalCacheMap::iterator ptr = m_cacheMap.begin(); ptr != end; ++ptr)
+        visitor.append(&ptr->second);
 }
 
-void CodeBlock::markAggregate(MarkStack& markStack)
+void CodeBlock::visitAggregate(SlotVisitor& visitor)
 {
-    for (size_t i = 0; i < m_constantRegisters.size(); ++i)
-        markStack.append(m_constantRegisters[i].jsValue());
+    visitor.append(&m_globalObject);
+    visitor.append(&m_ownerExecutable);
+    if (m_rareData) {
+        m_rareData->m_evalCodeCache.visitAggregate(visitor);
+        size_t regExpCount = m_rareData->m_regexps.size();
+        WriteBarrier<RegExp>* regexps = m_rareData->m_regexps.data();
+        for (size_t i = 0; i < regExpCount; i++)
+            visitor.append(regexps + i);
+    }
+    visitor.appendValues(m_constantRegisters.data(), m_constantRegisters.size());
     for (size_t i = 0; i < m_functionExprs.size(); ++i)
-        m_functionExprs[i]->markAggregate(markStack);
+        visitor.append(&m_functionExprs[i]);
     for (size_t i = 0; i < m_functionDecls.size(); ++i)
-        m_functionDecls[i]->markAggregate(markStack);
-}
-
-void CodeBlock::reparseForExceptionInfoIfNecessary(CallFrame* callFrame)
-{
-    if (m_exceptionInfo)
-        return;
-
-    ScopeChainNode* scopeChain = callFrame->scopeChain();
-    if (m_needsFullScopeChain) {
-        ScopeChain sc(scopeChain);
-        int scopeDelta = sc.localDepth();
-        if (m_codeType == EvalCode)
-            scopeDelta -= static_cast<EvalCodeBlock*>(this)->baseScopeDepth();
-        else if (m_codeType == FunctionCode)
-            scopeDelta++; // Compilation of function code assumes activation is not on the scope chain yet.
-        ASSERT(scopeDelta >= 0);
-        while (scopeDelta--)
-            scopeChain = scopeChain->next;
+        visitor.append(&m_functionDecls[i]);
+#if ENABLE(JIT_OPTIMIZE_CALL)
+    if (visitor.shouldUnlinkCalls())
+        unlinkCalls();
+    for (unsigned i = 0; i < numberOfCallLinkInfos(); ++i)
+        if (callLinkInfo(i).isLinked())
+            visitor.append(&callLinkInfo(i).callee);
+#endif
+#if ENABLE(INTERPRETER)
+    for (size_t size = m_propertyAccessInstructions.size(), i = 0; i < size; ++i)
+        visitStructures(visitor, &m_instructions[m_propertyAccessInstructions[i]]);
+    for (size_t size = m_globalResolveInstructions.size(), i = 0; i < size; ++i)
+        visitStructures(visitor, &m_instructions[m_globalResolveInstructions[i]]);
+#endif
+#if ENABLE(JIT)
+    for (size_t size = m_globalResolveInfos.size(), i = 0; i < size; ++i) {
+        if (m_globalResolveInfos[i].structure)
+            visitor.append(&m_globalResolveInfos[i].structure);
     }
 
-    m_exceptionInfo.set(m_ownerExecutable->reparseExceptionInfo(m_globalData, scopeChain, this));
+    for (size_t size = m_structureStubInfos.size(), i = 0; i < size; ++i)
+        m_structureStubInfos[i].visitAggregate(visitor);
+
+    for (size_t size = m_methodCallLinkInfos.size(), i = 0; i < size; ++i) {
+        if (m_methodCallLinkInfos[i].cachedStructure) {
+            // Both members must be filled at the same time
+            visitor.append(&m_methodCallLinkInfos[i].cachedStructure);
+            ASSERT(!!m_methodCallLinkInfos[i].cachedPrototypeStructure);
+            visitor.append(&m_methodCallLinkInfos[i].cachedPrototypeStructure);
+            visitor.append(&m_methodCallLinkInfos[i].cachedFunction);
+            visitor.append(&m_methodCallLinkInfos[i].cachedPrototype);
+        }
+    }
+#endif
 }
 
 HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
@@ -1551,122 +1550,66 @@ HandlerInfo* CodeBlock::handlerForBytecodeOffset(unsigned bytecodeOffset)
     return 0;
 }
 
-int CodeBlock::lineNumberForBytecodeOffset(CallFrame* callFrame, unsigned bytecodeOffset)
+int CodeBlock::lineNumberForBytecodeOffset(unsigned bytecodeOffset)
 {
     ASSERT(bytecodeOffset < m_instructionCount);
 
-    reparseForExceptionInfoIfNecessary(callFrame);
-    ASSERT(m_exceptionInfo);
+    if (!m_rareData)
+        return m_ownerExecutable->source().firstLine();
 
-    if (!m_exceptionInfo->m_lineInfo.size())
-        return m_ownerExecutable->source().firstLine(); // Empty function
+    Vector<LineInfo>& lineInfo = m_rareData->m_lineInfo;
 
     int low = 0;
-    int high = m_exceptionInfo->m_lineInfo.size();
+    int high = lineInfo.size();
     while (low < high) {
         int mid = low + (high - low) / 2;
-        if (m_exceptionInfo->m_lineInfo[mid].instructionOffset <= bytecodeOffset)
+        if (lineInfo[mid].instructionOffset <= bytecodeOffset)
             low = mid + 1;
         else
             high = mid;
     }
-    
+
     if (!low)
         return m_ownerExecutable->source().firstLine();
-    return m_exceptionInfo->m_lineInfo[low - 1].lineNumber;
+    return lineInfo[low - 1].lineNumber;
 }
 
-int CodeBlock::expressionRangeForBytecodeOffset(CallFrame* callFrame, unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset)
+void CodeBlock::expressionRangeForBytecodeOffset(unsigned bytecodeOffset, int& divot, int& startOffset, int& endOffset)
 {
     ASSERT(bytecodeOffset < m_instructionCount);
 
-    reparseForExceptionInfoIfNecessary(callFrame);
-    ASSERT(m_exceptionInfo);
-
-    if (!m_exceptionInfo->m_expressionInfo.size()) {
-        // We didn't think anything could throw.  Apparently we were wrong.
+    if (!m_rareData) {
         startOffset = 0;
         endOffset = 0;
         divot = 0;
-        return lineNumberForBytecodeOffset(callFrame, bytecodeOffset);
+        return;
     }
 
+    Vector<ExpressionRangeInfo>& expressionInfo = m_rareData->m_expressionInfo;
+
     int low = 0;
-    int high = m_exceptionInfo->m_expressionInfo.size();
+    int high = expressionInfo.size();
     while (low < high) {
         int mid = low + (high - low) / 2;
-        if (m_exceptionInfo->m_expressionInfo[mid].instructionOffset <= bytecodeOffset)
+        if (expressionInfo[mid].instructionOffset <= bytecodeOffset)
             low = mid + 1;
         else
             high = mid;
     }
-    
+
     ASSERT(low);
     if (!low) {
         startOffset = 0;
         endOffset = 0;
         divot = 0;
-        return lineNumberForBytecodeOffset(callFrame, bytecodeOffset);
+        return;
     }
 
-    startOffset = m_exceptionInfo->m_expressionInfo[low - 1].startOffset;
-    endOffset = m_exceptionInfo->m_expressionInfo[low - 1].endOffset;
-    divot = m_exceptionInfo->m_expressionInfo[low - 1].divotPoint + m_sourceOffset;
-    return lineNumberForBytecodeOffset(callFrame, bytecodeOffset);
+    startOffset = expressionInfo[low - 1].startOffset;
+    endOffset = expressionInfo[low - 1].endOffset;
+    divot = expressionInfo[low - 1].divotPoint + m_sourceOffset;
+    return;
 }
-
-bool CodeBlock::getByIdExceptionInfoForBytecodeOffset(CallFrame* callFrame, unsigned bytecodeOffset, OpcodeID& opcodeID)
-{
-    ASSERT(bytecodeOffset < m_instructionCount);
-
-    reparseForExceptionInfoIfNecessary(callFrame);
-    ASSERT(m_exceptionInfo);        
-
-    if (!m_exceptionInfo->m_getByIdExceptionInfo.size())
-        return false;
-
-    int low = 0;
-    int high = m_exceptionInfo->m_getByIdExceptionInfo.size();
-    while (low < high) {
-        int mid = low + (high - low) / 2;
-        if (m_exceptionInfo->m_getByIdExceptionInfo[mid].bytecodeOffset <= bytecodeOffset)
-            low = mid + 1;
-        else
-            high = mid;
-    }
-
-    if (!low || m_exceptionInfo->m_getByIdExceptionInfo[low - 1].bytecodeOffset != bytecodeOffset)
-        return false;
-
-    opcodeID = m_exceptionInfo->m_getByIdExceptionInfo[low - 1].isOpConstruct ? op_construct : op_instanceof;
-    return true;
-}
-
-#if ENABLE(JIT)
-bool CodeBlock::functionRegisterForBytecodeOffset(unsigned bytecodeOffset, int& functionRegisterIndex)
-{
-    ASSERT(bytecodeOffset < m_instructionCount);
-
-    if (!m_rareData || !m_rareData->m_functionRegisterInfos.size())
-        return false;
-
-    int low = 0;
-    int high = m_rareData->m_functionRegisterInfos.size();
-    while (low < high) {
-        int mid = low + (high - low) / 2;
-        if (m_rareData->m_functionRegisterInfos[mid].bytecodeOffset <= bytecodeOffset)
-            low = mid + 1;
-        else
-            high = mid;
-    }
-
-    if (!low || m_rareData->m_functionRegisterInfos[low - 1].bytecodeOffset != bytecodeOffset)
-        return false;
-
-    functionRegisterIndex = m_rareData->m_functionRegisterInfos[low - 1].functionRegisterIndex;
-    return true;
-}
-#endif
 
 #if ENABLE(INTERPRETER)
 bool CodeBlock::hasGlobalResolveInstructionAtBytecodeOffset(unsigned bytecodeOffset)
@@ -1723,7 +1666,6 @@ void CodeBlock::shrinkToFit()
     m_structureStubInfos.shrinkToFit();
     m_globalResolveInfos.shrinkToFit();
     m_callLinkInfos.shrinkToFit();
-    m_linkedCallerList.shrinkToFit();
 #endif
 
     m_identifiers.shrinkToFit();
@@ -1731,22 +1673,49 @@ void CodeBlock::shrinkToFit()
     m_functionExprs.shrinkToFit();
     m_constantRegisters.shrinkToFit();
 
-    if (m_exceptionInfo) {
-        m_exceptionInfo->m_expressionInfo.shrinkToFit();
-        m_exceptionInfo->m_lineInfo.shrinkToFit();
-        m_exceptionInfo->m_getByIdExceptionInfo.shrinkToFit();
-    }
-
     if (m_rareData) {
         m_rareData->m_exceptionHandlers.shrinkToFit();
         m_rareData->m_regexps.shrinkToFit();
         m_rareData->m_immediateSwitchJumpTables.shrinkToFit();
         m_rareData->m_characterSwitchJumpTables.shrinkToFit();
         m_rareData->m_stringSwitchJumpTables.shrinkToFit();
-#if ENABLE(JIT)
-        m_rareData->m_functionRegisterInfos.shrinkToFit();
-#endif
+        m_rareData->m_expressionInfo.shrinkToFit();
+        m_rareData->m_lineInfo.shrinkToFit();
     }
+}
+
+void CodeBlock::createActivation(CallFrame* callFrame)
+{
+    ASSERT(codeType() == FunctionCode);
+    ASSERT(needsFullScopeChain());
+    ASSERT(!callFrame->uncheckedR(activationRegister()).jsValue());
+    JSActivation* activation = new (callFrame) JSActivation(callFrame, static_cast<FunctionExecutable*>(ownerExecutable()));
+    callFrame->uncheckedR(activationRegister()) = TiValue(activation);
+    callFrame->setScopeChain(callFrame->scopeChain()->push(activation));
+}
+    
+#if ENABLE(JIT)
+void CodeBlock::unlinkCalls()
+{
+    if (!(m_callLinkInfos.size() || m_methodCallLinkInfos.size()))
+        return;
+    if (!m_globalData->canUseJIT())
+        return;
+    RepatchBuffer repatchBuffer(this);
+    for (size_t i = 0; i < m_callLinkInfos.size(); i++) {
+        if (!m_callLinkInfos[i].isLinked())
+            continue;
+        repatchBuffer.relink(m_callLinkInfos[i].callReturnLocation, m_callLinkInfos[i].isCall ? m_globalData->jitStubs->ctiVirtualCallLink() : m_globalData->jitStubs->ctiVirtualConstructLink());
+        m_callLinkInfos[i].unlink();
+    }
+}
+#endif
+
+void CodeBlock::clearEvalCache()
+{
+    if (!m_rareData)
+        return;
+    m_rareData->m_evalCodeCache.clear();
 }
 
 } // namespace TI

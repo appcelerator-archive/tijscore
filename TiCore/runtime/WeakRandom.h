@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,7 +30,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  *
  *
- * Copyright (c) 2009 Ian C. Bullard
+ * Copyright (c) 2009-2012 Ian C. Bullard
  * 
  * Permission is hereby granted, free of charge, to any person
  * obtaining a copy of this software and associated documentation
@@ -73,6 +73,11 @@ public:
     double get()
     {
         return advance() / (UINT_MAX + 1.0);
+    }
+
+    unsigned getUint32()
+    {
+        return advance();
     }
 
 private:

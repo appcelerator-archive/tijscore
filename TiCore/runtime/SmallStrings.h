@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,16 +34,22 @@
 #define SmallStrings_h
 
 #include "UString.h"
+#include <wtf/FixedArray.h>
 #include <wtf/OwnPtr.h>
 
 namespace TI {
 
+    class HeapRootVisitor;
     class TiGlobalData;
     class TiString;
     class MarkStack;
     class SmallStringsStorage;
+    typedef MarkStack SlotVisitor;
 
-    class SmallStrings : public Noncopyable {
+    static const unsigned maxSingleCharacterString = 0xFF;
+
+    class SmallStrings {
+        WTF_MAKE_NONCOPYABLE(SmallStrings);
     public:
         SmallStrings();
         ~SmallStrings();
@@ -54,6 +60,7 @@ namespace TI {
                 createEmptyString(globalData);
             return m_emptyString;
         }
+
         TiString* singleCharacterString(TiGlobalData* globalData, unsigned char character)
         {
             if (!m_singleCharacterStrings[character])
@@ -61,21 +68,23 @@ namespace TI {
             return m_singleCharacterStrings[character];
         }
 
-        UString::Rep* singleCharacterStringRep(unsigned char character);
+        StringImpl* singleCharacterStringRep(unsigned char character);
 
-        void markChildren(MarkStack&);
+        void visitChildren(HeapRootVisitor&);
         void clear();
 
         unsigned count() const;
-#if ENABLE(JIT)
-        TiString** singleCharacterStrings() { return m_singleCharacterStrings; }
-#endif
+
+        TiString** singleCharacterStrings() { return &m_singleCharacterStrings[0]; }
+
     private:
+        static const unsigned singleCharacterStringCount = maxSingleCharacterString + 1;
+
         void createEmptyString(TiGlobalData*);
         void createSingleCharacterString(TiGlobalData*, unsigned char);
 
         TiString* m_emptyString;
-        TiString* m_singleCharacterStrings[0x100];
+        TiString* m_singleCharacterStrings[singleCharacterStringCount];
         OwnPtr<SmallStringsStorage> m_storage;
     };
 

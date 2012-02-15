@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -46,7 +46,7 @@ Completion checkSyntax(TiExcState* exec, const SourceCode& source)
     TiLock lock(exec);
     ASSERT(exec->globalData().identifierTable == wtfThreadData().currentIdentifierTable());
 
-    RefPtr<ProgramExecutable> program = ProgramExecutable::create(exec, source);
+    ProgramExecutable* program = ProgramExecutable::create(exec, source);
     TiObject* error = program->checkSyntax(exec);
     if (error)
         return Completion(Throw, error);
@@ -54,22 +54,26 @@ Completion checkSyntax(TiExcState* exec, const SourceCode& source)
     return Completion(Normal);
 }
 
-Completion evaluate(TiExcState* exec, ScopeChain& scopeChain, const SourceCode& source, TiValue thisValue)
+Completion evaluate(TiExcState* exec, ScopeChainNode* scopeChain, const SourceCode& source, TiValue thisValue)
 {
     TiLock lock(exec);
     ASSERT(exec->globalData().identifierTable == wtfThreadData().currentIdentifierTable());
 
-    RefPtr<ProgramExecutable> program = ProgramExecutable::create(exec, source);
-    TiObject* error = program->compile(exec, scopeChain.node());
-    if (error)
-        return Completion(Throw, error);
+    ProgramExecutable* program = ProgramExecutable::create(exec, source);
+    if (!program) {
+        TiValue exception = exec->globalData().exception;
+        exec->globalData().exception = TiValue();
+        return Completion(Throw, exception);
+    }
 
     TiObject* thisObj = (!thisValue || thisValue.isUndefinedOrNull()) ? exec->dynamicGlobalObject() : thisValue.toObject(exec);
 
-    TiValue exception;
-    TiValue result = exec->interpreter()->execute(program.get(), exec, scopeChain.node(), thisObj, &exception);
+    TiValue result = exec->interpreter()->execute(program, exec, scopeChain, thisObj);
 
-    if (exception) {
+    if (exec->hadException()) {
+        TiValue exception = exec->exception();
+        exec->clearException();
+
         ComplType exceptionType = Throw;
         if (exception.isObject())
             exceptionType = asObject(exception)->exceptionType();

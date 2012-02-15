@@ -2,12 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000,2003 Harri Porten (porten@kde.org)
- *  Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2007, 2008, 2011 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -32,126 +32,208 @@
 #include "Error.h"
 #include "TiFunction.h"
 #include "TiString.h"
-#include "TiStringBuilder.h"
 #include "Operations.h"
-#include "PrototypeFunction.h"
-#include "StringBuilder.h"
 #include "dtoa.h"
 #include <wtf/Assertions.h>
+#include <wtf/DecimalNumber.h>
 #include <wtf/MathExtras.h>
 #include <wtf/Vector.h>
 
 namespace TI {
 
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncToLocaleString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncValueOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncToExponential(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState*);
+
+}
+
+#include "NumberPrototype.lut.h"
+
+namespace TI {
+
+const ClassInfo NumberPrototype::s_info = { "Number", &NumberObject::s_info, 0, TiExcState::numberPrototypeTable };
+
+/* Source for NumberPrototype.lut.h
+@begin numberPrototypeTable
+  toString          numberProtoFuncToString         DontEnum|Function 1
+  toLocaleString    numberProtoFuncToLocaleString   DontEnum|Function 0
+  valueOf           numberProtoFuncValueOf          DontEnum|Function 0
+  toFixed           numberProtoFuncToFixed          DontEnum|Function 1
+  toExponential     numberProtoFuncToExponential    DontEnum|Function 1
+  toPrecision       numberProtoFuncToPrecision      DontEnum|Function 1
+@end
+*/
+
 ASSERT_CLASS_FITS_IN_CELL(NumberPrototype);
 
-static TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL numberProtoFuncToLocaleString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL numberProtoFuncValueOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL numberProtoFuncToExponential(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-// ECMA 15.7.4
-
-NumberPrototype::NumberPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, Structure* prototypeFunctionStructure)
-    : NumberObject(structure)
+NumberPrototype::NumberPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure)
+    : NumberObject(exec->globalData(), structure)
 {
-    setInternalValue(jsNumber(exec, 0));
+    setInternalValue(exec->globalData(), jsNumber(0));
 
-    // The constructor will be added later, after NumberConstructor has been constructed
+    ASSERT(inherits(&s_info));
+    putAnonymousValue(globalObject->globalData(), 0, globalObject);
+}
 
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().toString, numberProtoFuncToString), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toLocaleString, numberProtoFuncToLocaleString), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().valueOf, numberProtoFuncValueOf), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().toFixed, numberProtoFuncToFixed), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().toExponential, numberProtoFuncToExponential), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().toPrecision, numberProtoFuncToPrecision), DontEnum);
+bool NumberPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<NumberObject>(exec, TiExcState::numberPrototypeTable(exec), this, propertyName, slot);
+}
+
+bool NumberPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<NumberObject>(exec, TiExcState::numberPrototypeTable(exec), this, propertyName, descriptor);
 }
 
 // ------------------------------ Functions ---------------------------
 
-// ECMA 15.7.4.2 - 15.7.4.7
-
-static UString integerPartNoExp(double d)
-{
-    int decimalPoint;
-    int sign;
-    char result[80];
-    WTI::dtoa(result, d, 0, &decimalPoint, &sign, NULL);
-    bool resultIsInfOrNan = (decimalPoint == 9999);
-    size_t length = strlen(result);
-
-    StringBuilder builder;
-    builder.append(sign ? "-" : "");
-    if (resultIsInfOrNan)
-        builder.append((const char*)result);
-    else if (decimalPoint <= 0)
-        builder.append("0");
-    else {
-        Vector<char, 1024> buf(decimalPoint + 1);
-
-        // FIXME: Remove use of strncpy()
-        if (static_cast<int>(length) <= decimalPoint) {
-            ASSERT(decimalPoint < 1024);
-            memcpy(buf.data(), result, length);
-            memset(buf.data() + length, '0', decimalPoint - length);
-        } else
-            strncpy(buf.data(), result, decimalPoint);
-        buf[decimalPoint] = '\0';
-
-        builder.append((const char*)(buf.data()));
-    }
-
-    return builder.build();
-}
-
-static UString charSequence(char c, int count)
-{
-    Vector<char, 2048> buf(count + 1, c);
-    buf[count] = '\0';
-
-    return UString(buf.data());
-}
-
-static double intPow10(int e)
-{
-    // This function uses the "exponentiation by squaring" algorithm and
-    // long double to quickly and precisely calculate integer powers of 10.0.
-
-    // This is a handy workaround for <rdar://problem/4494756>
-
-    if (e == 0)
-        return 1.0;
-
-    bool negative = e < 0;
-    unsigned exp = negative ? -e : e;
-
-    long double result = 10.0;
-    bool foundOne = false;
-    for (int bit = 31; bit >= 0; bit--) {
-        if (!foundOne) {
-            if ((exp >> bit) & 1)
-                foundOne = true;
-        } else {
-            result = result * result;
-            if ((exp >> bit) & 1)
-                result = result * 10.0;
-        }
-    }
-
-    if (negative)
-        return static_cast<double>(1.0 / result);
-    return static_cast<double>(result);
-}
-
-TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+static ALWAYS_INLINE bool toThisNumber(TiValue thisValue, double &x)
 {
     TiValue v = thisValue.getJSNumber();
-    if (!v)
-        return throwError(exec, TypeError);
+    if (UNLIKELY(!v))
+        return false;
+    x = v.uncheckedGetNumber();
+    return true;
+}
 
-    TiValue radixValue = args.at(0);
+static ALWAYS_INLINE bool getIntegerArgumentInRange(TiExcState* exec, int low, int high, int& result, bool& isUndefined)
+{
+    result = 0;
+    isUndefined = false;
+
+    TiValue argument0 = exec->argument(0);
+    if (argument0.isUndefined()) {
+        isUndefined = true;
+        return true;
+    }
+
+    double asDouble = argument0.toInteger(exec);
+    if (asDouble < low || asDouble > high)
+        return false;
+
+    result = static_cast<int>(asDouble);
+    return true;
+}
+
+// toExponential converts a number to a string, always formatting as an expoential.
+// This method takes an optional argument specifying a number of *decimal places*
+// to round the significand to (or, put another way, this method optionally rounds
+// to argument-plus-one significant figures).
+EncodedTiValue JSC_HOST_CALL numberProtoFuncToExponential(TiExcState* exec)
+{
+    // Get x (the double value of this, which should be a Number).
+    double x;
+    if (!toThisNumber(exec->hostThisValue(), x))
+        return throwVMTypeError(exec);
+
+    // Get the argument. 
+    int decimalPlacesInExponent;
+    bool isUndefined;
+    if (!getIntegerArgumentInRange(exec, 0, 20, decimalPlacesInExponent, isUndefined))
+        return throwVMError(exec, createRangeError(exec, "toExponential() argument must be between 0 and 20"));
+
+    // Handle NaN and Infinity.
+    if (isnan(x) || isinf(x))
+        return TiValue::encode(jsString(exec, UString::number(x)));
+
+    // Round if the argument is not undefined, always format as exponential.
+    NumberToStringBuffer buffer;
+    unsigned length = isUndefined
+        ? DecimalNumber(x).toStringExponential(buffer, WTI::NumberToStringBufferLength)
+        : DecimalNumber(x, RoundingSignificantFigures, decimalPlacesInExponent + 1).toStringExponential(buffer, WTI::NumberToStringBufferLength);
+
+    return TiValue::encode(jsString(exec, UString(buffer, length)));
+}
+
+// toFixed converts a number to a string, always formatting as an a decimal fraction.
+// This method takes an argument specifying a number of decimal places to round the
+// significand to. However when converting large values (1e+21 and above) this
+// method will instead fallback to calling ToString. 
+EncodedTiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState* exec)
+{
+    // Get x (the double value of this, which should be a Number).
+    TiValue thisValue = exec->hostThisValue();
+    TiValue v = thisValue.getJSNumber();
+    if (!v)
+        return throwVMTypeError(exec);
+    double x = v.uncheckedGetNumber();
+
+    // Get the argument. 
+    int decimalPlaces;
+    bool isUndefined; // This is ignored; undefined treated as 0.
+    if (!getIntegerArgumentInRange(exec, 0, 20, decimalPlaces, isUndefined))
+        return throwVMError(exec, createRangeError(exec, "toFixed() argument must be between 0 and 20"));
+
+    // 15.7.4.5.7 states "If x >= 10^21, then let m = ToString(x)"
+    // This also covers Ininity, and structure the check so that NaN
+    // values are also handled by numberToString
+    if (!(fabs(x) < 1e+21))
+        return TiValue::encode(jsString(exec, UString::number(x)));
+
+    // The check above will return false for NaN or Infinity, these will be
+    // handled by numberToString.
+    ASSERT(!isnan(x) && !isinf(x));
+
+    // Convert to decimal with rounding, and format as decimal.
+    NumberToStringBuffer buffer;
+    unsigned length = DecimalNumber(x, RoundingDecimalPlaces, decimalPlaces).toStringDecimal(buffer, WTI::NumberToStringBufferLength);
+    return TiValue::encode(jsString(exec, UString(buffer, length)));
+}
+
+// toPrecision converts a number to a string, takeing an argument specifying a
+// number of significant figures to round the significand to. For positive
+// exponent, all values that can be represented using a decimal fraction will
+// be, e.g. when rounding to 3 s.f. any value up to 999 will be formated as a
+// decimal, whilst 1000 is converted to the exponential representation 1.00e+3.
+// For negative exponents values >= 1e-6 are formated as decimal fractions,
+// with smaller values converted to exponential representation.
+EncodedTiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState* exec)
+{
+    // Get x (the double value of this, which should be a Number).
+    TiValue thisValue = exec->hostThisValue();
+    TiValue v = thisValue.getJSNumber();
+    if (!v)
+        return throwVMTypeError(exec);
+    double x = v.uncheckedGetNumber();
+
+    // Get the argument. 
+    int significantFigures;
+    bool isUndefined;
+    if (!getIntegerArgumentInRange(exec, 1, 21, significantFigures, isUndefined))
+        return throwVMError(exec, createRangeError(exec, "toPrecision() argument must be between 1 and 21"));
+
+    // To precision called with no argument is treated as ToString.
+    if (isUndefined)
+        return TiValue::encode(jsString(exec, UString::number(x)));
+
+    // Handle NaN and Infinity.
+    if (isnan(x) || isinf(x))
+        return TiValue::encode(jsString(exec, UString::number(x)));
+
+    // Convert to decimal with rounding.
+    DecimalNumber number(x, RoundingSignificantFigures, significantFigures);
+    // If number is in the range 1e-6 <= x < pow(10, significantFigures) then format
+    // as decimal. Otherwise, format the number as an exponential.  Decimal format
+    // demands a minimum of (exponent + 1) digits to represent a number, for example
+    // 1234 (1.234e+3) requires 4 digits. (See ECMA-262 15.7.4.7.10.c)
+    NumberToStringBuffer buffer;
+    unsigned length = number.exponent() >= -6 && number.exponent() < significantFigures
+        ? number.toStringDecimal(buffer, WTI::NumberToStringBufferLength)
+        : number.toStringExponential(buffer, WTI::NumberToStringBufferLength);
+    return TiValue::encode(jsString(exec, UString(buffer, length)));
+}
+
+EncodedTiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec)
+{
+    TiValue thisValue = exec->hostThisValue();
+    TiValue v = thisValue.getJSNumber();
+    if (!v)
+        return throwVMTypeError(exec);
+
+    TiValue radixValue = exec->argument(0);
     int radix;
     if (radixValue.isInt32())
         radix = radixValue.asInt32();
@@ -161,7 +243,7 @@ TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiVal
         radix = static_cast<int>(radixValue.toInteger(exec)); // nan -> 0
 
     if (radix == 10)
-        return jsString(exec, v.toString(exec));
+        return TiValue::encode(jsString(exec, v.toString(exec)));
 
     static const char* const digits = "0123456789abcdefghijklmnopqrstuvwxyz";
 
@@ -171,13 +253,13 @@ TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiVal
             int x = v.asInt32();
             if (static_cast<unsigned>(x) < 36) { // Exclude negatives
                 TiGlobalData* globalData = &exec->globalData();
-                return globalData->smallStrings.singleCharacterString(globalData, digits[x]);
+                return TiValue::encode(globalData->smallStrings.singleCharacterString(globalData, digits[x]));
             }
         }
     }
 
     if (radix < 2 || radix > 36)
-        return throwError(exec, RangeError, "toString() radix argument must be between 2 and 36");
+        return throwVMError(exec, createRangeError(exec, "toString() radix argument must be between 2 and 36"));
 
     // INT_MAX results in 1024 characters left of the dot with radix 2
     // give the same space on the right side. safety checks are in place
@@ -186,7 +268,7 @@ TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiVal
     const char* lastCharInString = s + sizeof(s) - 1;
     double x = v.uncheckedGetNumber();
     if (isnan(x) || isinf(x))
-        return jsString(exec, UString::from(x));
+        return TiValue::encode(jsString(exec, UString::number(x)));
 
     bool isNegative = x < 0.0;
     if (isNegative)
@@ -225,257 +307,29 @@ TiValue JSC_HOST_CALL numberProtoFuncToString(TiExcState* exec, TiObject*, TiVal
     *p = '\0';
     ASSERT(p < s + sizeof(s));
 
-    return jsString(exec, startOfResultString);
+    return TiValue::encode(jsString(exec, startOfResultString));
 }
 
-TiValue JSC_HOST_CALL numberProtoFuncToLocaleString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL numberProtoFuncToLocaleString(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     // FIXME: Not implemented yet.
 
     TiValue v = thisValue.getJSNumber();
     if (!v)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    return jsString(exec, v.toString(exec));
+    return TiValue::encode(jsString(exec, v.toString(exec)));
 }
 
-TiValue JSC_HOST_CALL numberProtoFuncValueOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL numberProtoFuncValueOf(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     TiValue v = thisValue.getJSNumber();
     if (!v)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    return v;
-}
-
-TiValue JSC_HOST_CALL numberProtoFuncToFixed(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
-{
-    TiValue v = thisValue.getJSNumber();
-    if (!v)
-        return throwError(exec, TypeError);
-
-    TiValue fractionDigits = args.at(0);
-    double df = fractionDigits.toInteger(exec);
-    if (!(df >= 0 && df <= 20))
-        return throwError(exec, RangeError, "toFixed() digits argument must be between 0 and 20");
-    int f = static_cast<int>(df);
-
-    double x = v.uncheckedGetNumber();
-    if (isnan(x))
-        return jsNontrivialString(exec, "NaN");
-
-    UString s;
-    if (x < 0) {
-        s = "-";
-        x = -x;
-    } else {
-        s = "";
-        if (x == -0.0)
-            x = 0;
-    }
-
-    if (x >= pow(10.0, 21.0))
-        return jsString(exec, makeString(s, UString::from(x)));
-
-    const double tenToTheF = pow(10.0, f);
-    double n = floor(x * tenToTheF);
-    if (fabs(n / tenToTheF - x) >= fabs((n + 1) / tenToTheF - x))
-        n++;
-
-    UString m = integerPartNoExp(n);
-
-    int k = m.size();
-    if (k <= f) {
-        StringBuilder z;
-        for (int i = 0; i < f + 1 - k; i++)
-            z.append('0');
-        z.append(m);
-        m = z.build();
-        k = f + 1;
-        ASSERT(k == static_cast<int>(m.size()));
-    }
-    int kMinusf = k - f;
-
-    if (kMinusf < static_cast<int>(m.size()))
-        return jsString(exec, makeString(s, m.substr(0, kMinusf), ".", m.substr(kMinusf)));
-    return jsString(exec, makeString(s, m.substr(0, kMinusf)));
-}
-
-static void fractionalPartToString(char* buf, int& i, const char* result, int resultLength, int fractionalDigits)
-{
-    if (fractionalDigits <= 0)
-        return;
-
-    int fDigitsInResult = static_cast<int>(resultLength) - 1;
-    buf[i++] = '.';
-    if (fDigitsInResult > 0) {
-        if (fractionalDigits < fDigitsInResult) {
-            strncpy(buf + i, result + 1, fractionalDigits);
-            i += fractionalDigits;
-        } else {
-            ASSERT(i + resultLength - 1 < 80);
-            memcpy(buf + i, result + 1, resultLength - 1);
-            i += static_cast<int>(resultLength) - 1;
-        }
-    }
-
-    for (int j = 0; j < fractionalDigits - fDigitsInResult; j++)
-        buf[i++] = '0';
-}
-
-static void exponentialPartToString(char* buf, int& i, int decimalPoint)
-{
-    buf[i++] = 'e';
-    // decimalPoint can't be more than 3 digits decimal given the
-    // nature of float representation
-    int exponential = decimalPoint - 1;
-    buf[i++] = (exponential >= 0) ? '+' : '-';
-    if (exponential < 0)
-        exponential *= -1;
-    if (exponential >= 100)
-        buf[i++] = static_cast<char>('0' + exponential / 100);
-    if (exponential >= 10)
-        buf[i++] = static_cast<char>('0' + (exponential % 100) / 10);
-    buf[i++] = static_cast<char>('0' + exponential % 10);
-}
-
-TiValue JSC_HOST_CALL numberProtoFuncToExponential(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
-{
-    TiValue v = thisValue.getJSNumber();
-    if (!v)
-        return throwError(exec, TypeError);
-
-    double x = v.uncheckedGetNumber();
-
-    if (isnan(x) || isinf(x))
-        return jsString(exec, UString::from(x));
-
-    TiValue fractionalDigitsValue = args.at(0);
-    double df = fractionalDigitsValue.toInteger(exec);
-    if (!(df >= 0 && df <= 20))
-        return throwError(exec, RangeError, "toExponential() argument must between 0 and 20");
-    int fractionalDigits = static_cast<int>(df);
-    bool includeAllDigits = fractionalDigitsValue.isUndefined();
-
-    int decimalAdjust = 0;
-    if (x && !includeAllDigits) {
-        double logx = floor(log10(fabs(x)));
-        x /= pow(10.0, logx);
-        const double tenToTheF = pow(10.0, fractionalDigits);
-        double fx = floor(x * tenToTheF) / tenToTheF;
-        double cx = ceil(x * tenToTheF) / tenToTheF;
-
-        if (fabs(fx - x) < fabs(cx - x))
-            x = fx;
-        else
-            x = cx;
-
-        decimalAdjust = static_cast<int>(logx);
-    }
-
-    if (isnan(x))
-        return jsNontrivialString(exec, "NaN");
-
-    if (x == -0.0) // (-0.0).toExponential() should print as 0 instead of -0
-        x = 0;
-
-    int decimalPoint;
-    int sign;
-    char result[80];
-    WTI::dtoa(result, x, 0, &decimalPoint, &sign, NULL);
-    size_t resultLength = strlen(result);
-    decimalPoint += decimalAdjust;
-
-    int i = 0;
-    char buf[80]; // digit + '.' + fractionDigits (max 20) + 'e' + sign + exponent (max?)
-    if (sign)
-        buf[i++] = '-';
-
-    // ? 9999 is the magical "result is Inf or NaN" value.  what's 999??
-    if (decimalPoint == 999) {
-        ASSERT(i + resultLength < 80);
-        memcpy(buf + i, result, resultLength);
-        buf[i + resultLength] = '\0';
-    } else {
-        buf[i++] = result[0];
-
-        if (includeAllDigits)
-            fractionalDigits = static_cast<int>(resultLength) - 1;
-
-        fractionalPartToString(buf, i, result, resultLength, fractionalDigits);
-        exponentialPartToString(buf, i, decimalPoint);
-        buf[i++] = '\0';
-    }
-    ASSERT(i <= 80);
-
-    return jsString(exec, buf);
-}
-
-TiValue JSC_HOST_CALL numberProtoFuncToPrecision(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
-{
-    TiValue v = thisValue.getJSNumber();
-    if (!v)
-        return throwError(exec, TypeError);
-
-    double doublePrecision = args.at(0).toIntegerPreserveNaN(exec);
-    double x = v.uncheckedGetNumber();
-    if (args.at(0).isUndefined() || isnan(x) || isinf(x))
-        return jsString(exec, v.toString(exec));
-
-    UString s;
-    if (x < 0) {
-        s = "-";
-        x = -x;
-    } else
-        s = "";
-
-    if (!(doublePrecision >= 1 && doublePrecision <= 21)) // true for NaN
-        return throwError(exec, RangeError, "toPrecision() argument must be between 1 and 21");
-    int precision = static_cast<int>(doublePrecision);
-
-    int e = 0;
-    UString m;
-    if (x) {
-        e = static_cast<int>(log10(x));
-        double tens = intPow10(e - precision + 1);
-        double n = floor(x / tens);
-        if (n < intPow10(precision - 1)) {
-            e = e - 1;
-            tens = intPow10(e - precision + 1);
-            n = floor(x / tens);
-        }
-
-        if (fabs((n + 1.0) * tens - x) <= fabs(n * tens - x))
-            ++n;
-        // maintain n < 10^(precision)
-        if (n >= intPow10(precision)) {
-            n /= 10.0;
-            e += 1;
-        }
-        ASSERT(intPow10(precision - 1) <= n);
-        ASSERT(n < intPow10(precision));
-
-        m = integerPartNoExp(n);
-        if (e < -6 || e >= precision) {
-            if (m.size() > 1)
-                m = makeString(m.substr(0, 1), ".", m.substr(1));
-            if (e >= 0)
-                return jsMakeNontrivialString(exec, s, m, "e+", UString::from(e));
-            return jsMakeNontrivialString(exec, s, m, "e-", UString::from(-e));
-        }
-    } else {
-        m = charSequence('0', precision);
-        e = 0;
-    }
-
-    if (e == precision - 1)
-        return jsString(exec, makeString(s, m));
-    if (e >= 0) {
-        if (e + 1 < static_cast<int>(m.size()))
-            return jsString(exec, makeString(s, m.substr(0, e + 1), ".", m.substr(e + 1)));
-        return jsString(exec, makeString(s, m));
-    }
-    return jsMakeNontrivialString(exec, s, "0.", charSequence('0', -(e + 1)), m);
+    return TiValue::encode(v);
 }
 
 } // namespace TI

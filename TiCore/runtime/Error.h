@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,44 +30,56 @@
 #ifndef Error_h
 #define Error_h
 
+#include "TiObject.h"
 #include <stdint.h>
 
 namespace TI {
 
     class TiExcState;
+    class TiGlobalData;
+    class TiGlobalObject;
     class TiObject;
+    class SourceCode;
+    class Structure;
     class UString;
 
-    /**
-     * Types of Native Errors available. For custom errors, GeneralError
-     * should be used.
-     */
-    enum ErrorType {
-        GeneralError   = 0,
-        EvalError      = 1,
-        RangeError     = 2,
-        ReferenceError = 3,
-        SyntaxError    = 4,
-        TypeError      = 5,
-        URIError       = 6
-    };
-    
-    extern const char* expressionBeginOffsetPropertyName;
-    extern const char* expressionCaretOffsetPropertyName;
-    extern const char* expressionEndOffsetPropertyName;
-    
-    class Error {
-    public:
-        static TiObject* create(TiExcState*, ErrorType, const UString& message, int lineNumber, intptr_t sourceID, const UString& sourceURL);
-        static TiObject* create(TiExcState*, ErrorType, const char* message);
-    };
+    // Methods to create a range of internal errors.
+    TiObject* createError(TiGlobalObject*, const UString&);
+    TiObject* createEvalError(TiGlobalObject*, const UString&);
+    TiObject* createRangeError(TiGlobalObject*, const UString&);
+    TiObject* createReferenceError(TiGlobalObject*, const UString&);
+    TiObject* createSyntaxError(TiGlobalObject*, const UString&);
+    TiObject* createTypeError(TiGlobalObject*, const UString&);
+    TiObject* createURIError(TiGlobalObject*, const UString&);
+    // TiExcState wrappers.
+    TiObject* createError(TiExcState*, const UString&);
+    TiObject* createEvalError(TiExcState*, const UString&);
+    TiObject* createRangeError(TiExcState*, const UString&);
+    TiObject* createReferenceError(TiExcState*, const UString&);
+    TiObject* createSyntaxError(TiExcState*, const UString&);
+    TiObject* createTypeError(TiExcState*, const UString&);
+    TiObject* createURIError(TiExcState*, const UString&);
 
-    TiObject* throwError(TiExcState*, ErrorType, const UString& message, int lineNumber, intptr_t sourceID, const UString& sourceURL);
-    TiObject* throwError(TiExcState*, ErrorType, const UString& message);
-    TiObject* throwError(TiExcState*, ErrorType, const char* message);
-    TiObject* throwError(TiExcState*, ErrorType);
+    // Methods to add 
+    bool hasErrorInfo(TiExcState*, TiObject* error);
+    TiObject* addErrorInfo(TiGlobalData*, TiObject* error, int line, const SourceCode&);
+    // TiExcState wrappers.
+    TiObject* addErrorInfo(TiExcState*, TiObject* error, int line, const SourceCode&);
+
+    // Methods to throw Errors.
+    TiValue throwError(TiExcState*, TiValue);
     TiObject* throwError(TiExcState*, TiObject*);
 
+    // Convenience wrappers, create an throw an exception with a default message.
+    TiObject* throwTypeError(TiExcState*);
+    TiObject* throwSyntaxError(TiExcState*);
+
+    // Convenience wrappers, wrap result as an EncodedTiValue.
+    inline EncodedTiValue throwVMError(TiExcState* exec, TiValue error) { return TiValue::encode(throwError(exec, error)); }
+    inline EncodedTiValue throwVMTypeError(TiExcState* exec) { return TiValue::encode(throwTypeError(exec)); }
+
+    TiValue createTypeErrorFunction(TiExcState* exec, const UString& message);
+    
 } // namespace TI
 
 #endif // Error_h

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,7 +31,7 @@
 #ifndef TiFunction_h
 #define TiFunction_h
 
-#include "InternalFunction.h"
+#include "TiObjectWithGlobalObject.h"
 
 namespace TI {
 
@@ -41,24 +41,36 @@ namespace TI {
     class JSActivation;
     class TiGlobalObject;
     class NativeExecutable;
+    class VPtrHackExecutable;
 
-    class TiFunction : public InternalFunction {
+    EncodedTiValue JSC_HOST_CALL callHostFunctionAsConstructor(TiExcState*);
+
+    class TiFunction : public TiObjectWithGlobalObject {
         friend class JIT;
         friend class TiGlobalData;
 
-        typedef InternalFunction Base;
+        typedef TiObjectWithGlobalObject Base;
 
     public:
-        TiFunction(TiExcState*, NonNullPassRefPtr<Structure>, int length, const Identifier&, NativeFunction);
-        TiFunction(TiExcState*, NonNullPassRefPtr<Structure>, int length, const Identifier&, NativeExecutable*, NativeFunction);
-        TiFunction(TiExcState*, NonNullPassRefPtr<FunctionExecutable>, ScopeChainNode*);
+        TiFunction(TiExcState*, TiGlobalObject*, Structure*, int length, const Identifier&, NativeFunction);
+        TiFunction(TiExcState*, TiGlobalObject*, Structure*, int length, const Identifier&, NativeExecutable*);
+        TiFunction(TiExcState*, FunctionExecutable*, ScopeChainNode*);
         virtual ~TiFunction();
 
-        TiObject* construct(TiExcState*, const ArgList&);
-        TiValue call(TiExcState*, TiValue thisValue, const ArgList&);
+        const UString& name(TiExcState*);
+        const UString displayName(TiExcState*);
+        const UString calculatedDisplayName(TiExcState*);
 
-        void setScope(const ScopeChain& scopeChain) { setScopeChain(scopeChain); }
-        ScopeChain& scope() { return scopeChain(); }
+        ScopeChainNode* scope()
+        {
+            ASSERT(!isHostFunctionNonInline());
+            return m_scopeChain.get();
+        }
+        void setScope(TiGlobalData& globalData, ScopeChainNode* scopeChain)
+        {
+            ASSERT(!isHostFunctionNonInline());
+            m_scopeChain.set(globalData, this, scopeChain);
+        }
 
         ExecutableBase* executable() const { return m_executable.get(); }
 
@@ -66,76 +78,48 @@ namespace TI {
         inline bool isHostFunction() const;
         FunctionExecutable* jsExecutable() const;
 
-        static JS_EXPORTDATA const ClassInfo info;
+        static JS_EXPORTDATA const ClassInfo s_info;
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype) 
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype) 
         { 
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); 
         }
 
-        NativeFunction nativeFunction()
-        {
-            return *WTI::bitwise_cast<NativeFunction*>(m_data);
-        }
+        NativeFunction nativeFunction();
 
         virtual ConstructType getConstructData(ConstructData&);
         virtual CallType getCallData(CallData&);
 
     protected:
-        const static unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesMarkChildren | OverridesGetPropertyNames | InternalFunction::StructureFlags;
+        const static unsigned StructureFlags = OverridesGetOwnPropertySlot | ImplementsHasInstance | OverridesVisitChildren | OverridesGetPropertyNames | TiObject::StructureFlags;
 
     private:
-        TiFunction(NonNullPassRefPtr<Structure>);
+        explicit TiFunction(VPtrStealingHackType);
 
         bool isHostFunctionNonInline() const;
 
+        virtual void preventExtensions(TiGlobalData&);
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
         virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
 
-        virtual void markChildren(MarkStack&);
-
-        virtual const ClassInfo* classInfo() const { return &info; }
+        virtual void visitChildren(SlotVisitor&);
 
         static TiValue argumentsGetter(TiExcState*, TiValue, const Identifier&);
         static TiValue callerGetter(TiExcState*, TiValue, const Identifier&);
         static TiValue lengthGetter(TiExcState*, TiValue, const Identifier&);
 
-        RefPtr<ExecutableBase> m_executable;
-        ScopeChain& scopeChain()
-        {
-            ASSERT(!isHostFunctionNonInline());
-            return *WTI::bitwise_cast<ScopeChain*>(m_data);
-        }
-        void clearScopeChain()
-        {
-            ASSERT(!isHostFunctionNonInline());
-            new (m_data) ScopeChain(NoScopeChain());
-        }
-        void setScopeChain(ScopeChainNode* sc)
-        {
-            ASSERT(!isHostFunctionNonInline());
-            new (m_data) ScopeChain(sc);
-        }
-        void setScopeChain(const ScopeChain& sc)
-        {
-            ASSERT(!isHostFunctionNonInline());
-            *WTI::bitwise_cast<ScopeChain*>(m_data) = sc;
-        }
-        void setNativeFunction(NativeFunction func)
-        {
-            *WTI::bitwise_cast<NativeFunction*>(m_data) = func;
-        }
-        unsigned char m_data[sizeof(void*)];
+        WriteBarrier<ExecutableBase> m_executable;
+        WriteBarrier<ScopeChainNode> m_scopeChain;
     };
 
     TiFunction* asFunction(TiValue);
 
     inline TiFunction* asFunction(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&TiFunction::info));
+        ASSERT(asObject(value)->inherits(&TiFunction::s_info));
         return static_cast<TiFunction*>(asObject(value));
     }
 

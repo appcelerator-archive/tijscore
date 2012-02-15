@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,6 +36,7 @@
 #include "APIShims.h"
 #include "APICast.h"
 #include "CodeBlock.h"
+#include "ExceptionHelpers.h"
 #include "TiFunction.h"
 #include "FunctionPrototype.h"
 #include <runtime/TiGlobalObject.h>
@@ -46,35 +47,36 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(TiCallbackFunction);
 
-const ClassInfo TiCallbackFunction::info = { "CallbackFunction", &InternalFunction::info, 0, 0 };
+const ClassInfo TiCallbackFunction::s_info = { "CallbackFunction", &InternalFunction::s_info, 0, 0 };
 
-TiCallbackFunction::TiCallbackFunction(TiExcState* exec, TiObjectCallAsFunctionCallback callback, const Identifier& name)
-    : InternalFunction(&exec->globalData(), exec->lexicalGlobalObject()->callbackFunctionStructure(), name)
+TiCallbackFunction::TiCallbackFunction(TiExcState* exec, TiGlobalObject* globalObject, TiObjectCallAsFunctionCallback callback, const Identifier& name)
+    : InternalFunction(&exec->globalData(), globalObject, globalObject->callbackFunctionStructure(), name)
     , m_callback(callback)
 {
+    ASSERT(inherits(&s_info));
 }
 
-TiValue TiCallbackFunction::call(TiExcState* exec, TiObject* functionObject, TiValue thisValue, const ArgList& args)
+EncodedTiValue TiCallbackFunction::call(TiExcState* exec)
 {
     TiContextRef execRef = toRef(exec);
-    TiObjectRef functionRef = toRef(functionObject);
-    TiObjectRef thisObjRef = toRef(thisValue.toThisObject(exec));
+    TiObjectRef functionRef = toRef(exec->callee());
+    TiObjectRef thisObjRef = toRef(exec->hostThisValue().toThisObject(exec));
 
-    int argumentCount = static_cast<int>(args.size());
+    int argumentCount = static_cast<int>(exec->argumentCount());
     Vector<TiValueRef, 16> arguments(argumentCount);
     for (int i = 0; i < argumentCount; i++)
-        arguments[i] = toRef(exec, args.at(i));
+        arguments[i] = toRef(exec, exec->argument(i));
 
     TiValueRef exception = 0;
     TiValueRef result;
     {
         APICallbackShim callbackShim(exec);
-        result = static_cast<TiCallbackFunction*>(functionObject)->m_callback(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception);
+        result = static_cast<TiCallbackFunction*>(toJS(functionRef))->m_callback(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception);
     }
     if (exception)
-        exec->setException(toJS(exec, exception));
+        throwError(exec, toJS(exec, exception));
 
-    return toJS(exec, result);
+    return TiValue::encode(toJS(exec, result));
 }
 
 CallType TiCallbackFunction::getCallData(CallData& callData)

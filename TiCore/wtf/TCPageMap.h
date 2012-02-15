@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // Copyright (c) 2005, Google Inc.
@@ -79,7 +79,7 @@ class TCMalloc_PageMap1 {
 
   // Ensure that the map contains initialized entries "x .. x+n-1".
   // Returns true if successful, false if we could not allocate memory.
-  bool Ensure(Number x, size_t n) {
+  bool Ensure(Number, size_t) {
     // Nothing to do since flat array was allocate at start
     return true;
   }

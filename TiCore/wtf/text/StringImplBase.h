@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,12 +33,12 @@
 #ifndef StringImplBase_h
 #define StringImplBase_h
 
-#include <wtf/Noncopyable.h>
 #include <wtf/unicode/Unicode.h>
 
 namespace WTI {
 
-class StringImplBase : public Noncopyable {
+class StringImplBase {
+    WTF_MAKE_NONCOPYABLE(StringImplBase); WTF_MAKE_FAST_ALLOCATED;
 public:
     bool isStringImpl() { return (m_refCountAndFlags & s_refCountInvalidForStringImpl) != s_refCountInvalidForStringImpl; }
     unsigned length() const { return m_length; }
@@ -51,9 +51,6 @@ protected:
         BufferSubstring,
         BufferShared,
     };
-
-    using Noncopyable::operator new;
-    void* operator new(size_t, void* inPlace) { ASSERT(inPlace); return inPlace; }
 
     // For SmallStringStorage, which allocates an array and uses an in-place new.
     StringImplBase() { }

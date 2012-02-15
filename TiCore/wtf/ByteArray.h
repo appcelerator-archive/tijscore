@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,7 +33,9 @@
 #ifndef ByteArray_h
 #define ByteArray_h
 
+#include <limits.h>
 #include <wtf/PassRefPtr.h>
+#include <wtf/Platform.h>
 #include <wtf/RefCounted.h>
 
 namespace WTI {
@@ -93,8 +95,17 @@ namespace WTI {
         {
         }
         size_t m_size;
-        unsigned char m_data[sizeof(size_t)];
+// MSVC can't handle correctly unsized array.
+// warning C4200: nonstandard extension used : zero-sized array in struct/union
+// Cannot generate copy-ctor or copy-assignment operator when UDT contains a zero-sized array
+#if COMPILER(MSVC)
+        unsigned char m_data[INT_MAX];
+#else
+        unsigned char m_data[];
+#endif
     };
-}
+} // namespace WTI
+
+using WTI::ByteArray;
 
 #endif

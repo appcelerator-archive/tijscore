@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -43,7 +43,7 @@ using namespace WTI::Unicode;
 TiStringRef TiStringCreateWithCharacters(const TiChar* chars, size_t numChars)
 {
     initializeThreading();
-    return OpaqueTiString::create(chars, numChars).releaseRef();
+    return OpaqueTiString::create(chars, numChars).leakRef();
 }
 
 TiStringRef TiStringCreateWithUTF8CString(const char* string)
@@ -54,11 +54,11 @@ TiStringRef TiStringCreateWithUTF8CString(const char* string)
         Vector<UChar, 1024> buffer(length);
         UChar* p = buffer.data();
         if (conversionOK == convertUTF8ToUTF16(&string, string + length, &p, p + length))
-            return OpaqueTiString::create(buffer.data(), p - buffer.data()).releaseRef();
+            return OpaqueTiString::create(buffer.data(), p - buffer.data()).leakRef();
     }
 
     // Null string.
-    return OpaqueTiString::create().releaseRef();
+    return OpaqueTiString::create().leakRef();
 }
 
 TiStringRef TiStringRetain(TiStringRef string)

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,7 +35,7 @@
 namespace TI {
 
     class TiExcState;
-    class ScopeChain;
+    class ScopeChainNode;
     class SourceCode;
 
     enum ComplType { Normal, Break, Continue, ReturnValue, Throw, Interrupted, Terminated };
@@ -63,7 +63,7 @@ namespace TI {
     };
 
     Completion checkSyntax(TiExcState*, const SourceCode&);
-    Completion evaluate(TiExcState*, ScopeChain&, const SourceCode&, TiValue thisValue = TiValue());
+    Completion evaluate(TiExcState*, ScopeChainNode*, const SourceCode&, TiValue thisValue = TiValue());
 
 } // namespace TI
 

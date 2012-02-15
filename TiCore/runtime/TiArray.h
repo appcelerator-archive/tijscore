@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,27 +30,49 @@
 
 #include "TiObject.h"
 
+#define CHECK_ARRAY_CONSISTENCY 0
+
 namespace TI {
 
-    typedef HashMap<unsigned, TiValue> SparseArrayValueMap;
+    typedef HashMap<unsigned, WriteBarrier<Unknown> > SparseArrayValueMap;
 
+    // This struct holds the actual data values of an array.  A TiArray object points to it's contained ArrayStorage
+    // struct by pointing to m_vector.  To access the contained ArrayStorage struct, use the getStorage() and 
+    // setStorage() methods.  It is important to note that there may be space before the ArrayStorage that 
+    // is used to quick unshift / shift operation.  The actual allocated pointer is available by using:
+    //     getStorage() - m_indexBias * sizeof(TiValue)
     struct ArrayStorage {
-        unsigned m_length;
+        unsigned m_length; // The "length" property on the array
         unsigned m_numValuesInVector;
         SparseArrayValueMap* m_sparseValueMap;
         void* subclassData; // A TiArray subclass can use this to fill the vector lazily.
+        void* m_allocBase; // Pointer to base address returned by malloc().  Keeping this pointer does eliminate false positives from the leak detector.
         size_t reportedMapCapacity;
-        TiValue m_vector[1];
+#if CHECK_ARRAY_CONSISTENCY
+        bool m_inCompactInitialization;
+#endif
+        WriteBarrier<Unknown> m_vector[1];
     };
 
-    class TiArray : public TiObject {
-        friend class JIT;
+    // The CreateCompact creation mode is used for fast construction of arrays
+    // whose size and contents are known at time of creation.
+    //
+    // There are two obligations when using this mode:
+    //
+    //   - uncheckedSetIndex() must be used when initializing the array.
+    //   - setLength() must be called after initialization.
+
+    enum ArrayCreationMode { CreateCompact, CreateInitialized };
+
+    class TiArray : public JSNonFinalObject {
         friend class Walker;
 
     public:
-        explicit TiArray(NonNullPassRefPtr<Structure>);
-        TiArray(NonNullPassRefPtr<Structure>, unsigned initialLength);
-        TiArray(NonNullPassRefPtr<Structure>, const ArgList& initialValues);
+        TiArray(VPtrStealingHackType);
+
+        explicit TiArray(TiGlobalData&, Structure*);
+        TiArray(TiGlobalData&, Structure*, unsigned initialLength, ArrayCreationMode);
+        TiArray(TiGlobalData&, Structure*, const ArgList& initialValues);
         virtual ~TiArray();
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
@@ -58,8 +80,8 @@ namespace TI {
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
         virtual void put(TiExcState*, unsigned propertyName, TiValue); // FIXME: Make protected and add setItem.
 
-        static JS_EXPORTDATA const ClassInfo info;
-
+        static JS_EXPORTDATA const ClassInfo s_info;
+        
         unsigned length() const { return m_storage->m_length; }
         void setLength(unsigned); // OK to use on new arrays, but not if it might be a RegExpMatchArray.
 
@@ -70,69 +92,95 @@ namespace TI {
         void push(TiExcState*, TiValue);
         TiValue pop();
 
+        void shiftCount(TiExcState*, int count);
+        void unshiftCount(TiExcState*, int count);
+
         bool canGetIndex(unsigned i) { return i < m_vectorLength && m_storage->m_vector[i]; }
         TiValue getIndex(unsigned i)
         {
             ASSERT(canGetIndex(i));
-            return m_storage->m_vector[i];
+            return m_storage->m_vector[i].get();
         }
 
         bool canSetIndex(unsigned i) { return i < m_vectorLength; }
-        void setIndex(unsigned i, TiValue v)
+        void setIndex(TiGlobalData& globalData, unsigned i, TiValue v)
         {
             ASSERT(canSetIndex(i));
-            TiValue& x = m_storage->m_vector[i];
+            
+            WriteBarrier<Unknown>& x = m_storage->m_vector[i];
             if (!x) {
-                ++m_storage->m_numValuesInVector;
-                if (i >= m_storage->m_length)
-                    m_storage->m_length = i + 1;
+                ArrayStorage *storage = m_storage;
+                ++storage->m_numValuesInVector;
+                if (i >= storage->m_length)
+                    storage->m_length = i + 1;
             }
-            x = v;
+            x.set(globalData, this, v);
+        }
+        
+        void uncheckedSetIndex(TiGlobalData& globalData, unsigned i, TiValue v)
+        {
+            ASSERT(canSetIndex(i));
+            ArrayStorage *storage = m_storage;
+#if CHECK_ARRAY_CONSISTENCY
+            ASSERT(storage->m_inCompactInitialization);
+#endif
+            storage->m_vector[i].set(globalData, this, v);
         }
 
         void fillArgList(TiExcState*, MarkedArgumentBuffer&);
         void copyToRegisters(TiExcState*, Register*, uint32_t);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
         
-        inline void markChildrenDirect(MarkStack& markStack);
+        inline void visitChildrenDirect(SlotVisitor&);
+
+        static ptrdiff_t storageOffset()
+        {
+            return OBJECT_OFFSETOF(TiArray, m_storage);
+        }
+
+        static ptrdiff_t vectorLengthOffset()
+        {
+            return OBJECT_OFFSETOF(TiArray, m_vectorLength);
+        }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | OverridesGetPropertyNames | TiObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | TiObject::StructureFlags;
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
         virtual bool deleteProperty(TiExcState*, unsigned propertyName);
         virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 
         void* subclassData() const;
         void setSubclassData(void*);
 
     private:
-        virtual const ClassInfo* classInfo() const { return &info; }
-
         bool getOwnPropertySlotSlowCase(TiExcState*, unsigned propertyName, PropertySlot&);
         void putSlowCase(TiExcState*, unsigned propertyName, TiValue);
 
+        unsigned getNewVectorLength(unsigned desiredLength);
         bool increaseVectorLength(unsigned newLength);
+        bool increaseVectorPrefixLength(unsigned newLength);
         
         unsigned compactForSorting();
 
         enum ConsistencyCheckType { NormalConsistencyCheck, DestructorConsistencyCheck, SortConsistencyCheck };
         void checkConsistency(ConsistencyCheckType = NormalConsistencyCheck);
 
-        unsigned m_vectorLength;
-        ArrayStorage* m_storage;
+        unsigned m_vectorLength; // The valid length of m_vector
+        int m_indexBias; // The number of TiValue sized blocks before ArrayStorage.
+        ArrayStorage *m_storage;
     };
 
     TiArray* asArray(TiValue);
 
     inline TiArray* asArray(TiCell* cell)
     {
-        ASSERT(cell->inherits(&TiArray::info));
+        ASSERT(cell->inherits(&TiArray::s_info));
         return static_cast<TiArray*>(cell);
     }
 
@@ -141,93 +189,35 @@ namespace TI {
         return asArray(value.asCell());
     }
 
-    inline bool isTiArray(TiGlobalData* globalData, TiValue v)
-    {
-        return v.isCell() && v.asCell()->vptr() == globalData->jsArrayVPtr;
-    }
     inline bool isTiArray(TiGlobalData* globalData, TiCell* cell) { return cell->vptr() == globalData->jsArrayVPtr; }
+    inline bool isTiArray(TiGlobalData* globalData, TiValue v) { return v.isCell() && isTiArray(globalData, v.asCell()); }
 
-    inline void TiArray::markChildrenDirect(MarkStack& markStack)
+    inline void TiArray::visitChildrenDirect(SlotVisitor& visitor)
     {
-        TiObject::markChildrenDirect(markStack);
+        TiObject::visitChildrenDirect(visitor);
         
         ArrayStorage* storage = m_storage;
 
         unsigned usedVectorLength = std::min(storage->m_length, m_vectorLength);
-        markStack.appendValues(storage->m_vector, usedVectorLength, MayContainNullValues);
+        visitor.appendValues(storage->m_vector, usedVectorLength, MayContainNullValues);
 
         if (SparseArrayValueMap* map = storage->m_sparseValueMap) {
             SparseArrayValueMap::iterator end = map->end();
             for (SparseArrayValueMap::iterator it = map->begin(); it != end; ++it)
-                markStack.append(it->second);
+                visitor.append(&it->second);
         }
     }
 
-    inline void MarkStack::markChildren(TiCell* cell)
+    // Rule from ECMA 15.2 about what an array index is.
+    // Must exactly match string form of an unsigned integer, and be less than 2^32 - 1.
+    inline unsigned Identifier::toArrayIndex(bool& ok) const
     {
-        ASSERT(Heap::isCellMarked(cell));
-        if (!cell->structure()->typeInfo().overridesMarkChildren()) {
-#ifdef NDEBUG
-            asObject(cell)->markChildrenDirect(*this);
-#else
-            ASSERT(!m_isCheckingForDefaultMarkViolation);
-            m_isCheckingForDefaultMarkViolation = true;
-            cell->markChildren(*this);
-            ASSERT(m_isCheckingForDefaultMarkViolation);
-            m_isCheckingForDefaultMarkViolation = false;
-#endif
-            return;
-        }
-        if (cell->vptr() == m_jsArrayVPtr) {
-            asArray(cell)->markChildrenDirect(*this);
-            return;
-        }
-        cell->markChildren(*this);
+        unsigned i = toUInt32(ok);
+        if (ok && i >= 0xFFFFFFFFU)
+            ok = false;
+        return i;
     }
 
-    inline void MarkStack::drain()
-    {
-        while (!m_markSets.isEmpty() || !m_values.isEmpty()) {
-            while (!m_markSets.isEmpty() && m_values.size() < 50) {
-                ASSERT(!m_markSets.isEmpty());
-                MarkSet& current = m_markSets.last();
-                ASSERT(current.m_values);
-                TiValue* end = current.m_end;
-                ASSERT(current.m_values);
-                ASSERT(current.m_values != end);
-            findNextUnmarkedNullValue:
-                ASSERT(current.m_values != end);
-                TiValue value = *current.m_values;
-                current.m_values++;
-
-                TiCell* cell;
-                if (!value || !value.isCell() || Heap::isCellMarked(cell = value.asCell())) {
-                    if (current.m_values == end) {
-                        m_markSets.removeLast();
-                        continue;
-                    }
-                    goto findNextUnmarkedNullValue;
-                }
-
-                Heap::markCell(cell);
-                if (cell->structure()->typeInfo().type() < CompoundType) {
-                    if (current.m_values == end) {
-                        m_markSets.removeLast();
-                        continue;
-                    }
-                    goto findNextUnmarkedNullValue;
-                }
-
-                if (current.m_values == end)
-                    m_markSets.removeLast();
-
-                markChildren(cell);
-            }
-            while (!m_values.isEmpty())
-                markChildren(m_values.removeLast());
-        }
-    }
-    
 } // namespace TI
 
 #endif // TiArray_h

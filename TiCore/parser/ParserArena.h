@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,32 +41,53 @@ namespace TI {
     class ParserArenaDeletable;
     class ParserArenaRefCounted;
 
-    class IdentifierArena : public FastAllocBase {
+    class IdentifierArena {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
+        IdentifierArena()
+        {
+            clear();
+        }
+
         ALWAYS_INLINE const Identifier& makeIdentifier(TiGlobalData*, const UChar* characters, size_t length);
         const Identifier& makeNumericIdentifier(TiGlobalData*, double number);
 
-        void clear() { m_identifiers.clear(); }
+        void clear()
+        {
+            m_identifiers.clear();
+            for (unsigned  i = 0; i < 128; i++)
+                m_shortIdentifiers[i] = 0;
+        }
         bool isEmpty() const { return m_identifiers.isEmpty(); }
 
     private:
+        static const int MaximumCachableCharacter = 128;
         typedef SegmentedVector<Identifier, 64> IdentifierVector;
         IdentifierVector m_identifiers;
+        FixedArray<Identifier*, MaximumCachableCharacter> m_shortIdentifiers;
     };
 
     ALWAYS_INLINE const Identifier& IdentifierArena::makeIdentifier(TiGlobalData* globalData, const UChar* characters, size_t length)
     {
+        if (length == 1 && characters[0] < MaximumCachableCharacter) {
+            if (Identifier* ident = m_shortIdentifiers[characters[0]])
+                return *ident;
+            m_identifiers.append(Identifier(globalData, characters, length));
+            m_shortIdentifiers[characters[0]] = &m_identifiers.last();
+            return m_identifiers.last();
+        }
         m_identifiers.append(Identifier(globalData, characters, length));
         return m_identifiers.last();
     }
 
     inline const Identifier& IdentifierArena::makeNumericIdentifier(TiGlobalData* globalData, double number)
     {
-        m_identifiers.append(Identifier(globalData, UString::from(number)));
+        m_identifiers.append(Identifier(globalData, UString::number(number)));
         return m_identifiers.last();
     }
 
-    class ParserArena : Noncopyable {
+    class ParserArena {
+        WTF_MAKE_NONCOPYABLE(ParserArena);
     public:
         ParserArena();
         ~ParserArena();

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -62,7 +62,7 @@ NEVER_INLINE TiValue jsAddSlowCase(CallFrame* callFrame, TiValue v1, TiValue v2)
     if (p2.isString())
         return jsString(callFrame, p1.toString(callFrame), asString(p2));
 
-    return jsNumber(callFrame, p1.toNumber(callFrame) + p2.toNumber(callFrame));
+    return jsNumber(p1.toNumber(callFrame) + p2.toNumber(callFrame));
 }
 
 TiValue jsTypeStringForValue(CallFrame* callFrame, TiValue v)
@@ -92,7 +92,7 @@ bool jsIsObjectType(TiValue v)
     if (!v.isCell())
         return v.isNull();
 
-    TiType type = asCell(v)->structure()->typeInfo().type();
+    TiType type = v.asCell()->structure()->typeInfo().type();
     if (type == NumberType || type == StringType)
         return false;
     if (type == ObjectType) {

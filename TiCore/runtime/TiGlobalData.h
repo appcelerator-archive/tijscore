@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,20 +37,26 @@
 #define TiGlobalData_h
 
 #include "CachedTranscendentalFunction.h"
-#include "Collector.h"
+#include "Heap.h"
 #include "DateInstanceCache.h"
 #include "ExecutableAllocator.h"
+#include "Strong.h"
 #include "JITStubs.h"
 #include "TiValue.h"
-#include "MarkStack.h"
 #include "NumericStrings.h"
 #include "SmallStrings.h"
 #include "Terminator.h"
 #include "TimeoutChecker.h"
 #include "WeakRandom.h"
+#include <wtf/BumpPointerAllocator.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
 #include <wtf/RefCounted.h>
+#include <wtf/ThreadSpecific.h>
+#include <wtf/WTFThreadData.h>
+#if ENABLE(REGEXP_TRACING)
+#include <wtf/ListHashSet.h>
+#endif
 
 struct OpaqueTiClass;
 struct OpaqueTiClassContextData;
@@ -59,19 +65,24 @@ namespace TI {
 
     class CodeBlock;
     class CommonIdentifiers;
+    class HandleStack;
     class IdentifierTable;
     class Interpreter;
     class TiGlobalObject;
     class TiObject;
     class Lexer;
+    class NativeExecutable;
     class Parser;
     class RegExpCache;
     class Stringifier;
     class Structure;
     class UString;
+#if ENABLE(REGEXP_TRACING)
+    class RegExp;
+#endif
 
     struct HashTable;
-    struct Instruction;    
+    struct Instruction;
 
     struct DSTOffsetCache {
         DSTOffsetCache()
@@ -115,6 +126,7 @@ namespace TI {
         };
 
         bool isSharedInstance() { return globalDataType == APIShared; }
+        bool usingAPI() { return globalDataType != Default; }
         static bool sharedInstanceExists();
         static TiGlobalData& sharedInstance();
 
@@ -125,35 +137,55 @@ namespace TI {
 
 #if ENABLE(JSC_MULTIPLE_THREADS)
         // Will start tracking threads that use the heap, which is resource-heavy.
-        void makeUsableFromMultipleThreads() { heap.makeUsableFromMultipleThreads(); }
+        void makeUsableFromMultipleThreads() { heap.machineThreads().makeUsableFromMultipleThreads(); }
 #endif
 
         GlobalDataType globalDataType;
         ClientData* clientData;
 
-        const HashTable* arrayTable;
+        const HashTable* arrayConstructorTable;
+        const HashTable* arrayPrototypeTable;
+        const HashTable* booleanPrototypeTable;
         const HashTable* dateTable;
+        const HashTable* dateConstructorTable;
+        const HashTable* errorPrototypeTable;
+        const HashTable* globalObjectTable;
         const HashTable* jsonTable;
         const HashTable* mathTable;
-        const HashTable* numberTable;
+        const HashTable* numberConstructorTable;
+        const HashTable* numberPrototypeTable;
+        const HashTable* objectConstructorTable;
+        const HashTable* objectPrototypeTable;
         const HashTable* regExpTable;
         const HashTable* regExpConstructorTable;
+        const HashTable* regExpPrototypeTable;
         const HashTable* stringTable;
+        const HashTable* stringConstructorTable;
         
-        RefPtr<Structure> activationStructure;
-        RefPtr<Structure> interruptedExecutionErrorStructure;
-        RefPtr<Structure> terminatedExecutionErrorStructure;
-        RefPtr<Structure> staticScopeStructure;
-        RefPtr<Structure> stringStructure;
-        RefPtr<Structure> notAnObjectErrorStubStructure;
-        RefPtr<Structure> notAnObjectStructure;
-        RefPtr<Structure> propertyNameIteratorStructure;
-        RefPtr<Structure> getterSetterStructure;
-        RefPtr<Structure> apiWrapperStructure;
-        RefPtr<Structure> dummyMarkableCellStructure;
+        Strong<Structure> structureStructure;
+        Strong<Structure> debuggerActivationStructure;
+        Strong<Structure> activationStructure;
+        Strong<Structure> interruptedExecutionErrorStructure;
+        Strong<Structure> terminatedExecutionErrorStructure;
+        Strong<Structure> staticScopeStructure;
+        Strong<Structure> strictEvalActivationStructure;
+        Strong<Structure> stringStructure;
+        Strong<Structure> notAnObjectStructure;
+        Strong<Structure> propertyNameIteratorStructure;
+        Strong<Structure> getterSetterStructure;
+        Strong<Structure> apiWrapperStructure;
+        Strong<Structure> scopeChainNodeStructure;
+        Strong<Structure> executableStructure;
+        Strong<Structure> nativeExecutableStructure;
+        Strong<Structure> evalExecutableStructure;
+        Strong<Structure> programExecutableStructure;
+        Strong<Structure> functionExecutableStructure;
+        Strong<Structure> dummyMarkableCellStructure;
+        Strong<Structure> regExpStructure;
+        Strong<Structure> structureChainStructure;
 
-#if USE(JSVALUE32)
-        RefPtr<Structure> numberStructure;
+#if ENABLE(JSC_ZOMBIES)
+        Strong<Structure> zombieStructure;
 #endif
 
         static void storeVPtrs();
@@ -174,23 +206,32 @@ namespace TI {
         ExecutableAllocator regexAllocator;
 #endif
 
-#if ENABLE(JIT)
-#if ENABLE(INTERPRETER)
+#if !ENABLE(JIT)
+        bool canUseJIT() { return false; } // interpreter only
+#elif !ENABLE(INTERPRETER)
+        bool canUseJIT() { return true; } // jit only
+#else
         bool canUseJIT() { return m_canUseJIT; }
 #endif
-#else
-        bool canUseJIT() { return false; }
-#endif
+
+        const StackBounds& stack()
+        {
+            return wtfThreadData().stack();
+        }
+
         Lexer* lexer;
         Parser* parser;
         Interpreter* interpreter;
 #if ENABLE(JIT)
         OwnPtr<JITThunks> jitStubs;
-        NativeExecutable* getThunk(ThunkGenerator generator)
+        MacroAssemblerCodePtr getCTIStub(ThunkGenerator generator)
         {
-            return jitStubs->specializedThunk(this, generator);
+            return jitStubs->ctiStub(this, generator);
         }
+        NativeExecutable* getHostFunction(NativeFunction, ThunkGenerator);
 #endif
+        NativeExecutable* getHostFunction(NativeFunction);
+
         TimeoutChecker timeoutChecker;
         Terminator terminator;
         Heap heap;
@@ -200,21 +241,12 @@ namespace TI {
         ReturnAddressPtr exceptionLocation;
 #endif
 
-        const Vector<Instruction>& numericCompareFunction(TiExcState*);
-        Vector<Instruction> lazyNumericCompareFunction;
-        bool initializingLazyNumericCompareFunction;
-
         HashMap<OpaqueTiClass*, OpaqueTiClassContextData*> opaqueTiClassData;
 
-        TiGlobalObject* head;
+        unsigned globalObjectCount;
         TiGlobalObject* dynamicGlobalObject;
 
-        HashSet<TiObject*> arrayVisitedElements;
-
-        CodeBlock* functionCodeBlockBeingReparsed;
-        Stringifier* firstStringifierToMark;
-
-        MarkStack markStack;
+        HashSet<TiObject*> stringRecursionCheckVisitedObjects;
 
         double cachedUTCOffset;
         DSTOffsetCache dstOffsetCache;
@@ -225,6 +257,12 @@ namespace TI {
         int maxReentryDepth;
 
         RegExpCache* m_regExpCache;
+        BumpPointerAllocator m_regExpAllocator;
+
+#if ENABLE(REGEXP_TRACING)
+        typedef ListHashSet<RefPtr<RegExp> > RTTraceList;
+        RTTraceList* m_rtTraceList;
+#endif
 
 #ifndef NDEBUG
         ThreadIdentifier exclusiveThread;
@@ -239,6 +277,17 @@ namespace TI {
         void dumpSampleData(TiExcState* exec);
         void recompileAllTiFunctions();
         RegExpCache* regExpCache() { return m_regExpCache; }
+#if ENABLE(REGEXP_TRACING)
+        void addRegExpToTrace(PassRefPtr<RegExp> regExp);
+#endif
+        void dumpRegExpTrace();
+        HandleSlot allocateGlobalHandle() { return heap.allocateGlobalHandle(); }
+        HandleSlot allocateLocalHandle() { return heap.allocateLocalHandle(); }
+        void clearBuiltinStructures();
+
+        bool isCollectorBusy() { return heap.isBusy(); }
+        void releaseExecutableMemory();
+
     private:
         TiGlobalData(GlobalDataType, ThreadStackType);
         static TiGlobalData*& sharedInstanceInternal();
@@ -246,7 +295,13 @@ namespace TI {
 #if ENABLE(JIT) && ENABLE(INTERPRETER)
         bool m_canUseJIT;
 #endif
+        StackBounds m_stack;
     };
+
+    inline HandleSlot allocateGlobalHandle(TiGlobalData& globalData)
+    {
+        return globalData.allocateGlobalHandle();
+    }
 
 } // namespace TI
 

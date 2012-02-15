@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,104 +38,181 @@
 #include "TiObject.h"
 #include "TiString.h"
 #include "NativeErrorConstructor.h"
+#include "SourceCode.h"
 
 namespace TI {
 
-const char* expressionBeginOffsetPropertyName = "expressionBeginOffset";
-const char* expressionCaretOffsetPropertyName = "expressionCaretOffset";
-const char* expressionEndOffsetPropertyName = "expressionEndOffset";
+static const char* linePropertyName = "line";
+static const char* sourceIdPropertyName = "sourceId";
+static const char* sourceURLPropertyName = "sourceURL";
 
-TiObject* Error::create(TiExcState* exec, ErrorType type, const UString& message, int lineNumber, intptr_t sourceID, const UString& sourceURL)
+TiObject* createError(TiGlobalObject* globalObject, const UString& message)
 {
-    TiObject* constructor;
-    const char* name;
-    switch (type) {
-        case EvalError:
-            constructor = exec->lexicalGlobalObject()->evalErrorConstructor();
-            name = "Evaluation error";
-            break;
-        case RangeError:
-            constructor = exec->lexicalGlobalObject()->rangeErrorConstructor();
-            name = "Range error";
-            break;
-        case ReferenceError:
-            constructor = exec->lexicalGlobalObject()->referenceErrorConstructor();
-            name = "Reference error";
-            break;
-        case SyntaxError:
-            constructor = exec->lexicalGlobalObject()->syntaxErrorConstructor();
-            name = "Syntax error";
-            break;
-        case TypeError:
-            constructor = exec->lexicalGlobalObject()->typeErrorConstructor();
-            name = "Type error";
-            break;
-        case URIError:
-            constructor = exec->lexicalGlobalObject()->URIErrorConstructor();
-            name = "URI error";
-            break;
-        default:
-            constructor = exec->lexicalGlobalObject()->errorConstructor();
-            name = "Error";
-            break;
-    }
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->errorStructure(), message);
+}
 
-    MarkedArgumentBuffer args;
-    if (message.isEmpty())
-        args.append(jsString(exec, name));
-    else
-        args.append(jsString(exec, message));
-    ConstructData constructData;
-    ConstructType constructType = constructor->getConstructData(constructData);
-    TiObject* error = construct(exec, constructor, constructType, constructData, args);
+TiObject* createEvalError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->evalErrorConstructor()->errorStructure(), message);
+}
 
-    if (lineNumber != -1)
-        error->putWithAttributes(exec, Identifier(exec, "line"), jsNumber(exec, lineNumber), ReadOnly | DontDelete);
+TiObject* createRangeError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->rangeErrorConstructor()->errorStructure(), message);
+}
+
+TiObject* createReferenceError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->referenceErrorConstructor()->errorStructure(), message);
+}
+
+TiObject* createSyntaxError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->syntaxErrorConstructor()->errorStructure(), message);
+}
+
+TiObject* createTypeError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->typeErrorConstructor()->errorStructure(), message);
+}
+
+TiObject* createURIError(TiGlobalObject* globalObject, const UString& message)
+{
+    ASSERT(!message.isEmpty());
+    return ErrorInstance::create(&globalObject->globalData(), globalObject->URIErrorConstructor()->errorStructure(), message);
+}
+
+TiObject* createError(TiExcState* exec, const UString& message)
+{
+    return createError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createEvalError(TiExcState* exec, const UString& message)
+{
+    return createEvalError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createRangeError(TiExcState* exec, const UString& message)
+{
+    return createRangeError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createReferenceError(TiExcState* exec, const UString& message)
+{
+    return createReferenceError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createSyntaxError(TiExcState* exec, const UString& message)
+{
+    return createSyntaxError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createTypeError(TiExcState* exec, const UString& message)
+{
+    return createTypeError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* createURIError(TiExcState* exec, const UString& message)
+{
+    return createURIError(exec->lexicalGlobalObject(), message);
+}
+
+TiObject* addErrorInfo(TiGlobalData* globalData, TiObject* error, int line, const SourceCode& source)
+{
+    intptr_t sourceID = source.provider()->asID();
+    const UString& sourceURL = source.provider()->url();
+
+    if (line != -1)
+        error->putWithAttributes(globalData, Identifier(globalData, linePropertyName), jsNumber(line), ReadOnly | DontDelete);
     if (sourceID != -1)
-        error->putWithAttributes(exec, Identifier(exec, "sourceId"), jsNumber(exec, sourceID), ReadOnly | DontDelete);
+        error->putWithAttributes(globalData, Identifier(globalData, sourceIdPropertyName), jsNumber((double)sourceID), ReadOnly | DontDelete);
     if (!sourceURL.isNull())
-        error->putWithAttributes(exec, Identifier(exec, "sourceURL"), jsString(exec, sourceURL), ReadOnly | DontDelete);
+        error->putWithAttributes(globalData, Identifier(globalData, sourceURLPropertyName), jsString(globalData, sourceURL), ReadOnly | DontDelete);
 
     return error;
 }
 
-TiObject* Error::create(TiExcState* exec, ErrorType type, const char* message)
+TiObject* addErrorInfo(TiExcState* exec, TiObject* error, int line, const SourceCode& source)
 {
-    return create(exec, type, message, -1, -1, UString());
+    return addErrorInfo(&exec->globalData(), error, line, source);
+}
+
+bool hasErrorInfo(TiExcState* exec, TiObject* error)
+{
+    return error->hasProperty(exec, Identifier(exec, linePropertyName))
+        || error->hasProperty(exec, Identifier(exec, sourceIdPropertyName))
+        || error->hasProperty(exec, Identifier(exec, sourceURLPropertyName));
+}
+
+TiValue throwError(TiExcState* exec, TiValue error)
+{
+    exec->globalData().exception = error;
+    return error;
 }
 
 TiObject* throwError(TiExcState* exec, TiObject* error)
 {
-    exec->setException(error);
+    exec->globalData().exception = error;
     return error;
 }
 
-TiObject* throwError(TiExcState* exec, ErrorType type)
+TiObject* throwTypeError(TiExcState* exec)
 {
-    TiObject* error = Error::create(exec, type, UString(), -1, -1, UString());
-    exec->setException(error);
-    return error;
+    return throwError(exec, createTypeError(exec, "Type error"));
 }
 
-TiObject* throwError(TiExcState* exec, ErrorType type, const UString& message)
+TiObject* throwSyntaxError(TiExcState* exec)
 {
-    TiObject* error = Error::create(exec, type, message, -1, -1, UString());
-    exec->setException(error);
-    return error;
+    return throwError(exec, createSyntaxError(exec, "Syntax error"));
 }
 
-TiObject* throwError(TiExcState* exec, ErrorType type, const char* message)
-{
-    TiObject* error = Error::create(exec, type, message, -1, -1, UString());
-    exec->setException(error);
-    return error;
-}
+class StrictModeTypeErrorFunction : public InternalFunction {
+public:
+    StrictModeTypeErrorFunction(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, const UString& message)
+        : InternalFunction(&exec->globalData(), globalObject, structure, exec->globalData().propertyNames->emptyIdentifier)
+        , m_message(message)
+    {
+    }
+    
+    static EncodedTiValue JSC_HOST_CALL constructThrowTypeError(TiExcState* exec)
+    {
+        throwTypeError(exec, static_cast<StrictModeTypeErrorFunction*>(exec->callee())->m_message);
+        return TiValue::encode(jsNull());
+    }
+    
+    ConstructType getConstructData(ConstructData& constructData)
+    {
+        constructData.native.function = constructThrowTypeError;
+        return ConstructTypeHost;
+    }
+    
+    static EncodedTiValue JSC_HOST_CALL callThrowTypeError(TiExcState* exec)
+    {
+        throwTypeError(exec, static_cast<StrictModeTypeErrorFunction*>(exec->callee())->m_message);
+        return TiValue::encode(jsNull());
+    }
 
-TiObject* throwError(TiExcState* exec, ErrorType type, const UString& message, int line, intptr_t sourceID, const UString& sourceURL)
+    CallType getCallData(CallData& callData)
+    {
+        callData.native.function = callThrowTypeError;
+        return CallTypeHost;
+    }
+
+private:
+    UString m_message;
+};
+
+ASSERT_CLASS_FITS_IN_CELL(StrictModeTypeErrorFunction);
+
+TiValue createTypeErrorFunction(TiExcState* exec, const UString& message)
 {
-    TiObject* error = Error::create(exec, type, message, line, sourceID, sourceURL);
-    exec->setException(error);
-    return error;
+    return new (exec) StrictModeTypeErrorFunction(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->internalFunctionStructure(), message);
 }
 
 } // namespace TI

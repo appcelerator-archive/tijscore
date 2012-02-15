@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -279,8 +279,8 @@ void ARMAssembler::dataTransfer32(bool isLoad, RegisterID srcDst, RegisterID bas
             add_r(ARMRegisters::S0, base, OP2_IMM | (offset >> 12) | (10 << 8));
             dtr_u(isLoad, srcDst, ARMRegisters::S0, (offset & 0xfff) | transferFlag);
         } else {
-            ARMWord reg = getImm(offset, ARMRegisters::S0);
-            dtr_ur(isLoad, srcDst, base, reg | transferFlag);
+            moveImm(offset, ARMRegisters::S0);
+            dtr_ur(isLoad, srcDst, base, ARMRegisters::S0 | transferFlag);
         }
     } else {
         offset = -offset;
@@ -290,8 +290,8 @@ void ARMAssembler::dataTransfer32(bool isLoad, RegisterID srcDst, RegisterID bas
             sub_r(ARMRegisters::S0, base, OP2_IMM | (offset >> 12) | (10 << 8));
             dtr_d(isLoad, srcDst, ARMRegisters::S0, (offset & 0xfff) | transferFlag);
         } else {
-            ARMWord reg = getImm(offset, ARMRegisters::S0);
-            dtr_dr(isLoad, srcDst, base, reg | transferFlag);
+            moveImm(offset, ARMRegisters::S0);
+            dtr_dr(isLoad, srcDst, base, ARMRegisters::S0 | transferFlag);
         }
     }
 }
@@ -350,23 +350,23 @@ void ARMAssembler::doubleTransfer(bool isLoad, FPRegisterID srcDst, RegisterID b
     fdtr_u(isLoad, srcDst, ARMRegisters::S0, 0);
 }
 
-void* ARMAssembler::executableCopy(ExecutablePool* allocator)
+void* ARMAssembler::executableCopy(TiGlobalData& globalData, ExecutablePool* allocator)
 {
     // 64-bit alignment is required for next constant pool and JIT code as well
     m_buffer.flushWithoutBarrier(true);
-    if (m_buffer.uncheckedSize() & 0x7)
+    if (!m_buffer.isAligned(8))
         bkpt(0);
 
-    char* data = reinterpret_cast<char*>(m_buffer.executableCopy(allocator));
+    char* data = reinterpret_cast<char*>(m_buffer.executableCopy(globalData, allocator));
 
     for (Jumps::Iterator iter = m_jumps.begin(); iter != m_jumps.end(); ++iter) {
         // The last bit is set if the constant must be placed on constant pool.
-        int pos = (*iter) & (~0x1);
-        ARMWord* ldrAddr = reinterpret_cast<ARMWord*>(data + pos);
+        int pos = (iter->m_offset) & (~0x1);
+        ARMWord* ldrAddr = reinterpret_cast_ptr<ARMWord*>(data + pos);
         ARMWord* addr = getLdrImmAddress(ldrAddr);
         if (*addr != InvalidBranchTarget) {
-            if (!(*iter & 1)) {
-                int diff = reinterpret_cast<ARMWord*>(data + *addr) - (ldrAddr + DefaultPrefetching);
+            if (!(iter->m_offset & 1)) {
+                int diff = reinterpret_cast_ptr<ARMWord*>(data + *addr) - (ldrAddr + DefaultPrefetching);
 
                 if ((diff <= BOFFSET_MAX && diff >= BOFFSET_MIN)) {
                     *ldrAddr = B | getConditionalField(*ldrAddr) | (diff & BRANCH_MASK);

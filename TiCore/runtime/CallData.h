@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,7 +36,7 @@
 #ifndef CallData_h
 #define CallData_h
 
-#include "NativeFunctionWrapper.h"
+#include "TiValue.h"
 
 namespace TI {
 
@@ -44,7 +44,6 @@ namespace TI {
     class TiExcState;
     class FunctionExecutable;
     class TiObject;
-    class TiValue;
     class ScopeChainNode;
 
     enum CallType {
@@ -53,7 +52,7 @@ namespace TI {
         CallTypeJS
     };
 
-    typedef TiValue (JSC_HOST_CALL *NativeFunction)(TiExcState*, TiObject*, TiValue thisValue, const ArgList&);
+    typedef EncodedTiValue (JSC_HOST_CALL *NativeFunction)(TiExcState*);
 
     union CallData {
         struct {

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,6 +33,7 @@
 #include "TiCell.h"
 
 #include "CallFrame.h"
+#include "Structure.h"
 
 namespace TI {
 
@@ -44,35 +45,36 @@ namespace TI {
         friend class JIT;
     public:
         GetterSetter(TiExcState* exec)
-            : TiCell(exec->globalData().getterSetterStructure.get())
-            , m_getter(0)
-            , m_setter(0)
+            : TiCell(exec->globalData(), exec->globalData().getterSetterStructure.get())
         {
         }
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 
-        TiObject* getter() const { return m_getter; }
-        void setGetter(TiObject* getter) { m_getter = getter; }
-        TiObject* setter() const { return m_setter; }
-        void setSetter(TiObject* setter) { m_setter = setter; }
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        TiObject* getter() const { return m_getter.get(); }
+        void setGetter(TiGlobalData& globalData, TiObject* getter) { m_getter.set(globalData, this, getter); }
+        TiObject* setter() const { return m_setter.get(); }
+        void setSetter(TiGlobalData& globalData, TiObject* setter) { m_setter.set(globalData, this, setter); }
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(GetterSetterType, OverridesMarkChildren), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(GetterSetterType, OverridesVisitChildren), AnonymousSlotCount, &s_info);
         }
+        
+        static const ClassInfo s_info;
+
     private:
         virtual bool isGetterSetter() const;
 
-        TiObject* m_getter;
-        TiObject* m_setter;  
+        WriteBarrier<TiObject> m_getter;
+        WriteBarrier<TiObject> m_setter;  
     };
 
     GetterSetter* asGetterSetter(TiValue);
 
     inline GetterSetter* asGetterSetter(TiValue value)
     {
-        ASSERT(asCell(value)->isGetterSetter());
-        return static_cast<GetterSetter*>(asCell(value));
+        ASSERT(value.asCell()->isGetterSetter());
+        return static_cast<GetterSetter*>(value.asCell());
     }
 
 

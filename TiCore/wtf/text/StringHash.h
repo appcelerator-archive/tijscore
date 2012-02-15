@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,13 +31,12 @@
 
 #include "AtomicString.h"
 #include "WTFString.h"
+#include <wtf/Forward.h>
 #include <wtf/HashTraits.h>
-#include <wtf/StringHashFunctions.h>
+#include <wtf/StringHasher.h>
 #include <wtf/unicode/Unicode.h>
 
-// FIXME: This is a temporary layering violation while we move string code to WTF.
-// Landing the file moves in one patch, will follow on with patches to change the namespaces.
-namespace WebCore {
+namespace WTI {
 
     // The hash() functions on StringHash and CaseFoldingHash do not support
     // null strings. get(), contains(), and add() on HashMap<String,..., StringHash>
@@ -63,7 +62,7 @@ namespace WebCore {
 
             // FIXME: perhaps we should have a more abstract macro that indicates when
             // going 4 bytes at a time is unsafe
-#if CPU(ARM) || CPU(SH4)
+#if CPU(ARM) || CPU(SH4) || CPU(MIPS)
             const UChar* aChars = a->characters();
             const UChar* bChars = b->characters();
             for (unsigned i = 0; i != aLength; ++i) {
@@ -105,99 +104,26 @@ namespace WebCore {
 
     class CaseFoldingHash {
     public:
-        // Paul Hsieh's SuperFastHash
-        // http://www.azillionmonkeys.com/qed/hash.html
+        template<typename T> static inline UChar foldCase(T ch)
+        {
+            return WTI::Unicode::foldCase(ch);
+        }
+
         static unsigned hash(const UChar* data, unsigned length)
         {
-            unsigned l = length;
-            const UChar* s = data;
-            uint32_t hash = WTI::stringHashingStartValue;
-            uint32_t tmp;
-            
-            int rem = l & 1;
-            l >>= 1;
-            
-            // Main loop.
-            for (; l > 0; l--) {
-                hash += WTI::Unicode::foldCase(s[0]);
-                tmp = (WTI::Unicode::foldCase(s[1]) << 11) ^ hash;
-                hash = (hash << 16) ^ tmp;
-                s += 2;
-                hash += hash >> 11;
-            }
-            
-            // Handle end case.
-            if (rem) {
-                hash += WTI::Unicode::foldCase(s[0]);
-                hash ^= hash << 11;
-                hash += hash >> 17;
-            }
-            
-            // Force "avalanching" of final 127 bits.
-            hash ^= hash << 3;
-            hash += hash >> 5;
-            hash ^= hash << 2;
-            hash += hash >> 15;
-            hash ^= hash << 10;
-            
-            // This avoids ever returning a hash code of 0, since that is used to
-            // signal "hash not computed yet", using a value that is likely to be
-            // effectively the same as 0 when the low bits are masked.
-            hash |= !hash << 31;
-            
-            return hash;
+            return StringHasher::computeHash<UChar, foldCase<UChar> >(data, length);
         }
 
         static unsigned hash(StringImpl* str)
         {
             return hash(str->characters(), str->length());
         }
-        
-        static unsigned hash(const char* str, unsigned length)
-        {
-            // This hash is designed to work on 16-bit chunks at a time. But since the normal case
-            // (above) is to hash UTF-16 characters, we just treat the 8-bit chars as if they
-            // were 16-bit chunks, which will give matching results.
 
-            unsigned l = length;
-            const char* s = str;
-            uint32_t hash = WTI::stringHashingStartValue;
-            uint32_t tmp;
-            
-            int rem = l & 1;
-            l >>= 1;
-            
-            // Main loop
-            for (; l > 0; l--) {
-                hash += WTI::Unicode::foldCase(s[0]);
-                tmp = (WTI::Unicode::foldCase(s[1]) << 11) ^ hash;
-                hash = (hash << 16) ^ tmp;
-                s += 2;
-                hash += hash >> 11;
-            }
-            
-            // Handle end case
-            if (rem) {
-                hash += WTI::Unicode::foldCase(s[0]);
-                hash ^= hash << 11;
-                hash += hash >> 17;
-            }
-            
-            // Force "avalanching" of final 127 bits
-            hash ^= hash << 3;
-            hash += hash >> 5;
-            hash ^= hash << 2;
-            hash += hash >> 15;
-            hash ^= hash << 10;
-            
-            // this avoids ever returning a hash code of 0, since that is used to
-            // signal "hash not computed yet", using a value that is likely to be
-            // effectively the same as 0 when the low bits are masked
-            hash |= !hash << 31;
-            
-            return hash;
+        static unsigned hash(const char* data, unsigned length)
+        {
+            return StringHasher::computeHash<char, foldCase<char> >(data, length);
         }
-        
+
         static bool equal(const StringImpl* a, const StringImpl* b)
         {
             if (a == b)
@@ -260,16 +186,12 @@ namespace WebCore {
         }
     };
 
-}
-
-namespace WTI {
-
-    template<> struct HashTraits<WebCore::String> : GenericHashTraits<WebCore::String> {
-        static const bool emptyValueIsZero = true;
-        static void constructDeletedValue(WebCore::String& slot) { new (&slot) WebCore::String(HashTableDeletedValue); }
-        static bool isDeletedValue(const WebCore::String& slot) { return slot.isHashTableDeletedValue(); }
-    };
+    template<> struct HashTraits<String> : SimpleClassHashTraits<String> { };
 
 }
+
+using WTI::StringHash;
+using WTI::CaseFoldingHash;
+using WTI::AlreadyHashed;
 
 #endif

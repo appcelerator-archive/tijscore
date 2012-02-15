@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -24,6 +24,9 @@
  * Boston, MA 02110-1301, USA.
  *
  */
+
+#ifndef RefPtrHashMap_h
+#define RefPtrHashMap_h
 
 namespace WTI {
 
@@ -49,7 +52,8 @@ namespace WTI {
     };
 
     template<typename T, typename MappedArg, typename HashArg, typename KeyTraitsArg, typename MappedTraitsArg>
-    class HashMap<RefPtr<T>, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg> : public FastAllocBase {
+    class HashMap<RefPtr<T>, MappedArg, HashArg, KeyTraitsArg, MappedTraitsArg> {
+        WTF_MAKE_FAST_ALLOCATED;
     private:
         typedef KeyTraitsArg KeyTraits;
         typedef MappedTraitsArg MappedTraits;
@@ -341,3 +345,5 @@ namespace WTI {
     }
 
 } // namespace WTI
+
+#endif // RefPtrHashMap_h

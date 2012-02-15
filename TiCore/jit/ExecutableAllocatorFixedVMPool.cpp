@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -42,14 +42,19 @@
 #include <sys/mman.h>
 #include <unistd.h>
 #include <wtf/AVLTree.h>
+#include <wtf/PageReservation.h>
 #include <wtf/VMTags.h>
+
+#if OS(LINUX)
+#include <stdio.h>
+#endif
 
     #define MMAP_FLAGS (MAP_PRIVATE | MAP_ANON | MAP_JIT)
 
 using namespace WTI;
 
 namespace TI {
-
+    
 #define TwoPow(n) (1ull << n)
 
 class AllocationTableSizeClass {
@@ -280,7 +285,7 @@ public:
                     // Mirror the suballocation's full bit.
                     if (m_suballocations[i].isFull())
                         m_full |= bit;
-                    return (i * subregionSize) + location;
+                    return (i * subregionSize) | location;
                 }
             }
             return notFound;
@@ -388,6 +393,7 @@ private:
     BitField m_hasSuballocation;
 };
 
+
 typedef AllocationTableLeaf<6> PageTables256KB;
 typedef AllocationTableDirectory<PageTables256KB, 6> PageTables16MB;
 typedef AllocationTableDirectory<LazyAllocationTable<PageTables16MB>, 1> PageTables32MB;
@@ -395,103 +401,75 @@ typedef AllocationTableDirectory<LazyAllocationTable<PageTables16MB>, 6> PageTab
 
 #if CPU(ARM)
 typedef PageTables16MB FixedVMPoolPageTables;
-#elif CPU(X86_64) && !OS(LINUX)
+#elif CPU(X86_64)
 typedef PageTables1GB FixedVMPoolPageTables;
 #else
 typedef PageTables32MB FixedVMPoolPageTables;
 #endif
+
 
 class FixedVMPoolAllocator
 {
 public:
     FixedVMPoolAllocator()
     {
-        m_base = mmap(0, FixedVMPoolPageTables::size(), INITIAL_PROTECTION_FLAGS, MMAP_FLAGS, VM_TAG_FOR_EXECUTABLEALLOCATOR_MEMORY, 0);
+        ASSERT(PageTables256KB::size() == 256 * 1024);
+        ASSERT(PageTables16MB::size() == 16 * 1024 * 1024);
+        ASSERT(PageTables32MB::size() == 32 * 1024 * 1024);
+        ASSERT(PageTables1GB::size() == 1024 * 1024 * 1024);
 
-        if (m_base == MAP_FAILED) {
-#if ENABLE(INTERPRETER)
-            m_base = 0;
-#else
+        m_reservation = PageReservation::reserveWithGuardPages(FixedVMPoolPageTables::size(), OSAllocator::JSJITCodePages, EXECUTABLE_POOL_WRITABLE, true);
+#if !ENABLE(INTERPRETER)
+        if (!isValid())
             CRASH();
 #endif
-        } else {
-            // For simplicity, we keep all memory in m_freeList in a 'released' state.
-            // This means that we can simply reuse all memory when allocating, without
-            // worrying about it's previous state, and also makes coalescing m_freeList
-            // simpler since we need not worry about the possibility of coalescing released
-            // chunks with non-released ones.
-            release(m_base, FixedVMPoolPageTables::size());
-        }
     }
  
-    void* alloc(size_t size)
+    ExecutablePool::Allocation alloc(size_t requestedSize)
     {
+        ASSERT(requestedSize);
+        AllocationTableSizeClass sizeClass = classForSize(requestedSize);
+        size_t size = sizeClass.size();
         ASSERT(size);
-        AllocationTableSizeClass sizeClass = classForSize(size);
-        ASSERT(sizeClass.size());
-        if (sizeClass.size() >= FixedVMPoolPageTables::size())
-            CRASH();
 
+        if (size >= FixedVMPoolPageTables::size())
+            return ExecutablePool::Allocation(0, 0);
         if (m_pages.isFull())
-            CRASH();
+            return ExecutablePool::Allocation(0, 0);
+
         size_t offset = m_pages.allocate(sizeClass);
         if (offset == notFound)
-            CRASH();
+            return ExecutablePool::Allocation(0, 0);
 
-        void* result = offsetToPointer(offset);
-        reuse(result, size);
-        return result;
+        void* pointer = offsetToPointer(offset);
+        m_reservation.commit(pointer, size);
+        return ExecutablePool::Allocation(pointer, size);
     }
 
-    void free(void* pointer, size_t size)
+    void free(ExecutablePool::Allocation allocation)
     {
-        release(pointer, size);
-
+        void* pointer = allocation.base();
+        size_t size = allocation.size();
         ASSERT(size);
-        AllocationTableSizeClass sizeClass = classForSize(size);
-        ASSERT(sizeClass.size());
-        ASSERT(sizeClass.size() < FixedVMPoolPageTables::size());
 
+        m_reservation.decommit(pointer, size);
+
+        AllocationTableSizeClass sizeClass = classForSize(size);
+        ASSERT(sizeClass.size() == size);
         m_pages.free(pointerToOffset(pointer), sizeClass);
+    }
+
+    size_t allocated()
+    {
+        return m_reservation.committed();
     }
 
     bool isValid() const
     {
-        return !!m_base;
+        return !!m_reservation;
     }
 
 private:
-    // Use madvise as apropriate to prevent freed pages from being spilled,
-    // and to attempt to ensure that used memory is reported correctly.
-#if HAVE(MADV_FREE_REUSE)
-    void release(void* position, size_t size)
-    {
-        while (madvise(position, size, MADV_FREE_REUSABLE) == -1 && errno == EAGAIN) { }
-    }
-
-    void reuse(void* position, size_t size)
-    {
-        while (madvise(position, size, MADV_FREE_REUSE) == -1 && errno == EAGAIN) { }
-    }
-#elif HAVE(MADV_FREE)
-    void release(void* position, size_t size)
-    {
-        while (madvise(position, size, MADV_FREE) == -1 && errno == EAGAIN) { }
-    }
-    
-    void reuse(void*, size_t) {}
-#elif HAVE(MADV_DONTNEED)
-    void release(void* position, size_t size)
-    {
-        while (madvise(position, size, MADV_DONTNEED) == -1 && errno == EAGAIN) { }
-    }
-
-    void reuse(void*, size_t) {}
-#else
-    void release(void*, size_t) {}
-    void reuse(void*, size_t) {}
-#endif
-
     AllocationTableSizeClass classForSize(size_t size)
     {
         return FixedVMPoolPageTables::classForSize(size);
@@ -499,26 +477,33 @@ private:
 
     void* offsetToPointer(size_t offset)
     {
-        return reinterpret_cast<void*>(reinterpret_cast<intptr_t>(m_base) + offset);
+        return reinterpret_cast<void*>(reinterpret_cast<intptr_t>(m_reservation.base()) + offset);
     }
 
     size_t pointerToOffset(void* pointer)
     {
-        return reinterpret_cast<intptr_t>(pointer) - reinterpret_cast<intptr_t>(m_base);
+        return reinterpret_cast<intptr_t>(pointer) - reinterpret_cast<intptr_t>(m_reservation.base());
     }
 
-    void* m_base;
+    PageReservation m_reservation;
     FixedVMPoolPageTables m_pages;
 };
+
+
+static SpinLock spinlock = SPINLOCK_INITIALIZER;
+static FixedVMPoolAllocator* allocator = 0;
+
+
+size_t ExecutableAllocator::committedByteCount()
+{
+    SpinLockHolder lockHolder(&spinlock);
+    return allocator ? allocator->allocated() : 0;
+}   
 
 void ExecutableAllocator::intializePageSize()
 {
     ExecutableAllocator::pageSize = getpagesize();
 }
-
-static FixedVMPoolAllocator* allocator = 0;
-static size_t allocatedCount = 0;
-static SpinLock spinlock = SPINLOCK_INITIALIZER;
 
 bool ExecutableAllocator::isValid() const
 {
@@ -528,34 +513,38 @@ bool ExecutableAllocator::isValid() const
     return allocator->isValid();
 }
 
+bool ExecutableAllocator::underMemoryPressure()
+{
+    // Technically we should take the spin lock here, but we don't care if we get stale data.
+    // This is only really a heuristic anyway.
+    return allocator && (allocator->allocated() > (FixedVMPoolPageTables::size() / 2));
+}
+
 ExecutablePool::Allocation ExecutablePool::systemAlloc(size_t size)
 {
     SpinLockHolder lock_holder(&spinlock);
-
-    if (!allocator)
-        allocator = new FixedVMPoolAllocator();
-    ExecutablePool::Allocation alloc = {reinterpret_cast<char*>(allocator->alloc(size)), size};
-    allocatedCount += size;
-    return alloc;
+    ASSERT(allocator);
+    return allocator->alloc(size);
 }
 
-void ExecutablePool::systemRelease(const ExecutablePool::Allocation& allocation) 
+void ExecutablePool::systemRelease(ExecutablePool::Allocation& allocation) 
 {
     SpinLockHolder lock_holder(&spinlock);
-
     ASSERT(allocator);
-    allocator->free(allocation.pages, allocation.size);
-    allocatedCount -= allocation.size;
-}
-
-bool ExecutablePool::underMemoryPressure()
-{
-    // Technically we should take the spin lock here, but we don't
-    // care if we get stale data.  This is only really a heuristic
-    // anyway.
-    return allocatedCount > (FixedVMPoolPageTables::size() / 2);
+    allocator->free(allocation);
 }
 
 }
+
 
 #endif // HAVE(ASSEMBLER)
+
+#if !ENABLE(JIT)
+// FIXME: Needed to satisfy TiCore.exp requirements when building only the interpreter.
+namespace TI {
+size_t ExecutableAllocator::committedByteCount()
+{
+    return 0;
+}
+} // namespace TI
+#endif // !ENABLE(JIT)

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,6 +36,7 @@
 #ifndef ExceptionHelpers_h
 #define ExceptionHelpers_h
 
+#include "TiValue.h"
 
 namespace TI {
 
@@ -43,23 +44,26 @@ namespace TI {
     class TiExcState;
     class Identifier;
     class TiGlobalData;
+    class TiGlobalObject;
     class JSNotAnObjectErrorStub;
     class TiObject;
-    class TiValue;
     class Node;
     struct Instruction;
     
-    TiValue createInterruptedExecutionException(TiGlobalData*);
-    TiValue createTerminatedExecutionException(TiGlobalData*);
-    TiValue createStackOverflowError(TiExcState*);
-    TiValue createTypeError(TiExcState*, const char* message);
-    TiValue createUndefinedVariableError(TiExcState*, const Identifier&, unsigned bytecodeOffset, CodeBlock*);
-    JSNotAnObjectErrorStub* createNotAnObjectErrorStub(TiExcState*, bool isNull);
-    TiObject* createInvalidParamError(TiExcState*, const char* op, TiValue, unsigned bytecodeOffset, CodeBlock*);
-    TiObject* createNotAConstructorError(TiExcState*, TiValue, unsigned bytecodeOffset, CodeBlock*);
-    TiValue createNotAFunctionError(TiExcState*, TiValue, unsigned bytecodeOffset, CodeBlock*);
-    TiObject* createNotAnObjectError(TiExcState*, JSNotAnObjectErrorStub*, unsigned bytecodeOffset, CodeBlock*);
-    TiValue throwOutOfMemoryError(TiExcState*);
+    TiObject* createInterruptedExecutionException(TiGlobalData*);
+    TiObject* createTerminatedExecutionException(TiGlobalData*);
+    TiObject* createStackOverflowError(TiExcState*);
+    TiObject* createStackOverflowError(TiGlobalObject*);
+    TiObject* createOutOfMemoryError(TiGlobalObject*);
+    TiObject* createUndefinedVariableError(TiExcState*, const Identifier&);
+    TiObject* createNotAnObjectError(TiExcState*, TiValue);
+    TiObject* createInvalidParamError(TiExcState*, const char* op, TiValue);
+    TiObject* createNotAConstructorError(TiExcState*, TiValue);
+    TiObject* createNotAFunctionError(TiExcState*, TiValue);
+    TiObject* createErrorForInvalidGlobalAssignment(TiExcState*, const UString&);
+
+    TiObject* throwOutOfMemoryError(TiExcState*);
+    TiObject* throwStackOverflowError(TiExcState*);
 
 } // namespace TI
 

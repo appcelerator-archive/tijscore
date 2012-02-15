@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,16 +32,14 @@
 
 namespace TI {
 
-    class PrototypeFunction;
-
     class FunctionPrototype : public InternalFunction {
     public:
-        FunctionPrototype(TiExcState*, NonNullPassRefPtr<Structure>);
-        void addFunctionProperties(TiExcState*, Structure* prototypeFunctionStructure, NativeFunctionWrapper** callFunction, NativeFunctionWrapper** applyFunction);
+        FunctionPrototype(TiExcState*, TiGlobalObject*, Structure*);
+        void addFunctionProperties(TiExcState*, TiGlobalObject*, Structure* functionStructure, TiFunction** callFunction, TiFunction** applyFunction);
 
-        static PassRefPtr<Structure> createStructure(TiValue proto)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto)
         {
-            return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
     private:

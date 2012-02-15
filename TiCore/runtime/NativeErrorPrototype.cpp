@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,6 +29,7 @@
 #include "NativeErrorPrototype.h"
 
 #include "ErrorPrototype.h"
+#include "TiGlobalObject.h"
 #include "TiString.h"
 #include "NativeErrorConstructor.h"
 #include "UString.h"
@@ -37,12 +38,12 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(NativeErrorPrototype);
 
-NativeErrorPrototype::NativeErrorPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, const UString& nameAndMessage, NativeErrorConstructor* constructor)
-    : TiObject(structure)
+NativeErrorPrototype::NativeErrorPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, const UString& nameAndMessage, NativeErrorConstructor* constructor)
+    : TiObjectWithGlobalObject(globalObject, structure)
 {
-    putDirect(exec->propertyNames().name, jsString(exec, nameAndMessage), 0);
-    putDirect(exec->propertyNames().message, jsString(exec, nameAndMessage), 0);
-    putDirect(exec->propertyNames().constructor, constructor, DontEnum);
+    putDirect(exec->globalData(), exec->propertyNames().name, jsString(exec, nameAndMessage), 0);
+    putDirect(exec->globalData(), exec->propertyNames().message, jsString(exec, nameAndMessage), 0);
+    putDirect(exec->globalData(), exec->propertyNames().constructor, constructor, DontEnum);
 }
 
 } // namespace TI

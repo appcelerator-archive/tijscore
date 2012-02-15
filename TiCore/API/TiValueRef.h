@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -116,24 +116,6 @@ JS_EXPORT bool TiValueIsNumber(TiContextRef ctx, TiValueRef value);
 @result         true if value's type is the string type, otherwise false.
 */
 JS_EXPORT bool TiValueIsString(TiContextRef ctx, TiValueRef value);
-
-/*!
-@function
-@abstract       Tests whether a Ti value's type is the array type.
-@param ctx  The execution context to use.
-@param value    The TiValue to test.
-@result         true if value's type is the string type, otherwise false.
-*/
-JS_EXPORT bool TiValueIsArray(TiContextRef ctx, TiValueRef value);
-
-/*!
-@function
-@abstract       Tests whether a Ti value's type is the date type.
-@param ctx  The execution context to use.
-@param value    The TiValue to test.
-@result         true if value's type is the string type, otherwise false.
-*/
-JS_EXPORT bool TiValueIsDate(TiContextRef ctx, TiValueRef value);
 
 /*!
 @function

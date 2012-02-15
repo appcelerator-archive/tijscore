@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,7 +29,6 @@
 #include "config.h"
 #include "Debugger.h"
 
-#include "CollectorHeapIterator.h"
 #include "Error.h"
 #include "Interpreter.h"
 #include "TiFunction.h"
@@ -37,11 +36,64 @@
 #include "Parser.h"
 #include "Protect.h"
 
-namespace TI {
+namespace {
 
-Debugger::Debugger()
+using namespace TI;
+
+class Recompiler {
+public:
+    Recompiler(Debugger*);
+    ~Recompiler();
+    void operator()(TiCell*);
+
+private:
+    typedef HashSet<FunctionExecutable*> FunctionExecutableSet;
+    typedef HashMap<SourceProvider*, TiExcState*> SourceProviderMap;
+    
+    Debugger* m_debugger;
+    FunctionExecutableSet m_functionExecutables;
+    SourceProviderMap m_sourceProviders;
+};
+
+inline Recompiler::Recompiler(Debugger* debugger)
+    : m_debugger(debugger)
 {
 }
+
+inline Recompiler::~Recompiler()
+{
+    // Call sourceParsed() after reparsing all functions because it will execute
+    // Ti in the inspector.
+    SourceProviderMap::const_iterator end = m_sourceProviders.end();
+    for (SourceProviderMap::const_iterator iter = m_sourceProviders.begin(); iter != end; ++iter)
+        m_debugger->sourceParsed(iter->second, iter->first, -1, UString());
+}
+
+inline void Recompiler::operator()(TiCell* cell)
+{
+    if (!cell->inherits(&TiFunction::s_info))
+        return;
+
+    TiFunction* function = asFunction(cell);
+    if (function->executable()->isHostFunction())
+        return;
+
+    FunctionExecutable* executable = function->jsExecutable();
+
+    // Check if the function is already in the set - if so,
+    // we've already retranslated it, nothing to do here.
+    if (!m_functionExecutables.add(executable).second)
+        return;
+
+    TiExcState* exec = function->scope()->globalObject->TiGlobalObject::globalExec();
+    executable->discardCode();
+    if (m_debugger == function->scope()->globalObject->debugger())
+        m_sourceProviders.add(executable->source().provider(), exec);
+}
+
+} // namespace
+
+namespace TI {
 
 Debugger::~Debugger()
 {
@@ -72,52 +124,29 @@ void Debugger::recompileAllTiFunctions(TiGlobalData* globalData)
     if (globalData->dynamicGlobalObject)
         return;
 
-    typedef HashSet<FunctionExecutable*> FunctionExecutableSet;
-    typedef HashMap<SourceProvider*, TiExcState*> SourceProviderMap;
-
-    FunctionExecutableSet functionExecutables;
-    SourceProviderMap sourceProviders;
-
-    LiveObjectIterator it = globalData->heap.primaryHeapBegin();
-    LiveObjectIterator heapEnd = globalData->heap.primaryHeapEnd();
-    for ( ; it != heapEnd; ++it) {
-        if (!(*it)->inherits(&TiFunction::info))
-            continue;
-
-        TiFunction* function = asFunction(*it);
-        if (function->executable()->isHostFunction())
-            continue;
-
-        FunctionExecutable* executable = function->jsExecutable();
-
-        // Check if the function is already in the set - if so,
-        // we've already retranslated it, nothing to do here.
-        if (!functionExecutables.add(executable).second)
-            continue;
-
-        TiExcState* exec = function->scope().globalObject()->TiGlobalObject::globalExec();
-        executable->recompile();
-        if (function->scope().globalObject()->debugger() == this)
-            sourceProviders.add(executable->source().provider(), exec);
-    }
-
-    // Call sourceParsed() after reparsing all functions because it will execute
-    // Ti in the inspector.
-    SourceProviderMap::const_iterator end = sourceProviders.end();
-    for (SourceProviderMap::const_iterator iter = sourceProviders.begin(); iter != end; ++iter)
-        sourceParsed(iter->second, SourceCode(iter->first), -1, UString());
+    Recompiler recompiler(this);
+    globalData->heap.forEach(recompiler);
 }
 
 TiValue evaluateInGlobalCallFrame(const UString& script, TiValue& exception, TiGlobalObject* globalObject)
 {
     CallFrame* globalCallFrame = globalObject->globalExec();
+    TiGlobalData& globalData = globalObject->globalData();
 
-    RefPtr<EvalExecutable> eval = EvalExecutable::create(globalCallFrame, makeSource(script));
-    TiObject* error = eval->compile(globalCallFrame, globalCallFrame->scopeChain());
-    if (error)
-        return error;
+    EvalExecutable* eval = EvalExecutable::create(globalCallFrame, makeSource(script), false);
+    if (!eval) {
+        exception = globalData.exception;
+        globalData.exception = TiValue();
+        return exception;
+    }
 
-    return globalObject->globalData()->interpreter->execute(eval.get(), globalCallFrame, globalObject, globalCallFrame->scopeChain(), &exception);
+    TiValue result = globalData.interpreter->execute(eval, globalCallFrame, globalObject, globalCallFrame->scopeChain());
+    if (globalData.exception) {
+        exception = globalData.exception;
+        globalData.exception = TiValue();
+    }
+    ASSERT(result);
+    return result;
 }
 
 } // namespace TI

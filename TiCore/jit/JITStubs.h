@@ -2,11 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) Research In Motion Limited 2010. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +37,7 @@
 #ifndef JITStubs_h
 #define JITStubs_h
 
+#include "CallData.h"
 #include "MacroAssemblerCodeRef.h"
 #include "Register.h"
 #include "ThunkGenerators.h"
@@ -64,6 +66,8 @@ namespace TI {
     class RegisterFile;
     class RegExp;
 
+    template <typename T> class Weak;
+
     union JITStubArg {
         void* asPointer;
         EncodedTiValue asEncodedTiValue;
@@ -85,8 +89,11 @@ namespace TI {
     struct TrampolineStructure {
         MacroAssemblerCodePtr ctiStringLengthTrampoline;
         MacroAssemblerCodePtr ctiVirtualCallLink;
+        MacroAssemblerCodePtr ctiVirtualConstructLink;
         MacroAssemblerCodePtr ctiVirtualCall;
-        RefPtr<NativeExecutable> ctiNativeCallThunk;
+        MacroAssemblerCodePtr ctiVirtualConstruct;
+        MacroAssemblerCodePtr ctiNativeCall;
+        MacroAssemblerCodePtr ctiNativeConstruct;
         MacroAssemblerCodePtr ctiSoftModulo;
     };
 
@@ -99,7 +106,7 @@ namespace TI {
         void* code;
         RegisterFile* registerFile;
         CallFrame* callFrame;
-        TiValue* exception;
+        void* unused1;
         Profiler** enabledProfilerReference;
         TiGlobalData* globalData;
 
@@ -135,7 +142,7 @@ namespace TI {
         void* code;
         RegisterFile* registerFile;
         CallFrame* callFrame;
-        TiValue* exception;
+        void* unused1;
         Profiler** enabledProfilerReference;
         TiGlobalData* globalData;
         
@@ -147,10 +154,10 @@ namespace TI {
 #endif // COMPILER(MSVC) || (OS(WINDOWS) && COMPILER(GCC))
 #elif CPU(ARM_THUMB2)
     struct JITStackFrame {
-        void* reserved; // Unused
+        JITStubArg reserved; // Unused
         JITStubArg args[6];
-#if USE(JSVALUE32_64)
-        void* padding[2]; // Maintain 16-byte stack alignment.
+#if USE(JSVALUE64)
+        void* padding; // Maintain 16-byte stack alignment.
 #endif
 
         ReturnAddressPtr thunkReturnAddress;
@@ -163,9 +170,7 @@ namespace TI {
         // These arguments passed in r1..r3 (r0 contained the entry code pointed, which is not preserved)
         RegisterFile* registerFile;
         CallFrame* callFrame;
-        TiValue* exception;
-
-        void* padding2;
+        void* unused1;
 
         // These arguments passed on the stack.
         Profiler** enabledProfilerReference;
@@ -174,6 +179,10 @@ namespace TI {
         ReturnAddressPtr* returnAddressSlot() { return &thunkReturnAddress; }
     };
 #elif CPU(ARM_TRADITIONAL)
+#if COMPILER(MSVC)
+#pragma pack(push)
+#pragma pack(4)
+#endif // COMPILER(MSVC)
     struct JITStackFrame {
         JITStubArg padding; // Unused
         JITStubArg args[7];
@@ -189,7 +198,7 @@ namespace TI {
 
         RegisterFile* registerFile;
         CallFrame* callFrame;
-        TiValue* exception;
+        void* unused1;
 
         // These arguments passed on the stack.
         Profiler** enabledProfilerReference;
@@ -198,10 +207,17 @@ namespace TI {
         // When JIT code makes a call, it pushes its return address just below the rest of the stack.
         ReturnAddressPtr* returnAddressSlot() { return &thunkReturnAddress; }
     };
+#if COMPILER(MSVC)
+#pragma pack(pop)
+#endif // COMPILER(MSVC)
 #elif CPU(MIPS)
     struct JITStackFrame {
-        void* reserved; // Unused
+        JITStubArg reserved; // Unused
         JITStubArg args[6];
+
+#if USE(JSVALUE32_64)
+        void* padding; // Make the overall stack length 8-byte aligned.
+#endif
 
         void* preservedGP; // store GP when using PIC code
         void* preservedS0;
@@ -214,9 +230,30 @@ namespace TI {
         // These arguments passed in a1..a3 (a0 contained the entry code pointed, which is not preserved)
         RegisterFile* registerFile;
         CallFrame* callFrame;
-        TiValue* exception;
+        void* unused1;
 
         // These arguments passed on the stack.
+        Profiler** enabledProfilerReference;
+        TiGlobalData* globalData;
+
+        ReturnAddressPtr* returnAddressSlot() { return &thunkReturnAddress; }
+    };
+#elif CPU(SH4)
+    struct JITStackFrame {
+        JITStubArg padding; // Unused
+        JITStubArg args[6];
+
+        ReturnAddressPtr thunkReturnAddress;
+        void* savedR10;
+        void* savedR11;
+        void* savedR13;
+        void* savedRPR;
+        void* savedR14;
+        void* savedTimeoutReg;
+
+        RegisterFile* registerFile;
+        CallFrame* callFrame;
+        TiValue* exception;
         Profiler** enabledProfilerReference;
         TiGlobalData* globalData;
 
@@ -228,48 +265,24 @@ namespace TI {
 
 #define JITSTACKFRAME_ARGS_INDEX (OBJECT_OFFSETOF(JITStackFrame, args) / sizeof(void*))
 
-#if USE(JIT_STUB_ARGUMENT_VA_LIST)
-    #define STUB_ARGS_DECLARATION void* args, ...
-    #define STUB_ARGS (reinterpret_cast<void**>(vl_args) - 1)
+#define STUB_ARGS_DECLARATION void** args
+#define STUB_ARGS (args)
 
+#if CPU(X86)
     #if COMPILER(MSVC)
-    #define JIT_STUB __cdecl
-    #else
-    #define JIT_STUB
-    #endif
-#else
-    #define STUB_ARGS_DECLARATION void** args
-    #define STUB_ARGS (args)
-
-    #if CPU(X86) && COMPILER(MSVC)
     #define JIT_STUB __fastcall
-    #elif CPU(X86) && COMPILER(GCC)
+    #elif COMPILER(GCC)
     #define JIT_STUB  __attribute__ ((fastcall))
     #else
-    #define JIT_STUB
+    #error "JIT_STUB function calls require fastcall conventions on x86, add appropriate directive/attribute here for your compiler!"
     #endif
-#endif
-
-#if CPU(X86_64)
-    struct VoidPtrPair {
-        void* first;
-        void* second;
-    };
-    #define RETURN_POINTER_PAIR(a,b) VoidPtrPair pair = { a, b }; return pair
 #else
-    // MSVC doesn't support returning a two-value struct in two registers, so
-    // we cast the struct to int64_t instead.
-    typedef uint64_t VoidPtrPair;
-    union VoidPtrPairUnion {
-        struct { void* first; void* second; } s;
-        VoidPtrPair i;
-    };
-    #define RETURN_POINTER_PAIR(a,b) VoidPtrPairUnion pair = {{ a, b }}; return pair.i
+    #define JIT_STUB
 #endif
 
     extern "C" void ctiVMThrowTrampoline();
     extern "C" void ctiOpThrowNotCaught();
-    extern "C" EncodedTiValue ctiTrampoline(void* code, RegisterFile*, CallFrame*, TiValue* exception, Profiler**, TiGlobalData*);
+    extern "C" EncodedTiValue ctiTrampoline(void* code, RegisterFile*, CallFrame*, void* /*unused1*/, Profiler**, TiGlobalData*);
 
     class JITThunks {
     public:
@@ -281,14 +294,25 @@ namespace TI {
 
         MacroAssemblerCodePtr ctiStringLengthTrampoline() { return m_trampolineStructure.ctiStringLengthTrampoline; }
         MacroAssemblerCodePtr ctiVirtualCallLink() { return m_trampolineStructure.ctiVirtualCallLink; }
+        MacroAssemblerCodePtr ctiVirtualConstructLink() { return m_trampolineStructure.ctiVirtualConstructLink; }
         MacroAssemblerCodePtr ctiVirtualCall() { return m_trampolineStructure.ctiVirtualCall; }
-        NativeExecutable* ctiNativeCallThunk() { return m_trampolineStructure.ctiNativeCallThunk.get(); }
+        MacroAssemblerCodePtr ctiVirtualConstruct() { return m_trampolineStructure.ctiVirtualConstruct; }
+        MacroAssemblerCodePtr ctiNativeCall() { return m_trampolineStructure.ctiNativeCall; }
+        MacroAssemblerCodePtr ctiNativeConstruct() { return m_trampolineStructure.ctiNativeConstruct; }
         MacroAssemblerCodePtr ctiSoftModulo() { return m_trampolineStructure.ctiSoftModulo; }
 
-        NativeExecutable* specializedThunk(TiGlobalData* globalData, ThunkGenerator generator);
+        MacroAssemblerCodePtr ctiStub(TiGlobalData* globalData, ThunkGenerator generator);
+
+        NativeExecutable* hostFunctionStub(TiGlobalData*, NativeFunction);
+        NativeExecutable* hostFunctionStub(TiGlobalData*, NativeFunction, ThunkGenerator);
+
+        void clearHostFunctionStubs();
+
     private:
-        typedef HashMap<ThunkGenerator, RefPtr<NativeExecutable> > ThunkMap;
-        ThunkMap m_thunkMap;
+        typedef HashMap<ThunkGenerator, MacroAssemblerCodePtr> CTIStubMap;
+        CTIStubMap m_ctiStubMap;
+        typedef HashMap<NativeFunction, Weak<NativeExecutable> > HostFunctionStubMap;
+        OwnPtr<HostFunctionStubMap> m_hostFunctionStubMap;
         RefPtr<ExecutablePool> m_executablePool;
 
         TrampolineStructure m_trampolineStructure;
@@ -303,16 +327,20 @@ extern "C" {
     EncodedTiValue JIT_STUB cti_op_call_NotTiFunction(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_call_eval(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_construct_NotJSConstruct(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_create_this(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_convert_this(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_convert_this_strict(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_create_arguments(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_create_arguments_no_params(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_del_by_id(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_del_by_val(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_div(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id_array_fail(STUB_ARGS_DECLARATION);
-    EncodedTiValue JIT_STUB cti_op_get_by_id_generic(STUB_ARGS_DECLARATION);
-    EncodedTiValue JIT_STUB cti_op_get_by_id_method_check(STUB_ARGS_DECLARATION);
-    EncodedTiValue JIT_STUB cti_op_get_by_id_getter_stub(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id_custom_stub(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_get_by_id_generic(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_get_by_id_getter_stub(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_get_by_id_method_check(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id_proto_fail(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id_proto_list(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_get_by_id_proto_list_full(STUB_ARGS_DECLARATION);
@@ -343,6 +371,8 @@ extern "C" {
     EncodedTiValue JIT_STUB cti_op_pre_inc(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_resolve(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_resolve_base(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_resolve_base_strict_put(STUB_ARGS_DECLARATION);
+    EncodedTiValue JIT_STUB cti_op_ensure_property_exists(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_resolve_global(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_resolve_global_dynamic(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_resolve_skip(STUB_ARGS_DECLARATION);
@@ -351,16 +381,13 @@ extern "C" {
     EncodedTiValue JIT_STUB cti_op_strcat(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_stricteq(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_sub(STUB_ARGS_DECLARATION);
-    EncodedTiValue JIT_STUB cti_op_throw(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_to_jsnumber(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_to_primitive(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_typeof(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_op_urshift(STUB_ARGS_DECLARATION);
-    EncodedTiValue JIT_STUB cti_vm_throw(STUB_ARGS_DECLARATION);
     EncodedTiValue JIT_STUB cti_to_object(STUB_ARGS_DECLARATION);
-    TiObject* JIT_STUB cti_op_construct_JSConstruct(STUB_ARGS_DECLARATION);
     TiObject* JIT_STUB cti_op_new_array(STUB_ARGS_DECLARATION);
-    TiObject* JIT_STUB cti_op_new_error(STUB_ARGS_DECLARATION);
+    TiObject* JIT_STUB cti_op_new_array_buffer(STUB_ARGS_DECLARATION);
     TiObject* JIT_STUB cti_op_new_func(STUB_ARGS_DECLARATION);
     TiObject* JIT_STUB cti_op_new_func_exp(STUB_ARGS_DECLARATION);
     TiObject* JIT_STUB cti_op_new_object(STUB_ARGS_DECLARATION);
@@ -370,7 +397,6 @@ extern "C" {
     TiObject* JIT_STUB cti_op_push_scope(STUB_ARGS_DECLARATION);
     TiObject* JIT_STUB cti_op_put_by_id_transition_realloc(STUB_ARGS_DECLARATION);
     TiPropertyNameIterator* JIT_STUB cti_op_get_pnames(STUB_ARGS_DECLARATION);
-    VoidPtrPair JIT_STUB cti_op_call_arityCheck(STUB_ARGS_DECLARATION);
     int JIT_STUB cti_op_eq(STUB_ARGS_DECLARATION);
     int JIT_STUB cti_op_eq_strings(STUB_ARGS_DECLARATION);
     int JIT_STUB cti_op_jless(STUB_ARGS_DECLARATION);
@@ -380,8 +406,7 @@ extern "C" {
     int JIT_STUB cti_op_loop_if_lesseq(STUB_ARGS_DECLARATION);
     int JIT_STUB cti_timeout_check(STUB_ARGS_DECLARATION);
     int JIT_STUB cti_has_property(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_op_create_arguments(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_op_create_arguments_no_params(STUB_ARGS_DECLARATION);
+    void JIT_STUB cti_op_check_has_instance(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_debug(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_end(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_jmp_scopes(STUB_ARGS_DECLARATION);
@@ -399,15 +424,21 @@ extern "C" {
     void JIT_STUB cti_op_put_by_val_byte_array(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_put_getter(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_put_setter(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_op_ret_scopeChain(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_tear_off_activation(STUB_ARGS_DECLARATION);
     void JIT_STUB cti_op_tear_off_arguments(STUB_ARGS_DECLARATION);
-    void JIT_STUB cti_register_file_check(STUB_ARGS_DECLARATION);
-    void* JIT_STUB cti_op_call_TiFunction(STUB_ARGS_DECLARATION);
+    void JIT_STUB cti_op_throw_reference_error(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_op_call_arityCheck(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_op_construct_arityCheck(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_op_call_jitCompile(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_op_construct_jitCompile(STUB_ARGS_DECLARATION);
     void* JIT_STUB cti_op_switch_char(STUB_ARGS_DECLARATION);
     void* JIT_STUB cti_op_switch_imm(STUB_ARGS_DECLARATION);
     void* JIT_STUB cti_op_switch_string(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_op_throw(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_register_file_check(STUB_ARGS_DECLARATION);
     void* JIT_STUB cti_vm_lazyLinkCall(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_vm_lazyLinkConstruct(STUB_ARGS_DECLARATION);
+    void* JIT_STUB cti_vm_throw(STUB_ARGS_DECLARATION);
 } // extern "C"
 
 } // namespace TI

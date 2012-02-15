@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,11 +33,14 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(JSWrapperObject);
 
-void JSWrapperObject::markChildren(MarkStack& markStack) 
+void JSWrapperObject::visitChildren(SlotVisitor& visitor) 
 {
-    TiObject::markChildren(markStack);
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    TiObject::visitChildren(visitor);
     if (m_internalValue)
-        markStack.append(m_internalValue);
+        visitor.append(&m_internalValue);
 }
 
 } // namespace TI

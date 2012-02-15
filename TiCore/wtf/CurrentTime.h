@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -43,31 +43,32 @@
 
 namespace WTI {
 
-    // Returns the current UTC time in seconds, counted from January 1, 1970.
-    // Precision varies depending on platform but is usually as good or better 
-    // than a millisecond.
-    double currentTime();
+// Returns the current UTC time in seconds, counted from January 1, 1970.
+// Precision varies depending on platform but is usually as good or better
+// than a millisecond.
+double currentTime();
 
-    // Same thing, in milliseconds.
-    inline double currentTimeMS()
-    {
-        return currentTime() * 1000.0; 
-    }
+// Same thing, in milliseconds.
+inline double currentTimeMS()
+{
+    return currentTime() * 1000.0;
+}
 
-    inline void getLocalTime(const time_t* localTime, struct tm* localTM)
-    {
-    #if COMPILER(MSVC7_OR_LOWER) || COMPILER(MINGW) || OS(WINCE)
-        *localTM = *localtime(localTime);
-    #elif COMPILER(MSVC)
-        localtime_s(localTM, localTime);
-    #else
-        localtime_r(localTime, localTM);
-    #endif
-    }
+inline void getLocalTime(const time_t* localTime, struct tm* localTM)
+{
+#if COMPILER(MSVC7_OR_LOWER) || COMPILER(MINGW) || OS(WINCE)
+    *localTM = *localtime(localTime);
+#elif COMPILER(MSVC)
+    localtime_s(localTM, localTime);
+#else
+    localtime_r(localTime, localTM);
+#endif
+}
 
 } // namespace WTI
 
 using WTI::currentTime;
+using WTI::currentTimeMS;
 using WTI::getLocalTime;
 
 #endif // CurrentTime_h

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,21 +34,21 @@
 #define TiCallbackConstructor_h
 
 #include "TiObjectRef.h"
-#include <runtime/TiObject.h>
+#include <runtime/TiObjectWithGlobalObject.h>
 
 namespace TI {
 
-class TiCallbackConstructor : public TiObject {
+class TiCallbackConstructor : public TiObjectWithGlobalObject {
 public:
-    TiCallbackConstructor(NonNullPassRefPtr<Structure>, TiClassRef, TiObjectCallAsConstructorCallback);
+    TiCallbackConstructor(TiGlobalObject*, Structure*, TiClassRef, TiObjectCallAsConstructorCallback);
     virtual ~TiCallbackConstructor();
     TiClassRef classRef() const { return m_class; }
     TiObjectCallAsConstructorCallback callback() const { return m_callback; }
-    static const ClassInfo info;
-    
-    static PassRefPtr<Structure> createStructure(TiValue proto) 
-    { 
-        return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+    static const ClassInfo s_info;
+
+    static Structure* createStructure(TiGlobalData& globalData, TiValue proto) 
+    {
+        return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
     }
 
 protected:
@@ -56,7 +56,6 @@ protected:
 
 private:
     virtual ConstructType getConstructData(ConstructData&);
-    virtual const ClassInfo* classInfo() const { return &info; }
 
     TiClassRef m_class;
     TiObjectCallAsConstructorCallback m_callback;

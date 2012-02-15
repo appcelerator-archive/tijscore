@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,14 +34,13 @@ namespace TI {
 
     class BooleanObject : public JSWrapperObject {
     public:
-        explicit BooleanObject(NonNullPassRefPtr<Structure>);
+        explicit BooleanObject(TiGlobalData&, Structure*);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
+        static const ClassInfo s_info;
         
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
     };
 
@@ -49,7 +48,7 @@ namespace TI {
 
     inline BooleanObject* asBooleanObject(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&BooleanObject::info));
+        ASSERT(asObject(value)->inherits(&BooleanObject::s_info));
         return static_cast<BooleanObject*>(asObject(value));
     }
 

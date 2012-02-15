@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -105,7 +105,10 @@ static inline unsigned getCPUTime()
     return GETUPTIMEMS();
 #else
     // FIXME: We should return the time the current thread has spent executing.
-    return currentTime() * 1000;
+
+    // use a relative time from first call in order to avoid an overflow
+    static double firstTime = currentTime();
+    return static_cast<unsigned> ((currentTime() - firstTime) * 1000);
 #endif
 }
 

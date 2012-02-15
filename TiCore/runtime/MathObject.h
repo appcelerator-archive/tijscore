@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,23 +28,22 @@
 #ifndef MathObject_h
 #define MathObject_h
 
-#include "TiObject.h"
+#include "TiObjectWithGlobalObject.h"
 
 namespace TI {
 
-    class MathObject : public TiObject {
+    class MathObject : public TiObjectWithGlobalObject {
     public:
-        MathObject(TiExcState*, NonNullPassRefPtr<Structure>);
+        MathObject(TiExcState*, TiGlobalObject*, Structure*);
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
+        static const ClassInfo s_info;
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
     protected:

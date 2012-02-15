@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -50,7 +50,7 @@ namespace TI {
             , m_pool(pool)
         {
             // Check that we have the expected number of arguments
-            m_failures.append(branch32(NotEqual, Address(callFrameRegister, RegisterFile::ArgumentCount * (int)sizeof(Register)), Imm32(expectedArgCount + 1)));
+            m_failures.append(branch32(NotEqual, Address(callFrameRegister, RegisterFile::ArgumentCount * (int)sizeof(Register)), TrustedImm32(expectedArgCount + 1)));
         }
         
         void loadDoubleArgument(int argument, FPRegisterID dst, RegisterID scratch)
@@ -68,7 +68,7 @@ namespace TI {
         void loadTiStringArgument(int argument, RegisterID dst)
         {
             loadCellArgument(argument, dst);
-            m_failures.append(branchPtr(NotEqual, Address(dst, 0), ImmPtr(m_globalData->jsStringVPtr)));
+            m_failures.append(branchPtr(NotEqual, Address(dst, 0), TrustedImmPtr(m_globalData->jsStringVPtr)));
             m_failures.append(branchTest32(NonZero, Address(dst, OBJECT_OFFSETOF(TiString, m_fiberCount))));
         }
         
@@ -94,7 +94,7 @@ namespace TI {
         {
             if (src != regT0)
                 move(src, regT0);
-            loadPtr(Address(callFrameRegister, RegisterFile::CallerFrame * (int)sizeof(Register)), callFrameRegister);
+            loadPtr(payloadFor(RegisterFile::CallerFrame, callFrameRegister), callFrameRegister);
             ret();
         }
         
@@ -103,16 +103,12 @@ namespace TI {
 #if USE(JSVALUE64)
             moveDoubleToPtr(src, regT0);
             subPtr(tagTypeNumberRegister, regT0);
-#elif USE(JSVALUE32_64)
+#else
             storeDouble(src, Address(stackPointerRegister, -(int)sizeof(double)));
             loadPtr(Address(stackPointerRegister, OBJECT_OFFSETOF(TiValue, u.asBits.tag) - sizeof(double)), regT1);
             loadPtr(Address(stackPointerRegister, OBJECT_OFFSETOF(TiValue, u.asBits.payload) - sizeof(double)), regT0);
-#else
-            UNUSED_PARAM(src);
-            ASSERT_NOT_REACHED();
-            m_failures.append(jump());
 #endif
-            loadPtr(Address(callFrameRegister, RegisterFile::CallerFrame * (int)sizeof(Register)), callFrameRegister);
+            loadPtr(payloadFor(RegisterFile::CallerFrame, callFrameRegister), callFrameRegister);
             ret();
         }
 
@@ -121,7 +117,7 @@ namespace TI {
             if (src != regT0)
                 move(src, regT0);
             tagReturnAsInt32();
-            loadPtr(Address(callFrameRegister, RegisterFile::CallerFrame * (int)sizeof(Register)), callFrameRegister);
+            loadPtr(payloadFor(RegisterFile::CallerFrame, callFrameRegister), callFrameRegister);
             ret();
         }
 
@@ -130,15 +126,15 @@ namespace TI {
             if (src != regT0)
                 move(src, regT0);
             tagReturnAsTiCell();
-            loadPtr(Address(callFrameRegister, RegisterFile::CallerFrame * (int)sizeof(Register)), callFrameRegister);
+            loadPtr(payloadFor(RegisterFile::CallerFrame, callFrameRegister), callFrameRegister);
             ret();
         }
         
-        PassRefPtr<NativeExecutable> finalize()
+        MacroAssemblerCodePtr finalize(TiGlobalData& globalData, MacroAssemblerCodePtr fallback)
         {
-            LinkBuffer patchBuffer(this, m_pool.get(), 0);
-            patchBuffer.link(m_failures, CodeLocationLabel(m_globalData->jitStubs->ctiNativeCallThunk()->generatedJITCode().addressForCall()));
-            return adoptRef(new NativeExecutable(patchBuffer.finalizeCode()));
+            LinkBuffer patchBuffer(globalData, this, m_pool.get());
+            patchBuffer.link(m_failures, CodeLocationLabel(fallback));
+            return patchBuffer.finalizeCode().m_code;
         }
         
     private:
@@ -151,20 +147,15 @@ namespace TI {
         {
 #if USE(JSVALUE64)
             orPtr(tagTypeNumberRegister, regT0);
-#elif USE(JSVALUE32_64)
-            move(Imm32(TiValue::Int32Tag), regT1);
 #else
-            signExtend32ToPtr(regT0, regT0);
-            // If we can't tag the result, give up and jump to the slow case
-            m_failures.append(branchAddPtr(Overflow, regT0, regT0));
-            addPtr(Imm32(JSImmediate::TagTypeNumber), regT0);
+            move(TrustedImm32(TiValue::Int32Tag), regT1);
 #endif
         }
 
         void tagReturnAsTiCell()
         {
 #if USE(JSVALUE32_64)
-            move(Imm32(TiValue::CellTag), regT1);
+            move(TrustedImm32(TiValue::CellTag), regT1);
 #endif
         }
         

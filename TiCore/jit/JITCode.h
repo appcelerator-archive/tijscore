@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -79,9 +79,10 @@ namespace TI {
         }
 
         // Execute the code!
-        inline TiValue execute(RegisterFile* registerFile, CallFrame* callFrame, TiGlobalData* globalData, TiValue* exception)
+        inline TiValue execute(RegisterFile* registerFile, CallFrame* callFrame, TiGlobalData* globalData)
         {
-            return TiValue::decode(ctiTrampoline(m_ref.m_code.executableAddress(), registerFile, callFrame, exception, Profiler::enabledProfilerReference(), globalData));
+            TiValue result = TiValue::decode(ctiTrampoline(m_ref.m_code.executableAddress(), registerFile, callFrame, 0, Profiler::enabledProfilerReference(), globalData));
+            return globalData->exception ? jsNull() : result;
         }
 
         void* start()
@@ -105,6 +106,12 @@ namespace TI {
         static JITCode HostFunction(CodePtr code)
         {
             return JITCode(code.dataLocation(), 0, 0);
+        }
+
+        void clear()
+        {
+            m_ref.~CodeRef();
+            new (&m_ref) CodeRef();
         }
 
     private:

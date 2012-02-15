@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,24 +34,27 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(StringObject);
 
-const ClassInfo StringObject::info = { "String", 0, 0, 0 };
+const ClassInfo StringObject::s_info = { "String", &JSWrapperObject::s_info, 0, 0 };
 
-StringObject::StringObject(TiExcState* exec, NonNullPassRefPtr<Structure> structure)
-    : JSWrapperObject(structure)
+StringObject::StringObject(TiExcState* exec, Structure* structure)
+    : JSWrapperObject(exec->globalData(), structure)
 {
-    setInternalValue(jsEmptyString(exec));
+    ASSERT(inherits(&s_info));
+    setInternalValue(exec->globalData(), jsEmptyString(exec));
 }
 
-StringObject::StringObject(NonNullPassRefPtr<Structure> structure, TiString* string)
-    : JSWrapperObject(structure)
+StringObject::StringObject(TiGlobalData& globalData, Structure* structure, TiString* string)
+    : JSWrapperObject(globalData, structure)
 {
-    setInternalValue(string);
+    ASSERT(inherits(&s_info));
+    setInternalValue(globalData, string);
 }
 
-StringObject::StringObject(TiExcState* exec, NonNullPassRefPtr<Structure> structure, const UString& string)
-    : JSWrapperObject(structure)
+StringObject::StringObject(TiExcState* exec, Structure* structure, const UString& string)
+    : JSWrapperObject(exec->globalData(), structure)
 {
-    setInternalValue(jsString(exec, string));
+    ASSERT(inherits(&s_info));
+    setInternalValue(exec->globalData(), jsString(exec, string));
 }
 
 bool StringObject::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -87,7 +90,7 @@ bool StringObject::deleteProperty(TiExcState* exec, const Identifier& propertyNa
     if (propertyName == exec->propertyNames().length)
         return false;
     bool isStrictUInt32;
-    unsigned i = propertyName.toStrictUInt32(&isStrictUInt32);
+    unsigned i = propertyName.toUInt32(isStrictUInt32);
     if (isStrictUInt32 && internalValue()->canGetIndex(i))
         return false;
     return TiObject::deleteProperty(exec, propertyName);
@@ -97,7 +100,7 @@ void StringObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& prop
 {
     int size = internalValue()->length();
     for (int i = 0; i < size; ++i)
-        propertyNames.add(Identifier(exec, UString::from(i)));
+        propertyNames.add(Identifier(exec, UString::number(i)));
     if (mode == IncludeDontEnumProperties)
         propertyNames.add(exec->propertyNames().length);
     return TiObject::getOwnPropertyNames(exec, propertyNames, mode);

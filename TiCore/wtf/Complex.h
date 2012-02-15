@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,13 +33,13 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef Complex_h
-#define Complex_h
+#ifndef WTF_Complex_h
+#define WTF_Complex_h
 
 #include <complex>
 #include <wtf/MathExtras.h>
 
-namespace WebCore {
+namespace WTI {
 
 typedef std::complex<double> Complex;
 
@@ -48,6 +48,9 @@ inline Complex complexFromMagnitudePhase(double magnitude, double phase)
     return Complex(magnitude * cos(phase), magnitude * sin(phase));
 }
 
-} // namespace WebCore
+} // namespace WTI
 
-#endif // Complex_h
+using WTI::Complex;
+using WTI::complexFromMagnitudePhase;
+
+#endif // WTF_Complex_h

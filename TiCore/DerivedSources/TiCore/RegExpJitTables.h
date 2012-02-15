@@ -1,3 +1,10 @@
+/**
+ * Appcelerator Titanium License
+ * This source code and all modifications done by Appcelerator
+ * are licensed under the Apache Public License (version 2) and
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
+ */
+
 static const char _spacesData[65536] = {
 0,0,0,0,0,0,0,0,0,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -1304,7 +1311,7 @@ static const char _spacesData[65536] = {
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
-0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
+0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,
@@ -2667,6 +2674,7 @@ CharacterClass* spacesCreate()
     characterClass->m_matchesUnicode.append(0x202f);
     characterClass->m_matchesUnicode.append(0x205f);
     characterClass->m_matchesUnicode.append(0x3000);
+    characterClass->m_matchesUnicode.append(0xfeff);
     return characterClass;
 }
 
@@ -2684,7 +2692,8 @@ CharacterClass* nonspacesCreate()
     characterClass->m_rangesUnicode.append(CharacterRange(0x202a, 0x202e));
     characterClass->m_rangesUnicode.append(CharacterRange(0x2030, 0x205e));
     characterClass->m_rangesUnicode.append(CharacterRange(0x2060, 0x2fff));
-    characterClass->m_rangesUnicode.append(CharacterRange(0x3001, 0xffff));
+    characterClass->m_rangesUnicode.append(CharacterRange(0x3001, 0xfefe));
+    characterClass->m_rangesUnicode.append(CharacterRange(0xff00, 0xffff));
     return characterClass;
 }
 

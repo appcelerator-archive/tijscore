@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -27,64 +27,69 @@
  */
 
 #include "config.h"
-#include "UnicodeWince.h"
+#include "UnicodeWinCE.h"
 
 #include <wchar.h>
 
 namespace WTI {
 namespace Unicode {
 
-wchar_t toLower(wchar_t c)
+UChar toLower(UChar c)
 {
     return towlower(c);
 }
 
-wchar_t toUpper(wchar_t c)
+UChar toUpper(UChar c)
 {
     return towupper(c);
 }
 
-wchar_t foldCase(wchar_t c)
+UChar foldCase(UChar c)
 {
     return towlower(c);
 }
 
-bool isPrintableChar(wchar_t c)
+bool isPrintableChar(UChar c)
 {
     return !!iswprint(c);
 }
 
-bool isSpace(wchar_t c)
+bool isSpace(UChar c)
 {
     return !!iswspace(c);
 }
 
-bool isLetter(wchar_t c)
+bool isLetter(UChar c)
 {
     return !!iswalpha(c);
 }
 
-bool isUpper(wchar_t c)
+bool isUpper(UChar c)
 {
     return !!iswupper(c);
 }
 
-bool isLower(wchar_t c)
+bool isLower(UChar c)
 {
     return !!iswlower(c);
 }
 
-bool isDigit(wchar_t c)
+bool isDigit(UChar c)
 {
     return !!iswdigit(c);
 }
 
-bool isPunct(wchar_t c)
+bool isPunct(UChar c)
 {
     return !!iswpunct(c);
 }
 
-int toLower(wchar_t* result, int resultLength, const wchar_t* source, int sourceLength, bool* isError)
+bool isAlphanumeric(UChar c)
+{
+    return !!iswalnum(c);
+}
+
+int toLower(UChar* result, int resultLength, const UChar* source, int sourceLength, bool* isError)
 {
     const UChar* sourceIterator = source;
     const UChar* sourceEnd = source + sourceLength;
@@ -101,14 +106,14 @@ int toLower(wchar_t* result, int resultLength, const wchar_t* source, int source
 
     if (sourceIterator < sourceEnd)
         remainingCharacters += sourceEnd - sourceIterator;
-    *isError = (remainingCharacters != 0);
+    *isError = !!remainingCharacters;
     if (resultIterator < resultEnd)
         *resultIterator = 0;
 
     return (resultIterator - result) + remainingCharacters;
 }
 
-int toUpper(wchar_t* result, int resultLength, const wchar_t* source, int sourceLength, bool* isError)
+int toUpper(UChar* result, int resultLength, const UChar* source, int sourceLength, bool* isError)
 {
     const UChar* sourceIterator = source;
     const UChar* sourceEnd = source + sourceLength;
@@ -125,14 +130,14 @@ int toUpper(wchar_t* result, int resultLength, const wchar_t* source, int source
 
     if (sourceIterator < sourceEnd)
         remainingCharacters += sourceEnd - sourceIterator;
-    *isError = (remainingCharacters != 0);
+    *isError = !!remainingCharacters;
     if (resultIterator < resultEnd)
         *resultIterator = 0;
 
     return (resultIterator - result) + remainingCharacters;
 }
 
-int foldCase(wchar_t* result, int resultLength, const wchar_t* source, int sourceLength, bool* isError)
+int foldCase(UChar* result, int resultLength, const UChar* source, int sourceLength, bool* isError)
 {
     *isError = false;
     if (resultLength < sourceLength) {
@@ -144,7 +149,7 @@ int foldCase(wchar_t* result, int resultLength, const wchar_t* source, int sourc
     return sourceLength;
 }
 
-wchar_t toTitleCase(wchar_t c)
+UChar toTitleCase(UChar c)
 {
     return towupper(c);
 }
@@ -169,12 +174,12 @@ unsigned char combiningClass(UChar32 c)
     return UnicodeCE::combiningClass(c);
 }
 
-wchar_t mirroredChar(UChar32 c)
+UChar mirroredChar(UChar32 c)
 {
     return UnicodeCE::mirroredChar(c);
 }
 
-int digitValue(wchar_t c)
+int digitValue(UChar c)
 {
     return UnicodeCE::digitValue(c);
 }

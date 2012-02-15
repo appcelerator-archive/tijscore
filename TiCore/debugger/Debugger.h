@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,18 +38,17 @@ namespace TI {
     class TiGlobalData;
     class TiGlobalObject;
     class TiValue;
-    class SourceCode;
+    class SourceProvider;
     class UString;
 
     class Debugger {
     public:
         virtual ~Debugger();
-		Debugger();
 
         void attach(TiGlobalObject*);
         virtual void detach(TiGlobalObject*);
 
-        virtual void sourceParsed(TiExcState*, const SourceCode&, int errorLineNumber, const UString& errorMessage) = 0;
+        virtual void sourceParsed(TiExcState*, SourceProvider*, int errorLineNumber, const UString& errorMessage) = 0;
         virtual void exception(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber, bool hasHandler) = 0;
         virtual void atStatement(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;
         virtual void callEvent(const DebuggerCallFrame&, intptr_t sourceID, int lineNumber) = 0;

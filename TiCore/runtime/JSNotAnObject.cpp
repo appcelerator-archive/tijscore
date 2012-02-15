@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -46,91 +46,84 @@ ASSERT_CLASS_FITS_IN_CELL(JSNotAnObject);
 // TiValue methods
 TiValue JSNotAnObject::toPrimitive(TiExcState* exec, PreferredPrimitiveType) const
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
-    return m_exception;
+    ASSERT_UNUSED(exec, exec->hadException());
+    return jsNumber(0);
 }
 
 bool JSNotAnObject::getPrimitiveNumber(TiExcState* exec, double&, TiValue&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 bool JSNotAnObject::toBoolean(TiExcState* exec) const
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 double JSNotAnObject::toNumber(TiExcState* exec) const
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return NaN;
 }
 
 UString JSNotAnObject::toString(TiExcState* exec) const
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return "";
 }
 
-TiObject* JSNotAnObject::toObject(TiExcState* exec) const
+TiObject* JSNotAnObject::toObject(TiExcState* exec, TiGlobalObject*) const
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
-    return m_exception;
-}
-
-// Marking
-void JSNotAnObject::markChildren(MarkStack& markStack)
-{
-    TiObject::markChildren(markStack);
-    markStack.append(m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
+    return const_cast<JSNotAnObject*>(this);
 }
 
 // TiObject methods
 bool JSNotAnObject::getOwnPropertySlot(TiExcState* exec, const Identifier&, PropertySlot&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 bool JSNotAnObject::getOwnPropertySlot(TiExcState* exec, unsigned, PropertySlot&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 bool JSNotAnObject::getOwnPropertyDescriptor(TiExcState* exec, const Identifier&, PropertyDescriptor&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 void JSNotAnObject::put(TiExcState* exec, const Identifier& , TiValue, PutPropertySlot&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
 }
 
 void JSNotAnObject::put(TiExcState* exec, unsigned, TiValue)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
 }
 
 bool JSNotAnObject::deleteProperty(TiExcState* exec, const Identifier&)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 bool JSNotAnObject::deleteProperty(TiExcState* exec, unsigned)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
     return false;
 }
 
 void JSNotAnObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray&, EnumerationMode)
 {
-    ASSERT_UNUSED(exec, exec->hadException() && exec->exception() == m_exception);
+    ASSERT_UNUSED(exec, exec->hadException());
 }
 
 } // namespace TI

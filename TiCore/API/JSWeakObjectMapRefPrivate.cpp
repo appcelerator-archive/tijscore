@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,7 +39,6 @@
 #include "TiValue.h"
 #include "JSWeakObjectMapRefInternal.h"
 #include <wtf/HashMap.h>
-#include <wtf/RefCounted.h>
 #include <wtf/text/StringHash.h>
 
 using namespace WTI;
@@ -65,8 +64,8 @@ void JSWeakObjectMapSet(TiContextRef ctx, JSWeakObjectMapRef map, void* key, TiO
     TiObject* obj = toJS(object);
     if (!obj)
         return;
-    ASSERT(obj->inherits(&TiCallbackObject<TiGlobalObject>::info) || obj->inherits(&TiCallbackObject<TiObject>::info));
-    map->map().set(key, obj);
+    ASSERT(obj->inherits(&TiCallbackObject<TiGlobalObject>::s_info) || obj->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info));
+    map->map().set(exec->globalData(), key, obj);
 }
 
 TiObjectRef JSWeakObjectMapGet(TiContextRef ctx, JSWeakObjectMapRef map, void* key)
@@ -76,14 +75,18 @@ TiObjectRef JSWeakObjectMapGet(TiContextRef ctx, JSWeakObjectMapRef map, void* k
     return toRef(static_cast<TiObject*>(map->map().get(key)));
 }
 
-bool JSWeakObjectMapClear(TiContextRef ctx, JSWeakObjectMapRef map, void* key, TiObjectRef object)
+void JSWeakObjectMapRemove(TiContextRef ctx, JSWeakObjectMapRef map, void* key)
 {
     TiExcState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
-    TiObject* obj = toJS(object);
-    if (map->map().uncheckedRemove(key, obj))
-        return true;
-    return false;
+    map->map().take(key);
+}
+
+// We need to keep this function in the build to keep the nightlies running.
+JS_EXPORT bool JSWeakObjectMapClear(TiContextRef, JSWeakObjectMapRef, void*, TiObjectRef);
+bool JSWeakObjectMapClear(TiContextRef, JSWeakObjectMapRef, void*, TiObjectRef)
+{
+    return true;
 }
 
 #ifdef __cplusplus

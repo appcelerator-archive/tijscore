@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,6 +33,9 @@
 #ifndef StructureChain_h
 #define StructureChain_h
 
+#include "TiCell.h"
+#include "Structure.h"
+
 #include <wtf/OwnArrayPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -42,17 +45,22 @@ namespace TI {
 
     class Structure;
 
-    class StructureChain : public RefCounted<StructureChain> {
+    class StructureChain : public TiCell {
         friend class JIT;
 
     public:
-        static PassRefPtr<StructureChain> create(Structure* head) { return adoptRef(new StructureChain(head)); }
-        RefPtr<Structure>* head() { return m_vector.get(); }
+        static StructureChain* create(TiGlobalData& globalData, Structure* head) { return new (&globalData) StructureChain(globalData, globalData.structureChainStructure.get(), head); }
+        WriteBarrier<Structure>* head() { return m_vector.get(); }
+        void visitChildren(SlotVisitor&);
+
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype) { return Structure::create(globalData, prototype, TypeInfo(CompoundType, OverridesVisitChildren), 0, &s_info); }
+        
+        static ClassInfo s_info;
 
     private:
-        StructureChain(Structure* head);
-
-        OwnArrayPtr<RefPtr<Structure> > m_vector;
+        StructureChain(TiGlobalData&, Structure*, Structure* head);
+        ~StructureChain();
+        OwnArrayPtr<WriteBarrier<Structure> > m_vector;
     };
 
 } // namespace TI

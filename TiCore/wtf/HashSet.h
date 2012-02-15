@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -42,7 +42,8 @@ namespace WTI {
     template<typename T> struct IdentityExtractor;
 
     template<typename ValueArg, typename HashArg = typename DefaultHash<ValueArg>::Hash,
-        typename TraitsArg = HashTraits<ValueArg> > class HashSet : public FastAllocBase {
+        typename TraitsArg = HashTraits<ValueArg> > class HashSet {
+        WTF_MAKE_FAST_ALLOCATED;
     private:
         typedef HashArg HashFunctions;
         typedef TraitsArg ValueTraits;
@@ -55,7 +56,7 @@ namespace WTI {
             HashFunctions, ValueTraits, ValueTraits> HashTableType;
 
     public:
-        typedef HashTableIteratorAdapter<HashTableType, ValueType> iterator;
+        typedef HashTableConstIteratorAdapter<HashTableType, ValueType> iterator;
         typedef HashTableConstIteratorAdapter<HashTableType, ValueType> const_iterator;
 
         void swap(HashSet&);
@@ -64,13 +65,10 @@ namespace WTI {
         int capacity() const;
         bool isEmpty() const;
 
-        iterator begin();
-        iterator end();
-        const_iterator begin() const;
-        const_iterator end() const;
+        iterator begin() const;
+        iterator end() const;
 
-        iterator find(const ValueType&);
-        const_iterator find(const ValueType&) const;
+        iterator find(const ValueType&) const;
         bool contains(const ValueType&) const;
 
         // An alternate version of find() that finds the object by hashing and comparing
@@ -78,8 +76,7 @@ namespace WTI {
         // must have the following function members:
         //   static unsigned hash(const T&);
         //   static bool equal(const ValueType&, const T&);
-        template<typename T, typename HashTranslator> iterator find(const T&);
-        template<typename T, typename HashTranslator> const_iterator find(const T&) const;
+        template<typename T, typename HashTranslator> iterator find(const T&) const;
         template<typename T, typename HashTranslator> bool contains(const T&) const;
 
         // The return value is a pair of an interator to the new value's location, 
@@ -144,37 +141,19 @@ namespace WTI {
     }
 
     template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::begin()
+    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::begin() const
     {
         return m_impl.begin(); 
     }
 
     template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::end()
+    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::end() const
     {
         return m_impl.end(); 
     }
 
     template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::const_iterator HashSet<T, U, V>::begin() const
-    {
-        return m_impl.begin(); 
-    }
-
-    template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::const_iterator HashSet<T, U, V>::end() const
-    {
-        return m_impl.end(); 
-    }
-
-    template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::find(const ValueType& value)
-    {
-        return m_impl.find(value); 
-    }
-
-    template<typename T, typename U, typename V>
-    inline typename HashSet<T, U, V>::const_iterator HashSet<T, U, V>::find(const ValueType& value) const
+    inline typename HashSet<T, U, V>::iterator HashSet<T, U, V>::find(const ValueType& value) const
     {
         return m_impl.find(value); 
     }
@@ -188,15 +167,6 @@ namespace WTI {
     template<typename Value, typename HashFunctions, typename Traits>
     template<typename T, typename HashTranslator>
     typename HashSet<Value, HashFunctions, Traits>::iterator
-    inline HashSet<Value, HashFunctions, Traits>::find(const T& value)
-    {
-        typedef HashSetTranslatorAdapter<ValueType, ValueTraits, T, HashTranslator> Adapter;
-        return m_impl.template find<T, Adapter>(value);
-    }
-
-    template<typename Value, typename HashFunctions, typename Traits>
-    template<typename T, typename HashTranslator>
-    typename HashSet<Value, HashFunctions, Traits>::const_iterator
     inline HashSet<Value, HashFunctions, Traits>::find(const T& value) const
     {
         typedef HashSetTranslatorAdapter<ValueType, ValueTraits, T, HashTranslator> Adapter;
@@ -212,14 +182,14 @@ namespace WTI {
     }
 
     template<typename T, typename U, typename V>
-    pair<typename HashSet<T, U, V>::iterator, bool> HashSet<T, U, V>::add(const ValueType& value)
+    inline pair<typename HashSet<T, U, V>::iterator, bool> HashSet<T, U, V>::add(const ValueType& value)
     {
         return m_impl.add(value);
     }
 
     template<typename Value, typename HashFunctions, typename Traits>
     template<typename T, typename HashTranslator>
-    pair<typename HashSet<Value, HashFunctions, Traits>::iterator, bool>
+    inline pair<typename HashSet<Value, HashFunctions, Traits>::iterator, bool>
     HashSet<Value, HashFunctions, Traits>::add(const T& value)
     {
         typedef HashSetTranslatorAdapter<ValueType, ValueTraits, T, HashTranslator> Adapter;

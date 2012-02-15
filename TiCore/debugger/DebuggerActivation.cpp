@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,20 +37,23 @@
 
 namespace TI {
 
-DebuggerActivation::DebuggerActivation(TiObject* activation)
-    : TiObject(DebuggerActivation::createStructure(jsNull()))
+DebuggerActivation::DebuggerActivation(TiGlobalData& globalData, TiObject* activation)
+    : JSNonFinalObject(globalData, globalData.debuggerActivationStructure.get())
 {
     ASSERT(activation);
     ASSERT(activation->isActivationObject());
-    m_activation = static_cast<JSActivation*>(activation);
+    m_activation.set(globalData, this, static_cast<JSActivation*>(activation));
 }
 
-void DebuggerActivation::markChildren(MarkStack& markStack)
+void DebuggerActivation::visitChildren(SlotVisitor& visitor)
 {
-    TiObject::markChildren(markStack);
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    TiObject::visitChildren(visitor);
 
     if (m_activation)
-        markStack.append(m_activation);
+        visitor.append(&m_activation);
 }
 
 UString DebuggerActivation::className() const

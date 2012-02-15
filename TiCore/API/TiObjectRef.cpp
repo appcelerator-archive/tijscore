@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -66,7 +66,7 @@ TiClassRef TiClassCreate(const TiClassDefinition* definition)
         ? OpaqueTiClass::createNoAutomaticPrototype(definition)
         : OpaqueTiClass::create(definition);
     
-    return jsClass.release().releaseRef();
+    return jsClass.release().leakRef();
 }
 
 TiClassRef TiClassRetain(TiClassRef jsClass)
@@ -86,11 +86,11 @@ TiObjectRef TiObjectMake(TiContextRef ctx, TiClassRef jsClass, void* data)
     APIEntryShim entryShim(exec);
 
     if (!jsClass)
-        return toRef(new (exec) TiObject(exec->lexicalGlobalObject()->emptyObjectStructure())); // slightly more efficient
+        return toRef(constructEmptyObject(exec));
 
-    TiCallbackObject<TiObject>* object = new (exec) TiCallbackObject<TiObject>(exec, exec->lexicalGlobalObject()->callbackObjectStructure(), jsClass, data);
+    TiCallbackObject<TiObjectWithGlobalObject>* object = new (exec) TiCallbackObject<TiObjectWithGlobalObject>(exec, exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackObjectStructure(), jsClass, data);
     if (TiObject* prototype = jsClass->prototype(exec))
-        object->setPrototype(prototype);
+        object->setPrototype(exec->globalData(), prototype);
 
     return toRef(object);
 }
@@ -102,7 +102,7 @@ TiObjectRef TiObjectMakeFunctionWithCallback(TiContextRef ctx, TiStringRef name,
 
     Identifier nameID = name ? name->identifier(&exec->globalData()) : Identifier(exec, "anonymous");
     
-    return toRef(new (exec) TiCallbackFunction(exec, callAsFunction, nameID));
+    return toRef(new (exec) TiCallbackFunction(exec, exec->lexicalGlobalObject(), callAsFunction, nameID));
 }
 
 TiObjectRef TiObjectMakeConstructor(TiContextRef ctx, TiClassRef jsClass, TiObjectCallAsConstructorCallback callAsConstructor)
@@ -114,8 +114,8 @@ TiObjectRef TiObjectMakeConstructor(TiContextRef ctx, TiClassRef jsClass, TiObje
     if (!jsPrototype)
         jsPrototype = exec->lexicalGlobalObject()->objectPrototype();
 
-    TiCallbackConstructor* constructor = new (exec) TiCallbackConstructor(exec->lexicalGlobalObject()->callbackConstructorStructure(), jsClass, callAsConstructor);
-    constructor->putDirect(exec->propertyNames().prototype, jsPrototype, DontEnum | DontDelete | ReadOnly);
+    TiCallbackConstructor* constructor = new (exec) TiCallbackConstructor(exec->lexicalGlobalObject(), exec->lexicalGlobalObject()->callbackConstructorStructure(), jsClass, callAsConstructor);
+    constructor->putDirect(exec->globalData(), exec->propertyNames().prototype, jsPrototype, DontEnum | DontDelete | ReadOnly);
     return toRef(constructor);
 }
 
@@ -131,7 +131,7 @@ TiObjectRef TiObjectMakeFunction(TiContextRef ctx, TiStringRef name, unsigned pa
         args.append(jsString(exec, parameterNames[i]->ustring()));
     args.append(jsString(exec, body->ustring()));
 
-    TiObject* result = constructFunction(exec, args, nameID, sourceURL->ustring(), startingLineNumber);
+    TiObject* result = constructFunction(exec, exec->lexicalGlobalObject(), args, nameID, sourceURL->ustring(), startingLineNumber);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -175,7 +175,7 @@ TiObjectRef TiObjectMakeDate(TiContextRef ctx, size_t argumentCount, const TiVal
     for (size_t i = 0; i < argumentCount; ++i)
         argList.append(toJS(exec, arguments[i]));
 
-    TiObject* result = constructDate(exec, argList);
+    TiObject* result = constructDate(exec, exec->lexicalGlobalObject(), argList);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -191,11 +191,10 @@ TiObjectRef TiObjectMakeError(TiContextRef ctx, size_t argumentCount, const TiVa
     TiExcState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
 
-    MarkedArgumentBuffer argList;
-    for (size_t i = 0; i < argumentCount; ++i)
-        argList.append(toJS(exec, arguments[i]));
+    TiValue message = argumentCount ? toJS(exec, arguments[0]) : jsUndefined();
+    Structure* errorStructure = exec->lexicalGlobalObject()->errorStructure();
+    TiObject* result = ErrorInstance::create(exec, errorStructure, message);
 
-    TiObject* result = constructError(exec, argList);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -215,7 +214,7 @@ TiObjectRef TiObjectMakeRegExp(TiContextRef ctx, size_t argumentCount, const TiV
     for (size_t i = 0; i < argumentCount; ++i)
         argList.append(toJS(exec, arguments[i]));
 
-    TiObject* result = constructRegExp(exec, argList);
+    TiObject* result = constructRegExp(exec, exec->lexicalGlobalObject(),  argList);
     if (exec->hadException()) {
         if (exception)
             *exception = toRef(exec, exec->exception());
@@ -243,7 +242,7 @@ void TiObjectSetPrototype(TiContextRef ctx, TiObjectRef object, TiValueRef value
     TiObject* jsObject = toJS(object);
     TiValue jsValue = toJS(exec, value);
 
-    jsObject->setPrototype(jsValue.isObject() ? jsValue : jsNull());
+    jsObject->setPrototypeWithCycleCheck(exec->globalData(), jsValue.isObject() ? jsValue : jsNull());
 }
 
 bool TiObjectHasProperty(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName)
@@ -348,10 +347,10 @@ void* TiObjectGetPrivate(TiObjectRef object)
 {
     TiObject* jsObject = toJS(object);
     
-    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info))
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::s_info))
         return static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->getPrivate();
-    else if (jsObject->inherits(&TiCallbackObject<TiObject>::info))
-        return static_cast<TiCallbackObject<TiObject>*>(jsObject)->getPrivate();
+    if (jsObject->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info))
+        return static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(jsObject)->getPrivate();
     
     return 0;
 }
@@ -360,11 +359,12 @@ bool TiObjectSetPrivate(TiObjectRef object, void* data)
 {
     TiObject* jsObject = toJS(object);
     
-    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info)) {
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::s_info)) {
         static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->setPrivate(data);
         return true;
-    } else if (jsObject->inherits(&TiCallbackObject<TiObject>::info)) {
-        static_cast<TiCallbackObject<TiObject>*>(jsObject)->setPrivate(data);
+    }
+    if (jsObject->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info)) {
+        static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(jsObject)->setPrivate(data);
         return true;
     }
         
@@ -378,10 +378,10 @@ TiValueRef TiObjectGetPrivateProperty(TiContextRef ctx, TiObjectRef object, TiSt
     TiObject* jsObject = toJS(object);
     TiValue result;
     Identifier name(propertyName->identifier(&exec->globalData()));
-    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info))
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::s_info))
         result = static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->getPrivateProperty(name);
-    else if (jsObject->inherits(&TiCallbackObject<TiObject>::info))
-        result = static_cast<TiCallbackObject<TiObject>*>(jsObject)->getPrivateProperty(name);
+    else if (jsObject->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info))
+        result = static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(jsObject)->getPrivateProperty(name);
     return toRef(exec, result);
 }
 
@@ -390,14 +390,14 @@ bool TiObjectSetPrivateProperty(TiContextRef ctx, TiObjectRef object, TiStringRe
     TiExcState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
     TiObject* jsObject = toJS(object);
-    TiValue jsValue = toJS(exec, value);
+    TiValue jsValue = value ? toJS(exec, value) : TiValue();
     Identifier name(propertyName->identifier(&exec->globalData()));
-    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info)) {
-        static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->setPrivateProperty(name, jsValue);
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::s_info)) {
+        static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->setPrivateProperty(exec->globalData(), name, jsValue);
         return true;
     }
-    if (jsObject->inherits(&TiCallbackObject<TiObject>::info)) {
-        static_cast<TiCallbackObject<TiObject>*>(jsObject)->setPrivateProperty(name, jsValue);
+    if (jsObject->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info)) {
+        static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(jsObject)->setPrivateProperty(exec->globalData(), name, jsValue);
         return true;
     }
     return false;
@@ -409,12 +409,12 @@ bool TiObjectDeletePrivateProperty(TiContextRef ctx, TiObjectRef object, TiStrin
     APIEntryShim entryShim(exec);
     TiObject* jsObject = toJS(object);
     Identifier name(propertyName->identifier(&exec->globalData()));
-    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::info)) {
+    if (jsObject->inherits(&TiCallbackObject<TiGlobalObject>::s_info)) {
         static_cast<TiCallbackObject<TiGlobalObject>*>(jsObject)->deletePrivateProperty(name);
         return true;
     }
-    if (jsObject->inherits(&TiCallbackObject<TiObject>::info)) {
-        static_cast<TiCallbackObject<TiObject>*>(jsObject)->deletePrivateProperty(name);
+    if (jsObject->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info)) {
+        static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(jsObject)->deletePrivateProperty(name);
         return true;
     }
     return false;
@@ -488,7 +488,9 @@ TiObjectRef TiObjectCallAsConstructor(TiContextRef ctx, TiObjectRef object, size
     return result;
 }
 
-struct OpaqueTiPropertyNameArray : FastAllocBase {
+struct OpaqueTiPropertyNameArray {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     OpaqueTiPropertyNameArray(TiGlobalData* globalData)
         : refCount(0)
         , globalData(globalData)
@@ -515,7 +517,7 @@ TiPropertyNameArrayRef TiObjectCopyPropertyNames(TiContextRef ctx, TiObjectRef o
     size_t size = array.size();
     propertyNames->array.reserveInitialCapacity(size);
     for (size_t i = 0; i < size; ++i)
-        propertyNames->array.append(TiRetainPtr<TiStringRef>(Adopt, OpaqueTiString::create(array[i].ustring()).releaseRef()));
+        propertyNames->array.append(TiRetainPtr<TiStringRef>(Adopt, OpaqueTiString::create(array[i].ustring()).leakRef()));
     
     return TiPropertyNameArrayRetain(propertyNames);
 }

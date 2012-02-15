@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -86,7 +86,7 @@ RefCountedLeakCounter::~RefCountedLeakCounter()
 
 void RefCountedLeakCounter::increment()
 {
-#if ENABLE(JSC_MULTIPLE_THREADS)
+#if ENABLE(WTF_MULTIPLE_THREADS)
     atomicIncrement(&m_count);
 #else
     ++m_count;
@@ -95,7 +95,7 @@ void RefCountedLeakCounter::increment()
 
 void RefCountedLeakCounter::decrement()
 {
-#if ENABLE(JSC_MULTIPLE_THREADS)
+#if ENABLE(WTF_MULTIPLE_THREADS)
     atomicDecrement(&m_count);
 #else
     --m_count;

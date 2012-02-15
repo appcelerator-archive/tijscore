@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,19 +34,18 @@
 #define ThunkGenerators_h
 
 #if ENABLE(JIT)
-#include <wtf/PassRefPtr.h>
-
 namespace TI {
     class ExecutablePool;
     class TiGlobalData;
     class NativeExecutable;
+    class MacroAssemblerCodePtr;
 
-    typedef PassRefPtr<NativeExecutable> (*ThunkGenerator)(TiGlobalData*, ExecutablePool*);
-    PassRefPtr<NativeExecutable> charCodeAtThunkGenerator(TiGlobalData*, ExecutablePool*);
-    PassRefPtr<NativeExecutable> charAtThunkGenerator(TiGlobalData*, ExecutablePool*);
-    PassRefPtr<NativeExecutable> fromCharCodeThunkGenerator(TiGlobalData*, ExecutablePool*);
-    PassRefPtr<NativeExecutable> sqrtThunkGenerator(TiGlobalData*, ExecutablePool*);
-    PassRefPtr<NativeExecutable> powThunkGenerator(TiGlobalData*, ExecutablePool*);
+    typedef MacroAssemblerCodePtr (*ThunkGenerator)(TiGlobalData*, ExecutablePool*);
+    MacroAssemblerCodePtr charCodeAtThunkGenerator(TiGlobalData*, ExecutablePool*);
+    MacroAssemblerCodePtr charAtThunkGenerator(TiGlobalData*, ExecutablePool*);
+    MacroAssemblerCodePtr fromCharCodeThunkGenerator(TiGlobalData*, ExecutablePool*);
+    MacroAssemblerCodePtr sqrtThunkGenerator(TiGlobalData*, ExecutablePool*);
+    MacroAssemblerCodePtr powThunkGenerator(TiGlobalData*, ExecutablePool*);
 }
 #endif
 

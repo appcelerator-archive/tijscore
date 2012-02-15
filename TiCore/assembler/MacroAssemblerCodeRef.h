@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -72,15 +72,47 @@ public:
     {
     }
 
+    template<typename returnType>
+    FunctionPtr(returnType(*value)())
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1>
+    FunctionPtr(returnType(*value)(argType1))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2>
+    FunctionPtr(returnType(*value)(argType1, argType2))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2, typename argType3>
+    FunctionPtr(returnType(*value)(argType1, argType2, argType3))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
+    template<typename returnType, typename argType1, typename argType2, typename argType3, typename argType4>
+    FunctionPtr(returnType(*value)(argType1, argType2, argType3, argType4))
+        : m_value((void*)value)
+    {
+        ASSERT_VALID_CODE_POINTER(m_value);
+    }
+
     template<typename FunctionType>
     explicit FunctionPtr(FunctionType* value)
-#if COMPILER(RVCT)
-     // RVTC compiler needs C-style cast as it fails with the following error
-     // Error:  #694: reinterpret_cast cannot cast away const or other type qualifiers
-        : m_value((void*)(value))
-#else
-        : m_value(reinterpret_cast<void*>(value))
-#endif
+        // Using a C-ctyle cast here to avoid compiler error on RVTC:
+        // Error:  #694: reinterpret_cast cannot cast away const or other type qualifiers
+        // (I guess on RVTC function pointers have a different constness to GCC/MSVC?)
+        : m_value((void*)value)
     {
         ASSERT_VALID_CODE_POINTER(m_value);
     }
@@ -159,7 +191,7 @@ public:
     void* dataLocation() const { ASSERT_VALID_CODE_POINTER(m_value); return m_value; }
 #endif
 
-    bool operator!()
+    bool operator!() const
     {
         return !m_value;
     }

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,14 +40,13 @@ using namespace WTI;
 
 namespace TI {
 
-const ClassInfo TiArrayArray::s_defaultInfo = { "ByteArray", 0, 0, 0 };
+const ClassInfo TiArrayArray::s_defaultInfo = { "ByteArray", &Base::s_info, 0, 0 };
 
-TiArrayArray::TiArrayArray(TiExcState* exec, NonNullPassRefPtr<Structure> structure, ByteArray* storage, const TI::ClassInfo* classInfo)
-    : TiObject(structure)
+TiArrayArray::TiArrayArray(TiExcState* exec, Structure* structure, ByteArray* storage)
+    : JSNonFinalObject(exec->globalData(), structure)
     , m_storage(storage)
-    , m_classInfo(classInfo)
 {
-    putDirect(exec->globalData().propertyNames->length, jsNumber(exec, m_storage->length()), ReadOnly | DontDelete);
+    putDirect(exec->globalData(), exec->globalData().propertyNames->length, jsNumber(m_storage->length()), ReadOnly | DontDelete);
 }
 
 #if !ASSERT_DISABLED
@@ -58,16 +57,15 @@ TiArrayArray::~TiArrayArray()
 #endif
 
 
-PassRefPtr<Structure> TiArrayArray::createStructure(TiValue prototype)
+Structure* TiArrayArray::createStructure(TiGlobalData& globalData, TiValue prototype, const TI::ClassInfo* classInfo)
 {
-    PassRefPtr<Structure> result = Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
-    return result;
+    return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, classInfo);
 }
 
 bool TiArrayArray::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
     bool ok;
-    unsigned index = propertyName.toUInt32(&ok, false);
+    unsigned index = propertyName.toUInt32(ok);
     if (ok && canAccessIndex(index)) {
         slot.setValue(getIndex(exec, index));
         return true;
@@ -78,7 +76,7 @@ bool TiArrayArray::getOwnPropertySlot(TiExcState* exec, const Identifier& proper
 bool TiArrayArray::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
     bool ok;
-    unsigned index = propertyName.toUInt32(&ok, false);
+    unsigned index = propertyName.toUInt32(ok);
     if (ok && canAccessIndex(index)) {
         descriptor.setDescriptor(getIndex(exec, index), DontDelete);
         return true;
@@ -98,7 +96,7 @@ bool TiArrayArray::getOwnPropertySlot(TiExcState* exec, unsigned propertyName, P
 void TiArrayArray::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
     bool ok;
-    unsigned index = propertyName.toUInt32(&ok, false);
+    unsigned index = propertyName.toUInt32(ok);
     if (ok) {
         setIndex(exec, index, value);
         return;

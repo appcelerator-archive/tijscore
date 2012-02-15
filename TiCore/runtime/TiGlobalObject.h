@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,9 +33,9 @@
 #include "TiGlobalData.h"
 #include "JSVariableObject.h"
 #include "JSWeakObjectMapRefInternal.h"
-#include "NativeFunctionWrapper.h"
 #include "NumberPrototype.h"
 #include "StringPrototype.h"
+#include "StructureChain.h"
 #include <wtf/HashSet.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RandomNumber.h>
@@ -49,10 +49,8 @@ namespace TI {
     class ErrorConstructor;
     class FunctionPrototype;
     class GlobalCodeBlock;
-    class GlobalEvalFunction;
     class NativeErrorConstructor;
     class ProgramCodeBlock;
-    class PrototypeFunction;
     class RegExpConstructor;
     class RegExpPrototype;
     class RegisterFile;
@@ -64,130 +62,106 @@ namespace TI {
     
     class TiGlobalObject : public JSVariableObject {
     protected:
-        using JSVariableObject::JSVariableObjectData;
         typedef HashSet<RefPtr<OpaqueJSWeakObjectMap> > WeakMapSet;
 
-        struct TiGlobalObjectData : public JSVariableObjectData {
-            // We use an explicit destructor function pointer instead of a
-            // virtual destructor because we want to avoid adding a vtable
-            // pointer to this struct. Adding a vtable pointer would force the
-            // compiler to emit costly pointer fixup code when casting from
-            // JSVariableObjectData* to TiGlobalObjectData*.
-            typedef void (*Destructor)(void*);
+        RefPtr<TiGlobalData> m_globalData;
 
-            TiGlobalObjectData(Destructor destructor)
-                : JSVariableObjectData(&symbolTable, 0)
-                , destructor(destructor)
-                , registerArraySize(0)
-                , globalScopeChain(NoScopeChain())
-                , regExpConstructor(0)
-                , errorConstructor(0)
-                , evalErrorConstructor(0)
-                , rangeErrorConstructor(0)
-                , referenceErrorConstructor(0)
-                , syntaxErrorConstructor(0)
-                , typeErrorConstructor(0)
-                , URIErrorConstructor(0)
-                , evalFunction(0)
-                , callFunction(0)
-                , applyFunction(0)
-                , objectPrototype(0)
-                , functionPrototype(0)
-                , arrayPrototype(0)
-                , booleanPrototype(0)
-                , stringPrototype(0)
-                , numberPrototype(0)
-                , datePrototype(0)
-                , regExpPrototype(0)
-                , methodCallDummy(0)
-                , weakRandom(static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
-            {
-            }
-            
-            Destructor destructor;
-            
-            size_t registerArraySize;
+        size_t m_registerArraySize;
+        Register m_globalCallFrame[RegisterFile::CallFrameHeaderSize];
 
-            TiGlobalObject* next;
-            TiGlobalObject* prev;
+        WriteBarrier<ScopeChainNode> m_globalScopeChain;
+        WriteBarrier<TiObject> m_methodCallDummy;
 
-            Debugger* debugger;
-            
-            ScopeChain globalScopeChain;
-            Register globalCallFrame[RegisterFile::CallFrameHeaderSize];
+        WriteBarrier<RegExpConstructor> m_regExpConstructor;
+        WriteBarrier<ErrorConstructor> m_errorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_evalErrorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_rangeErrorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_referenceErrorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_syntaxErrorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_typeErrorConstructor;
+        WriteBarrier<NativeErrorConstructor> m_URIErrorConstructor;
 
-            int recursion;
+        WriteBarrier<TiFunction> m_evalFunction;
+        WriteBarrier<TiFunction> m_callFunction;
+        WriteBarrier<TiFunction> m_applyFunction;
 
-            RegExpConstructor* regExpConstructor;
-            ErrorConstructor* errorConstructor;
-            NativeErrorConstructor* evalErrorConstructor;
-            NativeErrorConstructor* rangeErrorConstructor;
-            NativeErrorConstructor* referenceErrorConstructor;
-            NativeErrorConstructor* syntaxErrorConstructor;
-            NativeErrorConstructor* typeErrorConstructor;
-            NativeErrorConstructor* URIErrorConstructor;
+        WriteBarrier<ObjectPrototype> m_objectPrototype;
+        WriteBarrier<FunctionPrototype> m_functionPrototype;
+        WriteBarrier<ArrayPrototype> m_arrayPrototype;
+        WriteBarrier<BooleanPrototype> m_booleanPrototype;
+        WriteBarrier<StringPrototype> m_stringPrototype;
+        WriteBarrier<NumberPrototype> m_numberPrototype;
+        WriteBarrier<DatePrototype> m_datePrototype;
+        WriteBarrier<RegExpPrototype> m_regExpPrototype;
 
-            GlobalEvalFunction* evalFunction;
-            NativeFunctionWrapper* callFunction;
-            NativeFunctionWrapper* applyFunction;
+        WriteBarrier<Structure> m_argumentsStructure;
+        WriteBarrier<Structure> m_arrayStructure;
+        WriteBarrier<Structure> m_booleanObjectStructure;
+        WriteBarrier<Structure> m_callbackConstructorStructure;
+        WriteBarrier<Structure> m_callbackFunctionStructure;
+        WriteBarrier<Structure> m_callbackObjectStructure;
+        WriteBarrier<Structure> m_dateStructure;
+        WriteBarrier<Structure> m_emptyObjectStructure;
+        WriteBarrier<Structure> m_nullPrototypeObjectStructure;
+        WriteBarrier<Structure> m_errorStructure;
+        WriteBarrier<Structure> m_functionStructure;
+        WriteBarrier<Structure> m_numberObjectStructure;
+        WriteBarrier<Structure> m_regExpMatchesArrayStructure;
+        WriteBarrier<Structure> m_regExpStructure;
+        WriteBarrier<Structure> m_stringObjectStructure;
+        WriteBarrier<Structure> m_internalFunctionStructure;
 
-            ObjectPrototype* objectPrototype;
-            FunctionPrototype* functionPrototype;
-            ArrayPrototype* arrayPrototype;
-            BooleanPrototype* booleanPrototype;
-            StringPrototype* stringPrototype;
-            NumberPrototype* numberPrototype;
-            DatePrototype* datePrototype;
-            RegExpPrototype* regExpPrototype;
+        unsigned m_profileGroup;
+        Debugger* m_debugger;
 
-            TiObject* methodCallDummy;
-
-            RefPtr<Structure> argumentsStructure;
-            RefPtr<Structure> arrayStructure;
-            RefPtr<Structure> booleanObjectStructure;
-            RefPtr<Structure> callbackConstructorStructure;
-            RefPtr<Structure> callbackFunctionStructure;
-            RefPtr<Structure> callbackObjectStructure;
-            RefPtr<Structure> dateStructure;
-            RefPtr<Structure> emptyObjectStructure;
-            RefPtr<Structure> errorStructure;
-            RefPtr<Structure> functionStructure;
-            RefPtr<Structure> numberObjectStructure;
-            RefPtr<Structure> prototypeFunctionStructure;
-            RefPtr<Structure> regExpMatchesArrayStructure;
-            RefPtr<Structure> regExpStructure;
-            RefPtr<Structure> stringObjectStructure;
-
-            SymbolTable symbolTable;
-            unsigned profileGroup;
-
-            RefPtr<TiGlobalData> globalData;
-
-            HashSet<GlobalCodeBlock*> codeBlocks;
-            WeakMapSet weakMaps;
-            WeakRandom weakRandom;
+        WeakMapSet m_weakMaps;
+        Weak<TiGlobalObject> m_weakMapsFinalizer;
+        class WeakMapsFinalizer : public WeakHandleOwner {
+        public:
+            virtual void finalize(Handle<Unknown>, void* context);
         };
+        static WeakMapsFinalizer* weakMapsFinalizer();
+
+        WeakRandom m_weakRandom;
+
+        SymbolTable m_symbolTable;
+
+        bool m_isEvalEnabled;
 
     public:
         void* operator new(size_t, TiGlobalData*);
 
-        explicit TiGlobalObject()
-            : JSVariableObject(TiGlobalObject::createStructure(jsNull()), new TiGlobalObjectData(destroyTiGlobalObjectData))
+        explicit TiGlobalObject(TiGlobalData& globalData, Structure* structure)
+            : JSVariableObject(globalData, structure, &m_symbolTable, 0)
+            , m_registerArraySize(0)
+            , m_globalScopeChain()
+            , m_weakRandom(static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
+            , m_isEvalEnabled(true)
         {
+            COMPILE_ASSERT(TiGlobalObject::AnonymousSlotCount == 1, TiGlobalObject_has_only_a_single_slot);
+            putThisToAnonymousValue(0);
             init(this);
         }
 
+        static JS_EXPORTDATA const ClassInfo s_info;
+
     protected:
-        TiGlobalObject(NonNullPassRefPtr<Structure> structure, TiGlobalObjectData* data, TiObject* thisValue)
-            : JSVariableObject(structure, data)
+        TiGlobalObject(TiGlobalData& globalData, Structure* structure, TiObject* thisValue)
+            : JSVariableObject(globalData, structure, &m_symbolTable, 0)
+            , m_registerArraySize(0)
+            , m_globalScopeChain()
+            , m_weakRandom(static_cast<unsigned>(randomNumber() * (std::numeric_limits<unsigned>::max() + 1.0)))
+            , m_isEvalEnabled(true)
         {
+            COMPILE_ASSERT(TiGlobalObject::AnonymousSlotCount == 1, TiGlobalObject_has_only_a_single_slot);
+            putThisToAnonymousValue(0);
             init(thisValue);
         }
 
     public:
         virtual ~TiGlobalObject();
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
@@ -198,65 +172,65 @@ namespace TI {
         virtual void defineGetter(TiExcState*, const Identifier& propertyName, TiObject* getterFunc, unsigned attributes);
         virtual void defineSetter(TiExcState*, const Identifier& propertyName, TiObject* setterFunc, unsigned attributes);
 
-        // Linked list of all global objects that use the same TiGlobalData.
-        TiGlobalObject*& head() { return d()->globalData->head; }
-        TiGlobalObject* next() { return d()->next; }
+        // We use this in the code generator as we perform symbol table
+        // lookups prior to initializing the properties
+        bool symbolTableHasProperty(const Identifier& propertyName);
 
         // The following accessors return pristine values, even if a script 
         // replaces the global object's associated property.
 
-        RegExpConstructor* regExpConstructor() const { return d()->regExpConstructor; }
+        RegExpConstructor* regExpConstructor() const { return m_regExpConstructor.get(); }
 
-        ErrorConstructor* errorConstructor() const { return d()->errorConstructor; }
-        NativeErrorConstructor* evalErrorConstructor() const { return d()->evalErrorConstructor; }
-        NativeErrorConstructor* rangeErrorConstructor() const { return d()->rangeErrorConstructor; }
-        NativeErrorConstructor* referenceErrorConstructor() const { return d()->referenceErrorConstructor; }
-        NativeErrorConstructor* syntaxErrorConstructor() const { return d()->syntaxErrorConstructor; }
-        NativeErrorConstructor* typeErrorConstructor() const { return d()->typeErrorConstructor; }
-        NativeErrorConstructor* URIErrorConstructor() const { return d()->URIErrorConstructor; }
+        ErrorConstructor* errorConstructor() const { return m_errorConstructor.get(); }
+        NativeErrorConstructor* evalErrorConstructor() const { return m_evalErrorConstructor.get(); }
+        NativeErrorConstructor* rangeErrorConstructor() const { return m_rangeErrorConstructor.get(); }
+        NativeErrorConstructor* referenceErrorConstructor() const { return m_referenceErrorConstructor.get(); }
+        NativeErrorConstructor* syntaxErrorConstructor() const { return m_syntaxErrorConstructor.get(); }
+        NativeErrorConstructor* typeErrorConstructor() const { return m_typeErrorConstructor.get(); }
+        NativeErrorConstructor* URIErrorConstructor() const { return m_URIErrorConstructor.get(); }
 
-        GlobalEvalFunction* evalFunction() const { return d()->evalFunction; }
+        TiFunction* evalFunction() const { return m_evalFunction.get(); }
+        TiFunction* callFunction() const { return m_callFunction.get(); }
+        TiFunction* applyFunction() const { return m_applyFunction.get(); }
 
-        ObjectPrototype* objectPrototype() const { return d()->objectPrototype; }
-        FunctionPrototype* functionPrototype() const { return d()->functionPrototype; }
-        ArrayPrototype* arrayPrototype() const { return d()->arrayPrototype; }
-        BooleanPrototype* booleanPrototype() const { return d()->booleanPrototype; }
-        StringPrototype* stringPrototype() const { return d()->stringPrototype; }
-        NumberPrototype* numberPrototype() const { return d()->numberPrototype; }
-        DatePrototype* datePrototype() const { return d()->datePrototype; }
-        RegExpPrototype* regExpPrototype() const { return d()->regExpPrototype; }
+        ObjectPrototype* objectPrototype() const { return m_objectPrototype.get(); }
+        FunctionPrototype* functionPrototype() const { return m_functionPrototype.get(); }
+        ArrayPrototype* arrayPrototype() const { return m_arrayPrototype.get(); }
+        BooleanPrototype* booleanPrototype() const { return m_booleanPrototype.get(); }
+        StringPrototype* stringPrototype() const { return m_stringPrototype.get(); }
+        NumberPrototype* numberPrototype() const { return m_numberPrototype.get(); }
+        DatePrototype* datePrototype() const { return m_datePrototype.get(); }
+        RegExpPrototype* regExpPrototype() const { return m_regExpPrototype.get(); }
 
-        TiObject* methodCallDummy() const { return d()->methodCallDummy; }
+        TiObject* methodCallDummy() const { return m_methodCallDummy.get(); }
 
-        Structure* argumentsStructure() const { return d()->argumentsStructure.get(); }
-        Structure* arrayStructure() const { return d()->arrayStructure.get(); }
-        Structure* booleanObjectStructure() const { return d()->booleanObjectStructure.get(); }
-        Structure* callbackConstructorStructure() const { return d()->callbackConstructorStructure.get(); }
-        Structure* callbackFunctionStructure() const { return d()->callbackFunctionStructure.get(); }
-        Structure* callbackObjectStructure() const { return d()->callbackObjectStructure.get(); }
-        Structure* dateStructure() const { return d()->dateStructure.get(); }
-        Structure* emptyObjectStructure() const { return d()->emptyObjectStructure.get(); }
-        Structure* errorStructure() const { return d()->errorStructure.get(); }
-        Structure* functionStructure() const { return d()->functionStructure.get(); }
-        Structure* numberObjectStructure() const { return d()->numberObjectStructure.get(); }
-        Structure* prototypeFunctionStructure() const { return d()->prototypeFunctionStructure.get(); }
-        Structure* regExpMatchesArrayStructure() const { return d()->regExpMatchesArrayStructure.get(); }
-        Structure* regExpStructure() const { return d()->regExpStructure.get(); }
-        Structure* stringObjectStructure() const { return d()->stringObjectStructure.get(); }
+        Structure* argumentsStructure() const { return m_argumentsStructure.get(); }
+        Structure* arrayStructure() const { return m_arrayStructure.get(); }
+        Structure* booleanObjectStructure() const { return m_booleanObjectStructure.get(); }
+        Structure* callbackConstructorStructure() const { return m_callbackConstructorStructure.get(); }
+        Structure* callbackFunctionStructure() const { return m_callbackFunctionStructure.get(); }
+        Structure* callbackObjectStructure() const { return m_callbackObjectStructure.get(); }
+        Structure* dateStructure() const { return m_dateStructure.get(); }
+        Structure* emptyObjectStructure() const { return m_emptyObjectStructure.get(); }
+        Structure* nullPrototypeObjectStructure() const { return m_nullPrototypeObjectStructure.get(); }
+        Structure* errorStructure() const { return m_errorStructure.get(); }
+        Structure* functionStructure() const { return m_functionStructure.get(); }
+        Structure* numberObjectStructure() const { return m_numberObjectStructure.get(); }
+        Structure* internalFunctionStructure() const { return m_internalFunctionStructure.get(); }
+        Structure* regExpMatchesArrayStructure() const { return m_regExpMatchesArrayStructure.get(); }
+        Structure* regExpStructure() const { return m_regExpStructure.get(); }
+        Structure* stringObjectStructure() const { return m_stringObjectStructure.get(); }
 
-        void setProfileGroup(unsigned value) { d()->profileGroup = value; }
-        unsigned profileGroup() const { return d()->profileGroup; }
+        void setProfileGroup(unsigned value) { m_profileGroup = value; }
+        unsigned profileGroup() const { return m_profileGroup; }
 
-        Debugger* debugger() const { return d()->debugger; }
-        void setDebugger(Debugger* debugger) { d()->debugger = debugger; }
-        
+        Debugger* debugger() const { return m_debugger; }
+        void setDebugger(Debugger* debugger) { m_debugger = debugger; }
+
         virtual bool supportsProfiling() const { return false; }
-        
-        int recursion() { return d()->recursion; }
-        void incRecursion() { ++d()->recursion; }
-        void decRecursion() { --d()->recursion; }
-        
-        ScopeChain& globalScopeChain() { return d()->globalScopeChain; }
+        virtual bool supportsRichSourceInfo() const { return true; }
+
+        ScopeChainNode* globalScopeChain() { return m_globalScopeChain.get(); }
 
         virtual bool isGlobalObject() const { return true; }
 
@@ -269,35 +243,39 @@ namespace TI {
 
         virtual bool isDynamicScope(bool& requiresDynamicChecks) const;
 
-        HashSet<GlobalCodeBlock*>& codeBlocks() { return d()->codeBlocks; }
+        void disableEval();
+        bool isEvalEnabled() { return m_isEvalEnabled; }
 
         void copyGlobalsFrom(RegisterFile&);
         void copyGlobalsTo(RegisterFile&);
-        
-        void resetPrototype(TiValue prototype);
+        void resizeRegisters(int oldSize, int newSize);
 
-        TiGlobalData* globalData() { return d()->globalData.get(); }
-        TiGlobalObjectData* d() const { return static_cast<TiGlobalObjectData*>(JSVariableObject::d); }
+        void resetPrototype(TiGlobalData&, TiValue prototype);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        TiGlobalData& globalData() const { return *m_globalData.get(); }
+
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
         void registerWeakMap(OpaqueJSWeakObjectMap* map)
         {
-            d()->weakMaps.add(map);
+            if (!m_weakMapsFinalizer)
+                m_weakMapsFinalizer.set(globalData(), this, weakMapsFinalizer());
+            m_weakMaps.add(map);
         }
 
         void deregisterWeakMap(OpaqueJSWeakObjectMap* map)
         {
-            d()->weakMaps.remove(map);
+            m_weakMaps.remove(map);
         }
 
-        double weakRandomNumber() { return d()->weakRandom.get(); }
+        double weakRandomNumber() { return m_weakRandom.get(); }
     protected:
 
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
+        static const unsigned AnonymousSlotCount = JSVariableObject::AnonymousSlotCount + 1;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
 
         struct GlobalPropertyInfo {
             GlobalPropertyInfo(const Identifier& i, TiValue v, unsigned a)
@@ -314,13 +292,11 @@ namespace TI {
         void addStaticGlobals(GlobalPropertyInfo*, int count);
 
     private:
-        static void destroyTiGlobalObjectData(void*);
-
         // FIXME: Fold reset into init.
         void init(TiObject* thisValue);
         void reset(TiValue prototype);
 
-        void setRegisters(Register* registers, Register* registerArray, size_t count);
+        void setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray, size_t count);
 
         void* operator new(size_t); // can only be allocated with TiGlobalData
     };
@@ -333,42 +309,10 @@ namespace TI {
         return static_cast<TiGlobalObject*>(asObject(value));
     }
 
-    inline void TiGlobalObject::setRegisters(Register* registers, Register* registerArray, size_t count)
+    inline void TiGlobalObject::setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray, size_t count)
     {
         JSVariableObject::setRegisters(registers, registerArray);
-        d()->registerArraySize = count;
-    }
-
-    inline void TiGlobalObject::addStaticGlobals(GlobalPropertyInfo* globals, int count)
-    {
-        size_t oldSize = d()->registerArraySize;
-        size_t newSize = oldSize + count;
-        Register* registerArray = new Register[newSize];
-        if (d()->registerArray)
-            memcpy(registerArray + count, d()->registerArray.get(), oldSize * sizeof(Register));
-        setRegisters(registerArray + newSize, registerArray, newSize);
-
-        for (int i = 0, index = -static_cast<int>(oldSize) - 1; i < count; ++i, --index) {
-            GlobalPropertyInfo& global = globals[i];
-            ASSERT(global.attributes & DontDelete);
-            SymbolTableEntry newEntry(index, global.attributes);
-            symbolTable().add(global.identifier.ustring().rep(), newEntry);
-            registerAt(index) = global.value;
-        }
-    }
-
-    inline bool TiGlobalObject::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
-    {
-        if (JSVariableObject::getOwnPropertySlot(exec, propertyName, slot))
-            return true;
-        return symbolTableGet(propertyName, slot);
-    }
-
-    inline bool TiGlobalObject::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
-    {
-        if (symbolTableGet(propertyName, descriptor))
-            return true;
-        return JSVariableObject::getOwnPropertyDescriptor(exec, propertyName, descriptor);
+        m_registerArraySize = count;
     }
 
     inline bool TiGlobalObject::hasOwnPropertyForWrite(TiExcState* exec, const Identifier& propertyName)
@@ -380,21 +324,19 @@ namespace TI {
         return symbolTableGet(propertyName, slot, slotIsWriteable);
     }
 
+    inline bool TiGlobalObject::symbolTableHasProperty(const Identifier& propertyName)
+    {
+        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
+        return !entry.isNull();
+    }
+
     inline TiValue Structure::prototypeForLookup(TiExcState* exec) const
     {
         if (typeInfo().type() == ObjectType)
-            return m_prototype;
+            return m_prototype.get();
 
-#if USE(JSVALUE32)
-        if (typeInfo().type() == StringType)
-            return exec->lexicalGlobalObject()->stringPrototype();
-
-        ASSERT(typeInfo().type() == NumberType);
-        return exec->lexicalGlobalObject()->numberPrototype();
-#else
         ASSERT(typeInfo().type() == StringType);
         return exec->lexicalGlobalObject()->stringPrototype();
-#endif
     }
 
     inline StructureChain* Structure::prototypeChain(TiExcState* exec) const
@@ -402,7 +344,7 @@ namespace TI {
         // We cache our prototype chain so our clients can share it.
         if (!isValid(exec, m_cachedPrototypeChain.get())) {
             TiValue prototype = prototypeForLookup(exec);
-            m_cachedPrototypeChain = StructureChain::create(prototype.isNull() ? 0 : asObject(prototype)->structure());
+            m_cachedPrototypeChain.set(exec->globalData(), this, StructureChain::create(exec->globalData(), prototype.isNull() ? 0 : asObject(prototype)->structure()));
         }
         return m_cachedPrototypeChain.get();
     }
@@ -413,9 +355,9 @@ namespace TI {
             return false;
 
         TiValue prototype = prototypeForLookup(exec);
-        RefPtr<Structure>* cachedStructure = cachedPrototypeChain->head();
+        WriteBarrier<Structure>* cachedStructure = cachedPrototypeChain->head();
         while(*cachedStructure && !prototype.isNull()) {
-            if (asObject(prototype)->structure() != *cachedStructure)
+            if (asObject(prototype)->structure() != cachedStructure->get())
                 return false;
             ++cachedStructure;
             prototype = asObject(prototype)->prototype();
@@ -434,46 +376,62 @@ namespace TI {
         return globalData().dynamicGlobalObject;
     }
 
-    inline TiObject* constructEmptyObject(TiExcState* exec)
-    {
-        return new (exec) TiObject(exec->lexicalGlobalObject()->emptyObjectStructure());
-    }
-    
     inline TiObject* constructEmptyObject(TiExcState* exec, TiGlobalObject* globalObject)
     {
-        return new (exec) TiObject(globalObject->emptyObjectStructure());
+        return constructEmptyObject(exec, globalObject->emptyObjectStructure());
     }
 
-    inline TiArray* constructEmptyArray(TiExcState* exec)
+    inline TiObject* constructEmptyObject(TiExcState* exec)
     {
-        return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure());
+        return constructEmptyObject(exec, exec->lexicalGlobalObject());
     }
-    
+
     inline TiArray* constructEmptyArray(TiExcState* exec, TiGlobalObject* globalObject)
     {
-        return new (exec) TiArray(globalObject->arrayStructure());
+        return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure());
+    }
+    
+    inline TiArray* constructEmptyArray(TiExcState* exec)
+    {
+        return constructEmptyArray(exec, exec->lexicalGlobalObject());
+    }
+
+    inline TiArray* constructEmptyArray(TiExcState* exec, TiGlobalObject* globalObject, unsigned initialLength)
+    {
+        return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure(), initialLength, CreateInitialized);
     }
 
     inline TiArray* constructEmptyArray(TiExcState* exec, unsigned initialLength)
     {
-        return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure(), initialLength);
+        return constructEmptyArray(exec, exec->lexicalGlobalObject(), initialLength);
+    }
+
+    inline TiArray* constructArray(TiExcState* exec, TiGlobalObject* globalObject, TiValue singleItemValue)
+    {
+        MarkedArgumentBuffer values;
+        values.append(singleItemValue);
+        return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure(), values);
     }
 
     inline TiArray* constructArray(TiExcState* exec, TiValue singleItemValue)
     {
-        MarkedArgumentBuffer values;
-        values.append(singleItemValue);
-        return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure(), values);
+        return constructArray(exec, exec->lexicalGlobalObject(), singleItemValue);
+    }
+
+    inline TiArray* constructArray(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& values)
+    {
+        return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure(), values);
     }
 
     inline TiArray* constructArray(TiExcState* exec, const ArgList& values)
     {
-        return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure(), values);
+        return constructArray(exec, exec->lexicalGlobalObject(), values);
     }
 
-    class DynamicGlobalObjectScope : public Noncopyable {
+    class DynamicGlobalObjectScope {
+        WTF_MAKE_NONCOPYABLE(DynamicGlobalObjectScope);
     public:
-        DynamicGlobalObjectScope(CallFrame* callFrame, TiGlobalObject* dynamicGlobalObject);
+        DynamicGlobalObjectScope(TiGlobalData&, TiGlobalObject*);
 
         ~DynamicGlobalObjectScope()
         {

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // -*- mode: c++; c-basic-offset: 4 -*-
@@ -41,29 +41,30 @@
 
 namespace TI {
 
-    // WebCore uses MasqueradesAsUndefined to make document.all and style.filter undetectable.
-    static const unsigned MasqueradesAsUndefined = 1;
+    static const unsigned MasqueradesAsUndefined = 1; // WebCore uses MasqueradesAsUndefined to make document.all and style.filter undetectable.
     static const unsigned ImplementsHasInstance = 1 << 1;
     static const unsigned OverridesHasInstance = 1 << 2;
     static const unsigned ImplementsDefaultHasInstance = 1 << 3;
     static const unsigned NeedsThisConversion = 1 << 4;
     static const unsigned OverridesGetOwnPropertySlot = 1 << 5;
-    static const unsigned OverridesMarkChildren = 1 << 6;
+    static const unsigned OverridesVisitChildren = 1 << 6;
     static const unsigned OverridesGetPropertyNames = 1 << 7;
+    static const unsigned IsJSFinalObject = 1 << 8;
+    static const unsigned ProhibitsPropertyCaching = 1 << 9;
 
     class TypeInfo {
-        friend class JIT;
     public:
         TypeInfo(TiType type, unsigned flags = 0)
             : m_type(type)
+            , m_flags(flags & 0xff)
+            , m_flags2(flags >> 8)
         {
-            ASSERT(flags <= 0xFF);
-            ASSERT(type <= 0xFF);
+            ASSERT(flags <= 0x3ff);
+            ASSERT(type <= 0xff);
+            ASSERT(type >= CompoundType || !(flags & OverridesVisitChildren));
             // ImplementsDefaultHasInstance means (ImplementsHasInstance & !OverridesHasInstance)
-            if ((flags & (ImplementsHasInstance | OverridesHasInstance)) == ImplementsHasInstance)
-                m_flags = flags | ImplementsDefaultHasInstance;
-            else
-                m_flags = flags;
+            if ((m_flags & (ImplementsHasInstance | OverridesHasInstance)) == ImplementsHasInstance)
+                m_flags |= ImplementsDefaultHasInstance;
         }
 
         TiType type() const { return (TiType)m_type; }
@@ -73,13 +74,26 @@ namespace TI {
         bool overridesHasInstance() const { return m_flags & OverridesHasInstance; }
         bool needsThisConversion() const { return m_flags & NeedsThisConversion; }
         bool overridesGetOwnPropertySlot() const { return m_flags & OverridesGetOwnPropertySlot; }
-        bool overridesMarkChildren() const { return m_flags & OverridesMarkChildren; }
+        bool overridesVisitChildren() const { return m_flags & OverridesVisitChildren; }
         bool overridesGetPropertyNames() const { return m_flags & OverridesGetPropertyNames; }
+        unsigned isFinal() const { return m_flags2 & (IsJSFinalObject >> 8); }
+        unsigned prohibitsPropertyCaching() const { return m_flags2 & (ProhibitsPropertyCaching >> 8); }
         unsigned flags() const { return m_flags; }
+
+        static ptrdiff_t flagsOffset()
+        {
+            return OBJECT_OFFSETOF(TypeInfo, m_flags);
+        }
+
+        static ptrdiff_t typeOffset()
+        {
+            return OBJECT_OFFSETOF(TypeInfo, m_type);
+        }
 
     private:
         unsigned char m_type;
         unsigned char m_flags;
+        unsigned char m_flags2;
     };
 
 }

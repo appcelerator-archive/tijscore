@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,10 +35,15 @@
 
 #if ENABLE(ASSEMBLER)
 
+#define DUMP_LINK_STATISTICS 0
+#define DUMP_CODE 0
+
 #include <MacroAssembler.h>
 #include <wtf/Noncopyable.h>
 
 namespace TI {
+
+class TiGlobalData;
 
 // LinkBuffer:
 //
@@ -54,36 +59,47 @@ namespace TI {
 //   * The address of a Label pointing into the code may be resolved.
 //   * The value referenced by a DataLabel may be set.
 //
-class LinkBuffer : public Noncopyable {
+class LinkBuffer {
+    WTF_MAKE_NONCOPYABLE(LinkBuffer);
     typedef MacroAssemblerCodeRef CodeRef;
     typedef MacroAssemblerCodePtr CodePtr;
     typedef MacroAssembler::Label Label;
     typedef MacroAssembler::Jump Jump;
     typedef MacroAssembler::JumpList JumpList;
     typedef MacroAssembler::Call Call;
+    typedef MacroAssembler::DataLabelCompact DataLabelCompact;
     typedef MacroAssembler::DataLabel32 DataLabel32;
     typedef MacroAssembler::DataLabelPtr DataLabelPtr;
-    typedef MacroAssembler::JmpDst JmpDst;
 #if ENABLE(BRANCH_COMPACTION)
     typedef MacroAssembler::LinkRecord LinkRecord;
     typedef MacroAssembler::JumpLinkType JumpLinkType;
 #endif
 
 public:
-    // Note: Initialization sequence is significant, since executablePool is a PassRefPtr.
-    //       First, executablePool is copied into m_executablePool, then the initialization of
-    //       m_code uses m_executablePool, *not* executablePool, since this is no longer valid.
-    // The linkOffset parameter should only be non-null when recompiling for exception info
-    LinkBuffer(MacroAssembler* masm, PassRefPtr<ExecutablePool> executablePool, void* linkOffset)
+    LinkBuffer(TiGlobalData& globalData, MacroAssembler* masm, PassRefPtr<ExecutablePool> executablePool)
         : m_executablePool(executablePool)
         , m_size(0)
         , m_code(0)
         , m_assembler(masm)
+        , m_globalData(&globalData)
 #ifndef NDEBUG
         , m_completed(false)
 #endif
     {
-        linkCode(linkOffset);
+        linkCode();
+    }
+
+    LinkBuffer(TiGlobalData& globalData, MacroAssembler* masm, ExecutableAllocator& allocator)
+        : m_executablePool(allocator.poolForSize(globalData, masm->m_assembler.codeSize()))
+        , m_size(0)
+        , m_code(0)
+        , m_assembler(masm)
+        , m_globalData(&globalData)
+#ifndef NDEBUG
+        , m_completed(false)
+#endif
+    {
+        linkCode();
     }
 
     ~LinkBuffer()
@@ -114,13 +130,13 @@ public:
 
     void patch(DataLabelPtr label, void* value)
     {
-        JmpDst target = applyOffset(label.m_label);
+        AssemblerLabel target = applyOffset(label.m_label);
         MacroAssembler::linkPointer(code(), target, value);
     }
 
     void patch(DataLabelPtr label, CodeLocationLabel value)
     {
-        JmpDst target = applyOffset(label.m_label);
+        AssemblerLabel target = applyOffset(label.m_label);
         MacroAssembler::linkPointer(code(), target, value.executableAddress());
     }
 
@@ -154,6 +170,11 @@ public:
     {
         return CodeLocationDataLabel32(MacroAssembler::getLinkerAddress(code(), applyOffset(label.m_label)));
     }
+    
+    CodeLocationDataLabelCompact locationOf(DataLabelCompact label)
+    {
+        return CodeLocationDataLabelCompact(MacroAssembler::getLinkerAddress(code(), applyOffset(label.m_label)));
+    }
 
     // This method obtains the return address of the call, given as an offset from
     // the start of the code.
@@ -186,6 +207,13 @@ public:
         return CodePtr(MacroAssembler::AssemblerType_T::getRelocatedAddress(code(), applyOffset(label.m_label)));
     }
 
+#ifndef NDEBUG
+    void* debugAddress()
+    {
+        return m_code;
+    }
+#endif
+
 private:
     template <typename T> T applyOffset(T src)
     {
@@ -202,22 +230,21 @@ private:
         return m_code;
     }
 
-    void linkCode(void* linkOffset)
+    void linkCode()
     {
-        UNUSED_PARAM(linkOffset);
         ASSERT(!m_code);
 #if !ENABLE(BRANCH_COMPACTION)
-        m_code = m_assembler->m_assembler.executableCopy(m_executablePool.get());
-        m_size = m_assembler->size();
+        m_code = m_assembler->m_assembler.executableCopy(*m_globalData, m_executablePool.get());
+        m_size = m_assembler->m_assembler.codeSize();
+        ASSERT(m_code);
 #else
-        size_t initialSize = m_assembler->size();
-        m_code = (uint8_t*)m_executablePool->alloc(initialSize);
+        size_t initialSize = m_assembler->m_assembler.codeSize();
+        m_code = (uint8_t*)m_executablePool->alloc(*m_globalData, initialSize);
         if (!m_code)
             return;
-        ExecutableAllocator::makeWritable(m_code, m_assembler->size());
+        ExecutableAllocator::makeWritable(m_code, initialSize);
         uint8_t* inData = (uint8_t*)m_assembler->unlinkedCode();
         uint8_t* outData = reinterpret_cast<uint8_t*>(m_code);
-        const uint8_t* linkBase = linkOffset ? reinterpret_cast<uint8_t*>(linkOffset) : outData;
         int readPtr = 0;
         int writePtr = 0;
         Vector<LinkRecord>& jumpsToLink = m_assembler->jumpsToLink();
@@ -228,7 +255,14 @@ private:
             
             // Copy the instructions from the last jump to the current one.
             size_t regionSize = jumpsToLink[i].from() - readPtr;
-            memcpy(outData + writePtr, inData + readPtr, regionSize);
+            uint16_t* copySource = reinterpret_cast<uint16_t*>(inData + readPtr);
+            uint16_t* copyEnd = reinterpret_cast<uint16_t*>(inData + readPtr + regionSize);
+            uint16_t* copyDst = reinterpret_cast<uint16_t*>(outData + writePtr);
+            ASSERT(!(regionSize % 2));
+            ASSERT(!(readPtr % 2));
+            ASSERT(!(writePtr % 2));
+            while (copySource != copyEnd)
+                *copyDst++ = *copySource++;
             m_assembler->recordLinkOffsets(readPtr, jumpsToLink[i].from(), offset);
             readPtr += regionSize;
             writePtr += regionSize;
@@ -237,11 +271,11 @@ private:
             // branches we need to be precise, forward branches we are pessimistic
             const uint8_t* target;
             if (jumpsToLink[i].to() >= jumpsToLink[i].from())
-                target = linkBase + jumpsToLink[i].to() - offset; // Compensate for what we have collapsed so far
+                target = outData + jumpsToLink[i].to() - offset; // Compensate for what we have collapsed so far
             else
-                target = linkBase + jumpsToLink[i].to() - m_assembler->executableOffsetFor(jumpsToLink[i].to());
+                target = outData + jumpsToLink[i].to() - m_assembler->executableOffsetFor(jumpsToLink[i].to());
             
-            JumpLinkType jumpLinkType = m_assembler->computeJumpType(jumpsToLink[i], linkBase + writePtr, target);
+            JumpLinkType jumpLinkType = m_assembler->computeJumpType(jumpsToLink[i], outData + writePtr, target);
             // Compact branch if we can...
             if (m_assembler->canCompact(jumpsToLink[i].type())) {
                 // Step back in the write stream
@@ -254,22 +288,25 @@ private:
             jumpsToLink[i].setFrom(writePtr);
         }
         // Copy everything after the last jump
-        memcpy(outData + writePtr, inData + readPtr, m_assembler->size() - readPtr);
-        m_assembler->recordLinkOffsets(readPtr, m_assembler->size(), readPtr - writePtr);
+        memcpy(outData + writePtr, inData + readPtr, initialSize - readPtr);
+        m_assembler->recordLinkOffsets(readPtr, initialSize, readPtr - writePtr);
         
-        // Actually link everything (don't link if we've be given a linkoffset as it's a
-        // waste of time: linkOffset is used for recompiling to get exception info)
-        if (!linkOffset) {
-            for (unsigned i = 0; i < jumpCount; ++i) {
-                uint8_t* location = outData + jumpsToLink[i].from();
-                uint8_t* target = outData + jumpsToLink[i].to() - m_assembler->executableOffsetFor(jumpsToLink[i].to());
-                m_assembler->link(jumpsToLink[i], location, target);
-            }
+        for (unsigned i = 0; i < jumpCount; ++i) {
+            uint8_t* location = outData + jumpsToLink[i].from();
+            uint8_t* target = outData + jumpsToLink[i].to() - m_assembler->executableOffsetFor(jumpsToLink[i].to());
+            m_assembler->link(jumpsToLink[i], location, target);
         }
 
         jumpsToLink.clear();
-        m_size = writePtr + m_assembler->size() - readPtr;
+        m_size = writePtr + initialSize - readPtr;
         m_executablePool->tryShrink(m_code, initialSize, m_size);
+
+#if DUMP_LINK_STATISTICS
+        dumpLinkStatistics(m_code, initialSize, m_size);
+#endif
+#if DUMP_CODE
+        dumpCode(m_code, m_size);
+#endif
 #endif
     }
 
@@ -284,10 +321,58 @@ private:
         ExecutableAllocator::cacheFlush(code(), m_size);
     }
 
+#if DUMP_LINK_STATISTICS
+    static void dumpLinkStatistics(void* code, size_t initialSize, size_t finalSize)
+    {
+        static unsigned linkCount = 0;
+        static unsigned totalInitialSize = 0;
+        static unsigned totalFinalSize = 0;
+        linkCount++;
+        totalInitialSize += initialSize;
+        totalFinalSize += finalSize;
+        printf("link %p: orig %u, compact %u (delta %u, %.2f%%)\n", 
+               code, static_cast<unsigned>(initialSize), static_cast<unsigned>(finalSize),
+               static_cast<unsigned>(initialSize - finalSize),
+               100.0 * (initialSize - finalSize) / initialSize);
+        printf("\ttotal %u: orig %u, compact %u (delta %u, %.2f%%)\n", 
+               linkCount, totalInitialSize, totalFinalSize, totalInitialSize - totalFinalSize,
+               100.0 * (totalInitialSize - totalFinalSize) / totalInitialSize);
+    }
+#endif
+    
+#if DUMP_CODE
+    static void dumpCode(void* code, size_t size)
+    {
+#if CPU(ARM_THUMB2)
+        // Dump the generated code in an asm file format that can be assembled and then disassembled
+        // for debugging purposes. For example, save this output as jit.s:
+        //   gcc -arch armv7 -c jit.s
+        //   otool -tv jit.o
+        static unsigned codeCount = 0;
+        unsigned short* tcode = static_cast<unsigned short*>(code);
+        size_t tsize = size / sizeof(short);
+        char nameBuf[128];
+        snprintf(nameBuf, sizeof(nameBuf), "_jsc_jit%u", codeCount++);
+        printf("\t.syntax unified\n"
+               "\t.section\t__TEXT,__text,regular,pure_instructions\n"
+               "\t.globl\t%s\n"
+               "\t.align 2\n"
+               "\t.code 16\n"
+               "\t.thumb_func\t%s\n"
+               "# %p\n"
+               "%s:\n", nameBuf, nameBuf, code, nameBuf);
+        
+        for (unsigned i = 0; i < tsize; i++)
+            printf("\t.short\t0x%x\n", tcode[i]);
+#endif
+    }
+#endif
+    
     RefPtr<ExecutablePool> m_executablePool;
     size_t m_size;
     void* m_code;
     MacroAssembler* m_assembler;
+    TiGlobalData* m_globalData;
 #ifndef NDEBUG
     bool m_completed;
 #endif

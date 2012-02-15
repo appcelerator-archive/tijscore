@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,8 +39,6 @@
 
 #include <mach/vm_statistics.h>
 
-#if !defined(TARGETING_TIGER)
-
 #if defined(VM_MEMORY_TCMALLOC)
 #define VM_TAG_FOR_TCMALLOC_MEMORY VM_MAKE_TAG(VM_MEMORY_TCMALLOC)
 #else
@@ -58,19 +56,6 @@
 #else
 #define VM_TAG_FOR_REGISTERFILE_MEMORY VM_MAKE_TAG(65)
 #endif // defined(VM_MEMORY_JAVASCRIPT_JIT_REGISTER_FILE)
-
-#else // !defined(TARGETING_TIGER)
-
-// mmap on Tiger fails with tags that work on Leopard, so fall
-// back to Tiger-compatible tags (that also work on Leopard)
-// when targeting Tiger.
-#define VM_TAG_FOR_TCMALLOC_MEMORY -1
-#define VM_TAG_FOR_EXECUTABLEALLOCATOR_MEMORY -1
-#define VM_TAG_FOR_REGISTERFILE_MEMORY -1
-
-#endif // !defined(TARGETING_TIGER)
-
-// Tags for vm_map and vm_allocate work on both Tiger and Leopard.
 
 #if defined(VM_MEMORY_JAVASCRIPT_CORE)
 #define VM_TAG_FOR_COLLECTOR_MEMORY VM_MAKE_TAG(VM_MEMORY_JAVASCRIPT_CORE)

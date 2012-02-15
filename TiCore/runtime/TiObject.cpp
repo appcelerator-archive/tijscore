@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,6 +34,7 @@
 #include "DatePrototype.h"
 #include "ErrorConstructor.h"
 #include "GetterSetter.h"
+#include "TiFunction.h"
 #include "TiGlobalObject.h"
 #include "NativeErrorConstructor.h"
 #include "ObjectPrototype.h"
@@ -48,6 +49,12 @@
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(TiObject);
+ASSERT_CLASS_FITS_IN_CELL(JSNonFinalObject);
+ASSERT_CLASS_FITS_IN_CELL(JSFinalObject);
+
+const char* StrictModeReadonlyPropertyWriteError = "Attempted to assign to readonly property.";
+
+const ClassInfo TiObject::s_info = { "Object", 0, 0, 0 };
 
 static inline void getClassPropertyNames(TiExcState* exec, const ClassInfo* classInfo, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
@@ -68,26 +75,26 @@ static inline void getClassPropertyNames(TiExcState* exec, const ClassInfo* clas
     }
 }
 
-void TiObject::markChildren(MarkStack& markStack)
+void TiObject::visitChildren(SlotVisitor& visitor)
 {
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
 #ifndef NDEBUG
-    bool wasCheckingForDefaultMarkViolation = markStack.m_isCheckingForDefaultMarkViolation;
-    markStack.m_isCheckingForDefaultMarkViolation = false;
+    bool wasCheckingForDefaultMarkViolation = visitor.m_isCheckingForDefaultMarkViolation;
+    visitor.m_isCheckingForDefaultMarkViolation = false;
 #endif
 
-    markChildrenDirect(markStack);
+    visitChildrenDirect(visitor);
 
 #ifndef NDEBUG
-    markStack.m_isCheckingForDefaultMarkViolation = wasCheckingForDefaultMarkViolation;
+    visitor.m_isCheckingForDefaultMarkViolation = wasCheckingForDefaultMarkViolation;
 #endif
 }
 
 UString TiObject::className() const
 {
     const ClassInfo* info = classInfo();
-    if (info)
-        return info->className;
-    return "Object";
+    ASSERT(info);
+    return info->className;
 }
 
 bool TiObject::getOwnPropertySlot(TiExcState* exec, unsigned propertyName, PropertySlot& slot)
@@ -97,7 +104,7 @@ bool TiObject::getOwnPropertySlot(TiExcState* exec, unsigned propertyName, Prope
 
 static void throwSetterError(TiExcState* exec)
 {
-    throwError(exec, TypeError, "setting a property that has only a getter");
+    throwError(exec, createTypeError(exec, "setting a property that has only a getter"));
 }
 
 // ECMA 8.6.2.2
@@ -110,18 +117,8 @@ void TiObject::put(TiExcState* exec, const Identifier& propertyName, TiValue val
         // Setting __proto__ to a non-object, non-null value is silently ignored to match Mozilla.
         if (!value.isObject() && !value.isNull())
             return;
-
-        TiValue nextPrototypeValue = value;
-        while (nextPrototypeValue && nextPrototypeValue.isObject()) {
-            TiObject* nextPrototype = asObject(nextPrototypeValue)->unwrappedObject();
-            if (nextPrototype == this) {
-                throwError(exec, GeneralError, "cyclic __proto__ value");
-                return;
-            }
-            nextPrototypeValue = nextPrototype->prototype();
-        }
-
-        setPrototype(value);
+        if (!setPrototypeWithCycleCheck(exec->globalData(), value))
+            throwError(exec, createError(exec, "cyclic __proto__ value"));
         return;
     }
 
@@ -130,18 +127,22 @@ void TiObject::put(TiExcState* exec, const Identifier& propertyName, TiValue val
     for (TiObject* obj = this; !obj->structure()->hasGetterSetterProperties(); obj = asObject(prototype)) {
         prototype = obj->prototype();
         if (prototype.isNull()) {
-            putDirectInternal(exec->globalData(), propertyName, value, 0, true, slot);
+            if (!putDirectInternal(exec->globalData(), propertyName, value, 0, true, slot) && slot.isStrictMode())
+                throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
             return;
         }
     }
     
     unsigned attributes;
     TiCell* specificValue;
-    if ((m_structure->get(propertyName, attributes, specificValue) != WTI::notFound) && attributes & ReadOnly)
+    if ((m_structure->get(exec->globalData(), propertyName, attributes, specificValue) != WTI::notFound) && attributes & ReadOnly) {
+        if (slot.isStrictMode())
+            throwError(exec, createTypeError(exec, StrictModeReadonlyPropertyWriteError));
         return;
+    }
 
     for (TiObject* obj = this; ; obj = asObject(prototype)) {
-        if (TiValue gs = obj->getDirect(propertyName)) {
+        if (TiValue gs = obj->getDirect(exec->globalData(), propertyName)) {
             if (gs.isGetterSetter()) {
                 TiObject* setterFunc = asGetterSetter(gs)->setter();        
                 if (!setterFunc) {
@@ -167,7 +168,8 @@ void TiObject::put(TiExcState* exec, const Identifier& propertyName, TiValue val
             break;
     }
 
-    putDirectInternal(exec->globalData(), propertyName, value, 0, true, slot);
+    if (!putDirectInternal(exec->globalData(), propertyName, value, 0, true, slot) && slot.isStrictMode())
+        throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
     return;
 }
 
@@ -175,6 +177,21 @@ void TiObject::put(TiExcState* exec, unsigned propertyName, TiValue value)
 {
     PutPropertySlot slot;
     put(exec, Identifier::from(exec, propertyName), value, slot);
+}
+
+void TiObject::putWithAttributes(TiGlobalData* globalData, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
+{
+    putDirectInternal(*globalData, propertyName, value, attributes, checkReadOnly, slot);
+}
+
+void TiObject::putWithAttributes(TiGlobalData* globalData, const Identifier& propertyName, TiValue value, unsigned attributes)
+{
+    putDirectInternal(*globalData, propertyName, value, attributes);
+}
+
+void TiObject::putWithAttributes(TiGlobalData* globalData, unsigned propertyName, TiValue value, unsigned attributes)
+{
+    putWithAttributes(globalData, Identifier::from(globalData, propertyName), value, attributes);
 }
 
 void TiObject::putWithAttributes(TiExcState* exec, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
@@ -209,10 +226,10 @@ bool TiObject::deleteProperty(TiExcState* exec, const Identifier& propertyName)
 {
     unsigned attributes;
     TiCell* specificValue;
-    if (m_structure->get(propertyName, attributes, specificValue) != WTI::notFound) {
+    if (m_structure->get(exec->globalData(), propertyName, attributes, specificValue) != WTI::notFound) {
         if ((attributes & DontDelete))
             return false;
-        removeDirect(propertyName);
+        removeDirect(exec->globalData(), propertyName);
         return true;
     }
 
@@ -240,7 +257,7 @@ static ALWAYS_INLINE TiValue callDefaultValueFunction(TiExcState* exec, const Ti
 {
     TiValue function = object->get(exec, propertyName);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
         return exec->exception();
 
@@ -287,7 +304,7 @@ TiValue TiObject::defaultValue(TiExcState* exec, PreferredPrimitiveType hint) co
 
     ASSERT(!exec->hadException());
 
-    return throwError(exec, TypeError, "No default value");
+    return throwError(exec, createTypeError(exec, "No default value"));
 }
 
 const HashEntry* TiObject::findPropertyHashEntry(TiExcState* exec, const Identifier& propertyName) const
@@ -303,37 +320,36 @@ const HashEntry* TiObject::findPropertyHashEntry(TiExcState* exec, const Identif
 
 void TiObject::defineGetter(TiExcState* exec, const Identifier& propertyName, TiObject* getterFunction, unsigned attributes)
 {
-    TiValue object = getDirect(propertyName);
+    TiValue object = getDirect(exec->globalData(), propertyName);
     if (object && object.isGetterSetter()) {
         ASSERT(m_structure->hasGetterSetterProperties());
-        asGetterSetter(object)->setGetter(getterFunction);
+        asGetterSetter(object)->setGetter(exec->globalData(), getterFunction);
         return;
     }
 
+    TiGlobalData& globalData = exec->globalData();
     PutPropertySlot slot;
     GetterSetter* getterSetter = new (exec) GetterSetter(exec);
-    putDirectInternal(exec->globalData(), propertyName, getterSetter, attributes | Getter, true, slot);
+    putDirectInternal(globalData, propertyName, getterSetter, attributes | Getter, true, slot);
 
     // putDirect will change our Structure if we add a new property. For
     // getters and setters, though, we also need to change our Structure
     // if we override an existing non-getter or non-setter.
     if (slot.type() != PutPropertySlot::NewProperty) {
-        if (!m_structure->isDictionary()) {
-            RefPtr<Structure> structure = Structure::getterSetterTransition(m_structure);
-            setStructure(structure.release());
-        }
+        if (!m_structure->isDictionary())
+            setStructure(exec->globalData(), Structure::getterSetterTransition(globalData, m_structure.get()));
     }
 
     m_structure->setHasGetterSetterProperties(true);
-    getterSetter->setGetter(getterFunction);
+    getterSetter->setGetter(globalData, getterFunction);
 }
 
 void TiObject::defineSetter(TiExcState* exec, const Identifier& propertyName, TiObject* setterFunction, unsigned attributes)
 {
-    TiValue object = getDirect(propertyName);
+    TiValue object = getDirect(exec->globalData(), propertyName);
     if (object && object.isGetterSetter()) {
         ASSERT(m_structure->hasGetterSetterProperties());
-        asGetterSetter(object)->setSetter(setterFunction);
+        asGetterSetter(object)->setSetter(exec->globalData(), setterFunction);
         return;
     }
 
@@ -345,21 +361,19 @@ void TiObject::defineSetter(TiExcState* exec, const Identifier& propertyName, Ti
     // getters and setters, though, we also need to change our Structure
     // if we override an existing non-getter or non-setter.
     if (slot.type() != PutPropertySlot::NewProperty) {
-        if (!m_structure->isDictionary()) {
-            RefPtr<Structure> structure = Structure::getterSetterTransition(m_structure);
-            setStructure(structure.release());
-        }
+        if (!m_structure->isDictionary())
+            setStructure(exec->globalData(), Structure::getterSetterTransition(exec->globalData(), m_structure.get()));
     }
 
     m_structure->setHasGetterSetterProperties(true);
-    getterSetter->setSetter(setterFunction);
+    getterSetter->setSetter(exec->globalData(), setterFunction);
 }
 
-TiValue TiObject::lookupGetter(TiExcState*, const Identifier& propertyName)
+TiValue TiObject::lookupGetter(TiExcState* exec, const Identifier& propertyName)
 {
     TiObject* object = this;
     while (true) {
-        if (TiValue value = object->getDirect(propertyName)) {
+        if (TiValue value = object->getDirect(exec->globalData(), propertyName)) {
             if (!value.isGetterSetter())
                 return jsUndefined();
             TiObject* functionObject = asGetterSetter(value)->getter();
@@ -374,11 +388,11 @@ TiValue TiObject::lookupGetter(TiExcState*, const Identifier& propertyName)
     }
 }
 
-TiValue TiObject::lookupSetter(TiExcState*, const Identifier& propertyName)
+TiValue TiObject::lookupSetter(TiExcState* exec, const Identifier& propertyName)
 {
     TiObject* object = this;
     while (true) {
-        if (TiValue value = object->getDirect(propertyName)) {
+        if (TiValue value = object->getDirect(exec->globalData(), propertyName)) {
             if (!value.isGetterSetter())
                 return jsUndefined();
             TiObject* functionObject = asGetterSetter(value)->setter();
@@ -399,7 +413,7 @@ bool TiObject::hasInstance(TiExcState* exec, TiValue value, TiValue proto)
         return false;
 
     if (!proto.isObject()) {
-        throwError(exec, TypeError, "instanceof called on an object with an invalid prototype property.");
+        throwError(exec, createTypeError(exec, "instanceof called on an object with an invalid prototype property."));
         return false;
     }
 
@@ -419,10 +433,10 @@ bool TiObject::propertyIsEnumerable(TiExcState* exec, const Identifier& property
     return descriptor.enumerable();
 }
 
-bool TiObject::getPropertySpecificValue(TiExcState*, const Identifier& propertyName, TiCell*& specificValue) const
+bool TiObject::getPropertySpecificValue(TiExcState* exec, const Identifier& propertyName, TiCell*& specificValue) const
 {
     unsigned attributes;
-    if (m_structure->get(propertyName, attributes, specificValue) != WTI::notFound)
+    if (m_structure->get(exec->globalData(), propertyName, attributes, specificValue) != WTI::notFound)
         return true;
 
     // This could be a function within the static table? - should probably
@@ -455,7 +469,7 @@ void TiObject::getPropertyNames(TiExcState* exec, PropertyNameArray& propertyNam
 
 void TiObject::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propertyNames, EnumerationMode mode)
 {
-    m_structure->getPropertyNames(propertyNames, mode);
+    m_structure->getPropertyNames(exec->globalData(), propertyNames, mode);
     getClassPropertyNames(exec, classInfo(), propertyNames, mode);
 }
 
@@ -480,7 +494,7 @@ UString TiObject::toString(TiExcState* exec) const
     return primitive.toString(exec);
 }
 
-TiObject* TiObject::toObject(TiExcState*) const
+TiObject* TiObject::toObject(TiExcState*, TiGlobalObject*) const
 {
     return const_cast<TiObject*>(this);
 }
@@ -490,40 +504,79 @@ TiObject* TiObject::toThisObject(TiExcState*) const
     return const_cast<TiObject*>(this);
 }
 
+TiValue TiObject::toStrictThisObject(TiExcState*) const
+{
+    return const_cast<TiObject*>(this);
+}
+
 TiObject* TiObject::unwrappedObject()
 {
     return this;
 }
 
-void TiObject::removeDirect(const Identifier& propertyName)
+void TiObject::seal(TiGlobalData& globalData)
 {
+    if (isSealed(globalData))
+        return;
+    preventExtensions(globalData);
+    setStructure(globalData, Structure::sealTransition(globalData, m_structure.get()));
+}
+
+void TiObject::freeze(TiGlobalData& globalData)
+{
+    if (isFrozen(globalData))
+        return;
+    preventExtensions(globalData);
+    setStructure(globalData, Structure::freezeTransition(globalData, m_structure.get()));
+}
+
+void TiObject::preventExtensions(TiGlobalData& globalData)
+{
+    if (isExtensible())
+        setStructure(globalData, Structure::preventExtensionsTransition(globalData, m_structure.get()));
+}
+
+void TiObject::removeDirect(TiGlobalData& globalData, const Identifier& propertyName)
+{
+    if (m_structure->get(globalData, propertyName) == WTI::notFound)
+        return;
+
     size_t offset;
     if (m_structure->isUncacheableDictionary()) {
-        offset = m_structure->removePropertyWithoutTransition(propertyName);
+        offset = m_structure->removePropertyWithoutTransition(globalData, propertyName);
         if (offset != WTI::notFound)
-            putDirectOffset(offset, jsUndefined());
+            putUndefinedAtDirectOffset(offset);
         return;
     }
 
-    RefPtr<Structure> structure = Structure::removePropertyTransition(m_structure, propertyName, offset);
-    setStructure(structure.release());
+    setStructure(globalData, Structure::removePropertyTransition(globalData, m_structure.get(), propertyName, offset));
     if (offset != WTI::notFound)
-        putDirectOffset(offset, jsUndefined());
+        putUndefinedAtDirectOffset(offset);
 }
 
 void TiObject::putDirectFunction(TiExcState* exec, InternalFunction* function, unsigned attr)
 {
-    putDirectFunction(Identifier(exec, function->name(exec)), function, attr);
+    putDirectFunction(exec->globalData(), Identifier(exec, function->name(exec)), function, attr);
+}
+
+void TiObject::putDirectFunction(TiExcState* exec, TiFunction* function, unsigned attr)
+{
+    putDirectFunction(exec->globalData(), Identifier(exec, function->name(exec)), function, attr);
 }
 
 void TiObject::putDirectFunctionWithoutTransition(TiExcState* exec, InternalFunction* function, unsigned attr)
 {
-    putDirectFunctionWithoutTransition(Identifier(exec, function->name(exec)), function, attr);
+    putDirectFunctionWithoutTransition(exec->globalData(), Identifier(exec, function->name(exec)), function, attr);
 }
 
-NEVER_INLINE void TiObject::fillGetterPropertySlot(PropertySlot& slot, TiValue* location)
+void TiObject::putDirectFunctionWithoutTransition(TiExcState* exec, TiFunction* function, unsigned attr)
 {
-    if (TiObject* getterFunction = asGetterSetter(*location)->getter()) {
+    putDirectFunctionWithoutTransition(exec->globalData(), Identifier(exec, function->name(exec)), function, attr);
+}
+
+NEVER_INLINE void TiObject::fillGetterPropertySlot(PropertySlot& slot, WriteBarrierBase<Unknown>* location)
+{
+    if (TiObject* getterFunction = asGetterSetter(location->get())->getter()) {
         if (!structure()->isDictionary())
             slot.setCacheableGetterSlot(this, getterFunction, offsetForLocation(location));
         else
@@ -532,22 +585,38 @@ NEVER_INLINE void TiObject::fillGetterPropertySlot(PropertySlot& slot, TiValue* 
         slot.setUndefined();
 }
 
-Structure* TiObject::createInheritorID()
+Structure* TiObject::createInheritorID(TiGlobalData& globalData)
 {
-    m_inheritorID = TiObject::createStructure(this);
+    m_inheritorID.set(globalData, this, createEmptyObjectStructure(globalData, this));
+    ASSERT(m_inheritorID->isEmpty());
     return m_inheritorID.get();
 }
 
 void TiObject::allocatePropertyStorage(size_t oldSize, size_t newSize)
 {
-    allocatePropertyStorageInline(oldSize, newSize);
+    ASSERT(newSize > oldSize);
+
+    // It's important that this function not rely on m_structure, since
+    // we might be in the middle of a transition.
+    bool wasInline = (oldSize < TiObject::baseExternalStorageCapacity);
+
+    PropertyStorage oldPropertyStorage = m_propertyStorage;
+    PropertyStorage newPropertyStorage = new WriteBarrierBase<Unknown>[newSize];
+
+    for (unsigned i = 0; i < oldSize; ++i)
+       newPropertyStorage[i] = oldPropertyStorage[i];
+
+    if (!wasInline)
+        delete [] oldPropertyStorage;
+
+    m_propertyStorage = newPropertyStorage;
 }
 
-bool TiObject::getOwnPropertyDescriptor(TiExcState*, const Identifier& propertyName, PropertyDescriptor& descriptor)
+bool TiObject::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
     unsigned attributes = 0;
     TiCell* cell = 0;
-    size_t offset = m_structure->get(propertyName, attributes, cell);
+    size_t offset = m_structure->get(exec->globalData(), propertyName, attributes, cell);
     if (offset == WTI::notFound)
         return false;
     descriptor.setDescriptor(getDirectOffset(offset), attributes);
@@ -567,10 +636,28 @@ bool TiObject::getPropertyDescriptor(TiExcState* exec, const Identifier& propert
     }
 }
 
-static bool putDescriptor(TiExcState* exec, TiObject* target, const Identifier& propertyName, PropertyDescriptor& descriptor, unsigned attributes, TiValue oldValue)
+static bool putDescriptor(TiExcState* exec, TiObject* target, const Identifier& propertyName, PropertyDescriptor& descriptor, unsigned attributes, const PropertyDescriptor& oldDescriptor)
 {
     if (descriptor.isGenericDescriptor() || descriptor.isDataDescriptor()) {
-        target->putWithAttributes(exec, propertyName, descriptor.value() ? descriptor.value() : oldValue, attributes & ~(Getter | Setter));
+        if (descriptor.isGenericDescriptor() && oldDescriptor.isAccessorDescriptor()) {
+            GetterSetter* accessor = new (exec) GetterSetter(exec);
+            if (oldDescriptor.getter()) {
+                attributes |= Getter;
+                accessor->setGetter(exec->globalData(), asObject(oldDescriptor.getter()));
+            }
+            if (oldDescriptor.setter()) {
+                attributes |= Setter;
+                accessor->setSetter(exec->globalData(), asObject(oldDescriptor.setter()));
+            }
+            target->putWithAttributes(exec, propertyName, accessor, attributes);
+            return true;
+        }
+        TiValue newValue = jsUndefined();
+        if (descriptor.value())
+            newValue = descriptor.value();
+        else if (oldDescriptor.value())
+            newValue = oldDescriptor.value();
+        target->putWithAttributes(exec, propertyName, newValue, attributes & ~(Getter | Setter));
         return true;
     }
     attributes &= ~ReadOnly;
@@ -587,8 +674,17 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
 {
     // If we have a new property we can just put it on normally
     PropertyDescriptor current;
-    if (!getOwnPropertyDescriptor(exec, propertyName, current))
-        return putDescriptor(exec, this, propertyName, descriptor, descriptor.attributes(), jsUndefined());
+    if (!getOwnPropertyDescriptor(exec, propertyName, current)) {
+        // unless extensions are prevented!
+        if (!isExtensible()) {
+            if (throwException)
+                throwError(exec, createTypeError(exec, "Attempting to define property on object that is not extensible."));
+            return false;
+        }
+        PropertyDescriptor oldDescriptor;
+        oldDescriptor.setValue(jsUndefined());
+        return putDescriptor(exec, this, propertyName, descriptor, descriptor.attributes(), oldDescriptor);
+    }
 
     if (descriptor.isEmpty())
         return true;
@@ -600,12 +696,12 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
     if (!current.configurable()) {
         if (descriptor.configurable()) {
             if (throwException)
-                throwError(exec, TypeError, "Attempting to configurable attribute of unconfigurable property.");
+                throwError(exec, createTypeError(exec, "Attempting to configurable attribute of unconfigurable property."));
             return false;
         }
         if (descriptor.enumerablePresent() && descriptor.enumerable() != current.enumerable()) {
             if (throwException)
-                throwError(exec, TypeError, "Attempting to change enumerable attribute of unconfigurable property.");
+                throwError(exec, createTypeError(exec, "Attempting to change enumerable attribute of unconfigurable property."));
             return false;
         }
     }
@@ -614,7 +710,7 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
     if (descriptor.isGenericDescriptor()) {
         if (!current.attributesEqual(descriptor)) {
             deleteProperty(exec, propertyName);
-            putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current.value());
+            putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
         }
         return true;
     }
@@ -623,11 +719,11 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
     if (descriptor.isDataDescriptor() != current.isDataDescriptor()) {
         if (!current.configurable()) {
             if (throwException)
-                throwError(exec, TypeError, "Attempting to change access mechanism for an unconfigurable property.");
+                throwError(exec, createTypeError(exec, "Attempting to change access mechanism for an unconfigurable property."));
             return false;
         }
         deleteProperty(exec, propertyName);
-        return putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current.value() ? current.value() : jsUndefined());
+        return putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
     }
 
     // Changing the value and attributes of an existing property
@@ -635,13 +731,13 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
         if (!current.configurable()) {
             if (!current.writable() && descriptor.writable()) {
                 if (throwException)
-                    throwError(exec, TypeError, "Attempting to change writable attribute of unconfigurable property.");
+                    throwError(exec, createTypeError(exec, "Attempting to change writable attribute of unconfigurable property."));
                 return false;
             }
             if (!current.writable()) {
                 if (descriptor.value() || !TiValue::strictEqual(exec, current.value(), descriptor.value())) {
                     if (throwException)
-                        throwError(exec, TypeError, "Attempting to change value of a readonly property.");
+                        throwError(exec, createTypeError(exec, "Attempting to change value of a readonly property."));
                     return false;
                 }
             }
@@ -655,32 +751,32 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
             return true;
         }
         deleteProperty(exec, propertyName);
-        return putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current.value());
+        return putDescriptor(exec, this, propertyName, descriptor, current.attributesWithOverride(descriptor), current);
     }
 
     // Changing the accessor functions of an existing accessor property
     ASSERT(descriptor.isAccessorDescriptor());
     if (!current.configurable()) {
-        if (descriptor.setterPresent() && !(current.setter() && TiValue::strictEqual(exec, current.setter(), descriptor.setter()))) {
+        if (descriptor.setterPresent() && !(current.setterPresent() && TiValue::strictEqual(exec, current.setter(), descriptor.setter()))) {
             if (throwException)
-                throwError(exec, TypeError, "Attempting to change the setter of an unconfigurable property.");
+                throwError(exec, createTypeError(exec, "Attempting to change the setter of an unconfigurable property."));
             return false;
         }
-        if (descriptor.getterPresent() && !(current.getter() && TiValue::strictEqual(exec, current.getter(), descriptor.getter()))) {
+        if (descriptor.getterPresent() && !(current.getterPresent() && TiValue::strictEqual(exec, current.getter(), descriptor.getter()))) {
             if (throwException)
-                throwError(exec, TypeError, "Attempting to change the getter of an unconfigurable property.");
+                throwError(exec, createTypeError(exec, "Attempting to change the getter of an unconfigurable property."));
             return false;
         }
     }
-    TiValue accessor = getDirect(propertyName);
+    TiValue accessor = getDirect(exec->globalData(), propertyName);
     if (!accessor)
         return false;
     GetterSetter* getterSetter = asGetterSetter(accessor);
     if (current.attributesEqual(descriptor)) {
         if (descriptor.setter())
-            getterSetter->setSetter(asObject(descriptor.setter()));
+            getterSetter->setSetter(exec->globalData(), asObject(descriptor.setter()));
         if (descriptor.getter())
-            getterSetter->setGetter(asObject(descriptor.getter()));
+            getterSetter->setGetter(exec->globalData(), asObject(descriptor.getter()));
         return true;
     }
     deleteProperty(exec, propertyName);
@@ -689,8 +785,13 @@ bool TiObject::defineOwnProperty(TiExcState* exec, const Identifier& propertyNam
         attrs |= Setter;
     if (descriptor.getter())
         attrs |= Getter;
-    putDirect(propertyName, getterSetter, attrs);
+    putDirect(exec->globalData(), propertyName, getterSetter, attrs);
     return true;
+}
+
+TiObject* throwTypeError(TiExcState* exec, const UString& message)
+{
+    return throwError(exec, createTypeError(exec, message));
 }
 
 } // namespace TI

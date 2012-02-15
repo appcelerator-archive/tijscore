@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,31 +34,39 @@
 
 #include "RegExp.h"
 #include "RegExpKey.h"
+#include "Strong.h"
 #include "UString.h"
+#include "Weak.h"
+#include <wtf/FixedArray.h>
+#include <wtf/HashMap.h>
 
 #ifndef RegExpCache_h
 #define RegExpCache_h
 
 namespace TI {
 
-class RegExpCache {
+class RegExpCache : private WeakHandleOwner {
+friend class RegExp;
+typedef HashMap<RegExpKey, Weak<RegExp> > RegExpCacheMap;
+
 public:
-    PassRefPtr<RegExp> lookupOrCreate(const UString& patternString, const UString& flags);
-    PassRefPtr<RegExp> create(const UString& patternString, const UString& flags);
     RegExpCache(TiGlobalData* globalData);
-    
-    static bool isCacheable(const UString& patternString) { return patternString.size() < maxCacheablePatternLength; }
+    void invalidateCode();
 
 private:
-    static const unsigned maxCacheablePatternLength = 256;
-    static const int maxCacheableEntries = 32;
+    
+    static const unsigned maxStrongCacheablePatternLength = 256;
 
-    typedef HashMap<RegExpKey, RefPtr<RegExp> > RegExpCacheMap;
-    RegExpKey patternKeyArray[maxCacheableEntries];
-    RegExpCacheMap m_cacheMap;
+    static const int maxStrongCacheableEntries = 32;
+
+    virtual void finalize(Handle<Unknown>, void* context);
+
+    RegExp* lookupOrCreate(const UString& patternString, RegExpFlags);
+    void addToStrongCache(RegExp*);
+    RegExpCacheMap m_weakCache; // Holds all regular expressions currently live.
+    int m_nextEntryInStrongCache;
+    WTI::FixedArray<Strong<RegExp>, maxStrongCacheableEntries> m_strongCache; // Holds a select few regular expressions that have compiled and executed
     TiGlobalData* m_globalData;
-    int m_nextKeyToEvict;
-    bool m_isFull;
 };
 
 } // namespace TI

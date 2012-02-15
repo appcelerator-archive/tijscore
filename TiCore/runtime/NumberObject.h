@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,29 +34,20 @@ namespace TI {
 
     class NumberObject : public JSWrapperObject {
     public:
-        explicit NumberObject(NonNullPassRefPtr<Structure>);
+        explicit NumberObject(TiGlobalData&, Structure*);
 
-        static const ClassInfo info;
+        static const ClassInfo s_info;
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
-    protected:
-#if USE(JSVALUE32)
-        static const unsigned StructureFlags = OverridesMarkChildren | JSWrapperObject::StructureFlags;
-#else
-        static const unsigned StructureFlags = JSWrapperObject::StructureFlags;
-#endif
-
     private:
-        virtual const ClassInfo* classInfo() const { return &info; }
-
         virtual TiValue getJSNumber();
     };
 
-    NumberObject* constructNumber(TiExcState*, TiValue);
+    NumberObject* constructNumber(TiExcState*, TiGlobalObject*, TiValue);
 
 } // namespace TI
 

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // Copyright (c) 2005, 2007, Google Inc.
@@ -38,10 +38,10 @@
 // Author: Sanjay Ghemawat
 
 #include "config.h"
+#if !(defined(USE_SYSTEM_MALLOC) && USE_SYSTEM_MALLOC)
 #include "TCSystemAlloc.h"
 
 #include <algorithm>
-#include <fcntl.h>
 #include "Assertions.h"
 #include "TCSpinLock.h"
 #include "UnusedParam.h"
@@ -527,3 +527,6 @@ void TCMalloc_SystemCommit(void* start, size_t length)
 // declared in TCSystemAlloc.h
 
 #endif
+
+#endif // #if !(defined(USE_SYSTEM_MALLOC) && USE_SYSTEM_MALLOC)
+

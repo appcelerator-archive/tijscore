@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -47,7 +47,6 @@
 #include "SymbolTable.h"
 #include "Debugger.h"
 #include "Nodes.h"
-#include <wtf/FastAllocBase.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/SegmentedVector.h>
 #include <wtf/Vector.h>
@@ -55,8 +54,24 @@
 namespace TI {
 
     class Identifier;
-    class ScopeChain;
-    class ScopeNode;
+    class ScopeChainNode;
+
+    class CallArguments {
+    public:
+        CallArguments(BytecodeGenerator& generator, ArgumentsNode* argumentsNode);
+
+        RegisterID* thisRegister() { return m_argv[0].get(); }
+        RegisterID* argumentRegister(unsigned i) { return m_argv[i + 1].get(); }
+        unsigned callFrame() { return thisRegister()->index() + count() + RegisterFile::CallFrameHeaderSize; }
+        unsigned count() { return m_argv.size(); }
+        RegisterID* profileHookRegister() { return m_profileHookRegister.get(); }
+        ArgumentsNode* argumentsNode() { return m_argumentsNode; }
+
+    private:
+        RefPtr<RegisterID> m_profileHookRegister;
+        ArgumentsNode* m_argumentsNode;
+        Vector<RefPtr<RegisterID>, 16> m_argv;
+    };
 
     struct FinallyContext {
         Label* finallyAddr;
@@ -75,7 +90,8 @@ namespace TI {
         RefPtr<RegisterID> propertyRegister;
     };
 
-    class BytecodeGenerator : public FastAllocBase {
+    class BytecodeGenerator {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         typedef DeclarationStacks::VarStack VarStack;
         typedef DeclarationStacks::FunctionStack FunctionStack;
@@ -83,20 +99,27 @@ namespace TI {
         static void setDumpsGeneratedCode(bool dumpsGeneratedCode);
         static bool dumpsGeneratedCode();
 
-        BytecodeGenerator(ProgramNode*, const Debugger*, const ScopeChain&, SymbolTable*, ProgramCodeBlock*);
-        BytecodeGenerator(FunctionBodyNode*, const Debugger*, const ScopeChain&, SymbolTable*, CodeBlock*);
-        BytecodeGenerator(EvalNode*, const Debugger*, const ScopeChain&, SymbolTable*, EvalCodeBlock*);
+        BytecodeGenerator(ProgramNode*, ScopeChainNode*, SymbolTable*, ProgramCodeBlock*);
+        BytecodeGenerator(FunctionBodyNode*, ScopeChainNode*, SymbolTable*, CodeBlock*);
+        BytecodeGenerator(EvalNode*, ScopeChainNode*, SymbolTable*, EvalCodeBlock*);
 
         TiGlobalData* globalData() const { return m_globalData; }
         const CommonIdentifiers& propertyNames() const { return *m_globalData->propertyNames; }
 
-        void generate();
+        bool isConstructor() { return m_codeBlock->m_isConstructor; }
+
+        TiObject* generate();
 
         // Returns the register corresponding to a local variable, or 0 if no
         // such register exists. Registers returned by registerFor do not
         // require explicit reference counting.
         RegisterID* registerFor(const Identifier&);
-        
+
+        // Returns the agument number if this is an argument, or 0 if not.
+        int argumentNumberFor(const Identifier&);
+
+        void setIsNumericCompareFunction(bool isNumericCompareFunction);
+
         bool willResolveToArguments(const Identifier&);
         RegisterID* uncheckedRegisterForArguments();
 
@@ -110,9 +133,6 @@ namespace TI {
         // VariableObject that defines the property.  If the property cannot be found
         // statically, depth will contain the depth of the scope chain where dynamic
         // lookup must begin.
-        //
-        // NB: depth does _not_ include the local scope.  eg. a depth of 0 refers
-        // to the scope containing this codeblock.
         bool findScopedProperty(const Identifier&, int& index, size_t& depth, bool forWriting, bool& includesDynamicScopes, TiObject*& globalObject);
 
         // Returns the register storing "this"
@@ -157,6 +177,17 @@ namespace TI {
             return newTemporary();
         }
 
+        // Returns the place to write the final output of an operation.
+        RegisterID* finalDestinationOrIgnored(RegisterID* originalDst, RegisterID* tempDst = 0)
+        {
+            if (originalDst)
+                return originalDst;
+            ASSERT(tempDst != ignoredResult());
+            if (tempDst && tempDst->isTemporary())
+                return tempDst;
+            return newTemporary();
+        }
+
         RegisterID* destinationForAssignResult(RegisterID* dst)
         {
             if (dst && dst != ignoredResult() && m_codeBlock->needsFullScopeChain())
@@ -182,16 +213,10 @@ namespace TI {
         {
             // Node::emitCode assumes that dst, if provided, is either a local or a referenced temporary.
             ASSERT(!dst || dst == ignoredResult() || !dst->isTemporary() || dst->refCount());
-            if (!m_codeBlock->numberOfLineInfos() || m_codeBlock->lastLineInfo().lineNumber != n->lineNo()) {
-                LineInfo info = { instructions().size(), n->lineNo() };
-                m_codeBlock->addLineInfo(info);
-            }
-            if (m_emitNodeDepth >= s_maxEmitNodeDepth)
-                return emitThrowExpressionTooDeepException();
-            ++m_emitNodeDepth;
-            RegisterID* r = n->emitBytecode(*this, dst);
-            --m_emitNodeDepth;
-            return r;
+            addLineInfo(n->lineNo());
+            return m_stack.recursionCheck()
+                ? n->emitBytecode(*this, dst)
+                : emitThrowExpressionTooDeepException();
         }
 
         RegisterID* emitNode(Node* n)
@@ -201,19 +226,18 @@ namespace TI {
 
         void emitNodeInConditionContext(ExpressionNode* n, Label* trueTarget, Label* falseTarget, bool fallThroughMeansTrue)
         {
-            if (!m_codeBlock->numberOfLineInfos() || m_codeBlock->lastLineInfo().lineNumber != n->lineNo()) {
-                LineInfo info = { instructions().size(), n->lineNo() };
-                m_codeBlock->addLineInfo(info);
-            }
-            if (m_emitNodeDepth >= s_maxEmitNodeDepth)
+            addLineInfo(n->lineNo());
+            if (m_stack.recursionCheck())
+                n->emitBytecodeInConditionContext(*this, trueTarget, falseTarget, fallThroughMeansTrue);
+            else
                 emitThrowExpressionTooDeepException();
-            ++m_emitNodeDepth;
-            n->emitBytecodeInConditionContext(*this, trueTarget, falseTarget, fallThroughMeansTrue);
-            --m_emitNodeDepth;
         }
 
         void emitExpressionInfo(unsigned divot, unsigned startOffset, unsigned endOffset)
-        { 
+        {
+            if (!m_shouldEmitRichSourceInfo)
+                return;
+
             divot -= m_codeBlock->sourceOffset();
             if (divot > ExpressionRangeInfo::MaxDivot) {
                 // Overflow has occurred, we can only give line number info for errors for this region
@@ -241,17 +265,6 @@ namespace TI {
             m_codeBlock->addExpressionInfo(info);
         }
 
-        void emitGetByIdExceptionInfo(OpcodeID opcodeID)
-        {
-            // Only op_construct and op_instanceof need exception info for
-            // a preceding op_get_by_id.
-            ASSERT(opcodeID == op_construct || opcodeID == op_instanceof);
-            GetByIdExceptionInfo info;
-            info.bytecodeOffset = instructions().size();
-            info.isOpConstruct = (opcodeID == op_construct);
-            m_codeBlock->addGetByIdExceptionInfo(info);
-        }
-        
         ALWAYS_INLINE bool leftHandSideNeedsCopy(bool rightHasAssignments, bool rightIsPure)
         {
             return (m_codeType != FunctionCode || m_codeBlock->needsFullScopeChain() || rightHasAssignments) && !rightIsPure;
@@ -279,11 +292,13 @@ namespace TI {
         RegisterID* emitUnaryNoDstOp(OpcodeID, RegisterID* src);
 
         RegisterID* emitNewObject(RegisterID* dst);
-        RegisterID* emitNewArray(RegisterID* dst, ElementNode*); // stops at first elision
+        RegisterID* emitNewArray(RegisterID* dst, ElementNode*, unsigned length); // stops at first elision
 
         RegisterID* emitNewFunction(RegisterID* dst, FunctionBodyNode* body);
+        RegisterID* emitLazyNewFunction(RegisterID* dst, FunctionBodyNode* body);
+        RegisterID* emitNewFunctionInternal(RegisterID* dst, unsigned index, bool shouldNullCheck);
         RegisterID* emitNewFunctionExpression(RegisterID* dst, FuncExprNode* func);
-        RegisterID* emitNewRegExp(RegisterID* dst, RegExp* regExp);
+        RegisterID* emitNewRegExp(RegisterID* dst, RegExp*);
 
         RegisterID* emitMove(RegisterID* dst, RegisterID* src);
 
@@ -293,6 +308,7 @@ namespace TI {
         RegisterID* emitPostInc(RegisterID* dst, RegisterID* srcDst);
         RegisterID* emitPostDec(RegisterID* dst, RegisterID* srcDst);
 
+        void emitCheckHasInstance(RegisterID* base);
         RegisterID* emitInstanceOf(RegisterID* dst, RegisterID* value, RegisterID* base, RegisterID* basePrototype);
         RegisterID* emitTypeOf(RegisterID* dst, RegisterID* src) { return emitUnaryOp(op_typeof, dst, src); }
         RegisterID* emitIn(RegisterID* dst, RegisterID* property, RegisterID* base) { return emitBinaryOp(op_in, dst, property, base, OperandTypes()); }
@@ -302,30 +318,33 @@ namespace TI {
         RegisterID* emitPutScopedVar(size_t skip, int index, RegisterID* value, TiValue globalObject);
 
         RegisterID* emitResolveBase(RegisterID* dst, const Identifier& property);
+        RegisterID* emitResolveBaseForPut(RegisterID* dst, const Identifier& property);
         RegisterID* emitResolveWithBase(RegisterID* baseDst, RegisterID* propDst, const Identifier& property);
 
         void emitMethodCheck();
 
         RegisterID* emitGetById(RegisterID* dst, RegisterID* base, const Identifier& property);
+        RegisterID* emitGetArgumentsLength(RegisterID* dst, RegisterID* base);
         RegisterID* emitPutById(RegisterID* base, const Identifier& property, RegisterID* value);
         RegisterID* emitDirectPutById(RegisterID* base, const Identifier& property, RegisterID* value);
         RegisterID* emitDeleteById(RegisterID* dst, RegisterID* base, const Identifier&);
         RegisterID* emitGetByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
+        RegisterID* emitGetArgumentByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
         RegisterID* emitPutByVal(RegisterID* base, RegisterID* property, RegisterID* value);
         RegisterID* emitDeleteByVal(RegisterID* dst, RegisterID* base, RegisterID* property);
         RegisterID* emitPutByIndex(RegisterID* base, unsigned index, RegisterID* value);
         RegisterID* emitPutGetter(RegisterID* base, const Identifier& property, RegisterID* value);
         RegisterID* emitPutSetter(RegisterID* base, const Identifier& property, RegisterID* value);
 
-        RegisterID* emitCall(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, ArgumentsNode*, unsigned divot, unsigned startOffset, unsigned endOffset);
-        RegisterID* emitCallEval(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, ArgumentsNode*, unsigned divot, unsigned startOffset, unsigned endOffset);
+        RegisterID* emitCall(RegisterID* dst, RegisterID* func, CallArguments&, unsigned divot, unsigned startOffset, unsigned endOffset);
+        RegisterID* emitCallEval(RegisterID* dst, RegisterID* func, CallArguments&, unsigned divot, unsigned startOffset, unsigned endOffset);
         RegisterID* emitCallVarargs(RegisterID* dst, RegisterID* func, RegisterID* thisRegister, RegisterID* argCount, unsigned divot, unsigned startOffset, unsigned endOffset);
-        RegisterID* emitLoadVarargs(RegisterID* argCountDst, RegisterID* args);
+        RegisterID* emitLoadVarargs(RegisterID* argCountDst, RegisterID* thisRegister, RegisterID* args);
 
         RegisterID* emitReturn(RegisterID* src);
         RegisterID* emitEnd(RegisterID* src) { return emitUnaryNoDstOp(op_end, src); }
 
-        RegisterID* emitConstruct(RegisterID* dst, RegisterID* func, ArgumentsNode*, unsigned divot, unsigned startOffset, unsigned endOffset);
+        RegisterID* emitConstruct(RegisterID* dst, RegisterID* func, CallArguments&, unsigned divot, unsigned startOffset, unsigned endOffset);
         RegisterID* emitStrcat(RegisterID* dst, RegisterID* src, int count);
         void emitToPrimitive(RegisterID* dst, RegisterID* src);
 
@@ -344,8 +363,14 @@ namespace TI {
         RegisterID* emitNextPropertyName(RegisterID* dst, RegisterID* base, RegisterID* i, RegisterID* size, RegisterID* iter, Label* target);
 
         RegisterID* emitCatch(RegisterID*, Label* start, Label* end);
-        void emitThrow(RegisterID* exc) { emitUnaryNoDstOp(op_throw, exc); }
-        RegisterID* emitNewError(RegisterID* dst, ErrorType type, TiValue message);
+        void emitThrow(RegisterID* exc)
+        { 
+            m_usesExceptions = true;
+            emitUnaryNoDstOp(op_throw, exc);
+        }
+
+        void emitThrowReferenceError(const UString& message);
+
         void emitPushNewScope(RegisterID* dst, const Identifier& property, RegisterID* value);
 
         RegisterID* emitPushScope(RegisterID* scope);
@@ -378,11 +403,9 @@ namespace TI {
 
         CodeType codeType() const { return m_codeType; }
 
-        void setRegeneratingForExceptionInfo(CodeBlock* originalCodeBlock)
-        {
-            m_regeneratingForExceptionInfo = true;
-            m_codeBlockBeingRegeneratedFrom = originalCodeBlock;
-        }
+        bool shouldEmitProfileHooks() { return m_shouldEmitProfileHooks; }
+        
+        bool isStrictMode() const { return m_codeBlock->isStrictMode(); }
 
     private:
         void emitOpcode(OpcodeID);
@@ -404,23 +427,31 @@ namespace TI {
             static const bool needsRef = false;
         };
 
-        typedef HashMap<RefPtr<UString::Rep>, int, IdentifierRepHash, HashTraits<RefPtr<UString::Rep> >, IdentifierMapIndexHashTraits> IdentifierMap;
+        typedef HashMap<RefPtr<StringImpl>, int, IdentifierRepHash, HashTraits<RefPtr<StringImpl> >, IdentifierMapIndexHashTraits> IdentifierMap;
         typedef HashMap<double, TiValue> NumberMap;
-        typedef HashMap<UString::Rep*, TiString*, IdentifierRepHash> IdentifierStringMap;
+        typedef HashMap<StringImpl*, TiString*, IdentifierRepHash> IdentifierStringMap;
         
-        RegisterID* emitCall(OpcodeID, RegisterID* dst, RegisterID* func, RegisterID* thisRegister, ArgumentsNode*, unsigned divot, unsigned startOffset, unsigned endOffset);
-        
+        RegisterID* emitCall(OpcodeID, RegisterID* dst, RegisterID* func, CallArguments&, unsigned divot, unsigned startOffset, unsigned endOffset);
+
         RegisterID* newRegister();
 
-        // Returns the RegisterID corresponding to ident.
+        // Adds a var slot and maps it to the name ident in symbolTable().
         RegisterID* addVar(const Identifier& ident, bool isConstant)
         {
             RegisterID* local;
             addVar(ident, isConstant, local);
             return local;
         }
-        // Returns true if a new RegisterID was added, false if a pre-existing RegisterID was re-used.
+
+        // Ditto. Returns true if a new RegisterID was added, false if a pre-existing RegisterID was re-used.
         bool addVar(const Identifier&, bool isConstant, RegisterID*&);
+        
+        // Adds an anonymous var slot. To give this slot a name, add it to symbolTable().
+        RegisterID* addVar()
+        {
+            ++m_codeBlock->m_numVars;
+            return newRegister();
+        }
 
         // Returns the RegisterID corresponding to ident.
         RegisterID* addGlobalVar(const Identifier& ident, bool isConstant)
@@ -432,17 +463,15 @@ namespace TI {
         // Returns true if a new RegisterID was added, false if a pre-existing RegisterID was re-used.
         bool addGlobalVar(const Identifier&, bool isConstant, RegisterID*&);
 
-        RegisterID* addParameter(const Identifier&);
+        void addParameter(const Identifier&, int parameterIndex);
         
         void preserveLastVar();
+        bool shouldAvoidResolveGlobal();
 
         RegisterID& registerFor(int index)
         {
             if (index >= 0)
                 return m_calleeRegisters[index];
-
-            if (index == RegisterFile::OptionalCalleeArguments)
-                return m_argumentsRegister;
 
             if (m_parameters.size()) {
                 ASSERT(!m_globals.size());
@@ -456,15 +485,29 @@ namespace TI {
         RegisterID* addConstantValue(TiValue);
         unsigned addRegExp(RegExp*);
 
-        PassRefPtr<FunctionExecutable> makeFunction(TiExcState* exec, FunctionBodyNode* body)
+        unsigned addConstantBuffer(unsigned length);
+        
+        FunctionExecutable* makeFunction(TiExcState* exec, FunctionBodyNode* body)
         {
-            return FunctionExecutable::create(exec, body->ident(), body->source(), body->usesArguments(), body->parameters(), body->lineNo(), body->lastLine());
+            return FunctionExecutable::create(exec, body->ident(), body->source(), body->usesArguments(), body->parameters(), body->isStrictMode(), body->lineNo(), body->lastLine());
         }
 
-        PassRefPtr<FunctionExecutable> makeFunction(TiGlobalData* globalData, FunctionBodyNode* body)
+        FunctionExecutable* makeFunction(TiGlobalData* globalData, FunctionBodyNode* body)
         {
-            return FunctionExecutable::create(globalData, body->ident(), body->source(), body->usesArguments(), body->parameters(), body->lineNo(), body->lastLine());
+            return FunctionExecutable::create(globalData, body->ident(), body->source(), body->usesArguments(), body->parameters(), body->isStrictMode(), body->lineNo(), body->lastLine());
         }
+
+        TiString* addStringConstant(const Identifier&);
+
+        void addLineInfo(unsigned lineNo)
+        {
+#if !ENABLE(OPCODE_SAMPLING)
+            if (m_shouldEmitRichSourceInfo)
+#endif
+                m_codeBlock->addLineInfo(instructions().size(), lineNo);
+        }
+
+        RegisterID* emitInitLazyRegister(RegisterID*);
 
         Vector<Instruction>& instructions() { return m_codeBlock->instructions(); }
         SymbolTable& symbolTable() { return *m_symbolTable; }
@@ -475,11 +518,14 @@ namespace TI {
         RegisterID* emitThrowExpressionTooDeepException();
 
         void createArgumentsIfNecessary();
+        void createActivationIfNecessary();
+        RegisterID* createLazyRegisterIfNecessary(RegisterID*);
 
         bool m_shouldEmitDebugHooks;
         bool m_shouldEmitProfileHooks;
+        bool m_shouldEmitRichSourceInfo;
 
-        const ScopeChain* m_scopeChain;
+        Strong<ScopeChainNode> m_scopeChain;
         SymbolTable* m_symbolTable;
 
         ScopeNode* m_scopeNode;
@@ -487,11 +533,10 @@ namespace TI {
 
         // Some of these objects keep pointers to one another. They are arranged
         // to ensure a sane destruction order that avoids references to freed memory.
-        HashSet<RefPtr<UString::Rep>, IdentifierRepHash> m_functions;
+        HashSet<RefPtr<StringImpl>, IdentifierRepHash> m_functions;
         RegisterID m_ignoredResultRegister;
         RegisterID m_thisRegister;
-        RegisterID m_argumentsRegister;
-        int m_activationRegisterIndex;
+        RegisterID* m_activationRegister;
         SegmentedVector<RegisterID, 32> m_constantPoolRegisters;
         SegmentedVector<RegisterID, 32> m_calleeRegisters;
         SegmentedVector<RegisterID, 32> m_parameters;
@@ -509,13 +554,19 @@ namespace TI {
         Vector<ForInContext> m_forInContextStack;
 
         int m_nextGlobalIndex;
-        int m_nextParameterIndex;
         int m_firstConstantIndex;
         int m_nextConstantOffset;
         unsigned m_globalConstantIndex;
 
         int m_globalVarStorageOffset;
 
+        bool m_hasCreatedActivation;
+        int m_firstLazyFunction;
+        int m_lastLazyFunction;
+        HashMap<unsigned int, FunctionBodyNode*, WTI::IntHash<unsigned int>, WTI::UnsignedWithZeroKeyHashTraits<unsigned int> > m_lazyFunctions;
+        typedef HashMap<FunctionBodyNode*, unsigned> FunctionOffsetMap;
+        FunctionOffsetMap m_functionOffsets;
+        
         // Constant pool
         IdentifierMap m_identifierMap;
         TiValueMap m_jsValueMap;
@@ -525,34 +576,14 @@ namespace TI {
         TiGlobalData* m_globalData;
 
         OpcodeID m_lastOpcodeID;
+#ifndef NDEBUG
+        size_t m_lastOpcodePosition;
+#endif
 
-        unsigned m_emitNodeDepth;
+        StackBounds m_stack;
 
-        bool m_regeneratingForExceptionInfo;
-        CodeBlock* m_codeBlockBeingRegeneratedFrom;
-
-        static const unsigned s_maxEmitNodeDepth = 3000;
-
-        friend class IncreaseEmitNodeDepth;
-    };
-
-    class IncreaseEmitNodeDepth {
-    public:
-        IncreaseEmitNodeDepth(BytecodeGenerator& generator, unsigned count = 1)
-            : m_generator(generator)
-            , m_count(count)
-        {
-            m_generator.m_emitNodeDepth += count;
-        }
-
-        ~IncreaseEmitNodeDepth()
-        {
-            m_generator.m_emitNodeDepth -= m_count;
-        }
-
-    private:
-        BytecodeGenerator& m_generator;
-        unsigned m_count;
+        bool m_usesExceptions;
+        bool m_expressionTooDeep;
     };
 }
 

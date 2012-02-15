@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,7 +37,6 @@
 #define Interpreter_h
 
 #include "ArgList.h"
-#include "FastAllocBase.h"
 #include "TiCell.h"
 #include "TiValue.h"
 #include "TiObject.h"
@@ -51,7 +50,6 @@ namespace TI {
     class CodeBlock;
     class EvalExecutable;
     class FunctionExecutable;
-    class InternalFunction;
     class TiFunction;
     class TiGlobalObject;
     class ProgramExecutable;
@@ -73,13 +71,14 @@ namespace TI {
 
     // We use a smaller reentrancy limit on iPhone because of the high amount of
     // stack space required on the web thread.
-    enum { MaxLargeThreadReentryDepth = 100, MaxSmallThreadReentryDepth = 32 };
+    enum { MaxLargeThreadReentryDepth = 93, MaxSmallThreadReentryDepth = 32 };
 
-    class Interpreter : public FastAllocBase {
+    class Interpreter {
+        WTF_MAKE_FAST_ALLOCATED;
         friend class JIT;
         friend class CachedCall;
     public:
-        Interpreter();
+        Interpreter(TiGlobalData&);
 
         RegisterFile& registerFile() { return m_registerFile; }
         
@@ -103,21 +102,22 @@ namespace TI {
         }
 
         bool isOpcode(Opcode);
-        
-        TiValue execute(ProgramExecutable*, CallFrame*, ScopeChainNode*, TiObject* thisObj, TiValue* exception);
-        TiValue execute(FunctionExecutable*, CallFrame*, TiFunction*, TiObject* thisObj, const ArgList& args, ScopeChainNode*, TiValue* exception);
-        TiValue execute(EvalExecutable* evalNode, CallFrame* exec, TiObject* thisObj, ScopeChainNode* scopeChain, TiValue* exception);
+
+        TiValue execute(ProgramExecutable*, CallFrame*, ScopeChainNode*, TiObject* thisObj);
+        TiValue executeCall(CallFrame*, TiObject* function, CallType, const CallData&, TiValue thisValue, const ArgList&);
+        TiObject* executeConstruct(CallFrame*, TiObject* function, ConstructType, const ConstructData&, const ArgList&);
+        TiValue execute(EvalExecutable* evalNode, CallFrame* exec, TiObject* thisObj, ScopeChainNode* scopeChain);
 
         TiValue retrieveArguments(CallFrame*, TiFunction*) const;
-        TiValue retrieveCaller(CallFrame*, InternalFunction*) const;
+        TiValue retrieveCaller(CallFrame*, TiFunction*) const;
         void retrieveLastCaller(CallFrame*, int& lineNumber, intptr_t& sourceID, UString& sourceURL, TiValue& function) const;
         
         void getArgumentsData(CallFrame*, TiFunction*&, ptrdiff_t& firstParameterIndex, Register*& argv, int& argc);
         
         SamplingTool* sampler() { return m_sampler.get(); }
 
-        NEVER_INLINE TiValue callEval(CallFrame*, RegisterFile*, Register* argv, int argc, int registerOffset, TiValue& exceptionValue);
-        NEVER_INLINE HandlerInfo* throwException(CallFrame*&, TiValue&, unsigned bytecodeOffset, bool);
+        NEVER_INLINE TiValue callEval(CallFrame*, RegisterFile*, Register* argv, int argc, int registerOffset);
+        NEVER_INLINE HandlerInfo* throwException(CallFrame*&, TiValue&, unsigned bytecodeOffset);
         NEVER_INLINE void debug(CallFrame*, DebugHookID, int firstLine, int lastLine);
 
         void dumpSampleData(TiExcState* exec);
@@ -126,11 +126,11 @@ namespace TI {
     private:
         enum ExecutionFlag { Normal, InitializeAndReturn };
 
-        CallFrameClosure prepareForRepeatCall(FunctionExecutable*, CallFrame*, TiFunction*, int argCount, ScopeChainNode*, TiValue* exception);
+        CallFrameClosure prepareForRepeatCall(FunctionExecutable*, CallFrame*, TiFunction*, int argCount, ScopeChainNode*);
         void endRepeatCall(CallFrameClosure&);
-        TiValue execute(CallFrameClosure&, TiValue* exception);
+        TiValue execute(CallFrameClosure&);
 
-        TiValue execute(EvalExecutable*, CallFrame*, TiObject* thisObject, int globalRegisterOffset, ScopeChainNode*, TiValue* exception);
+        TiValue execute(EvalExecutable*, CallFrame*, TiObject* thisObject, int globalRegisterOffset, ScopeChainNode*);
 
 #if ENABLE(INTERPRETER)
         NEVER_INLINE bool resolve(CallFrame*, Instruction*, TiValue& exceptionValue);
@@ -151,9 +151,9 @@ namespace TI {
 
         static ALWAYS_INLINE CallFrame* slideRegisterWindowForCall(CodeBlock*, RegisterFile*, CallFrame*, size_t registerOffset, int argc);
 
-        static CallFrame* findFunctionCallFrame(CallFrame*, InternalFunction*);
+        static CallFrame* findFunctionCallFrame(CallFrame*, TiFunction*);
 
-        TiValue privateExecute(ExecutionFlag, RegisterFile*, CallFrame*, TiValue* exception);
+        TiValue privateExecute(ExecutionFlag, RegisterFile*, CallFrame*);
 
         void dumpCallFrame(CallFrame*);
         void dumpRegisters(CallFrame*);

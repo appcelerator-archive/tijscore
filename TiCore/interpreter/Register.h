@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,16 +38,14 @@
 
 #include "TiValue.h"
 #include <wtf/Assertions.h>
-#include <wtf/FastAllocBase.h>
 #include <wtf/VectorTraits.h>
 
 namespace TI {
 
-    class Arguments;
     class CodeBlock;
     class TiExcState;
     class JSActivation;
-    class TiFunction;
+    class TiObject;
     class TiPropertyNameIterator;
     class ScopeChainNode;
 
@@ -55,50 +53,43 @@ namespace TI {
 
     typedef TiExcState CallFrame;
 
-    class Register : public WTI::FastAllocBase {
+    class Register {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         Register();
 
         Register(const TiValue&);
         Register& operator=(const TiValue&);
         TiValue jsValue() const;
+        EncodedTiValue encodedTiValue() const;
         
-        Register& operator=(JSActivation*);
         Register& operator=(CallFrame*);
         Register& operator=(CodeBlock*);
-        Register& operator=(TiFunction*);
-        Register& operator=(TiPropertyNameIterator*);
         Register& operator=(ScopeChainNode*);
         Register& operator=(Instruction*);
 
         int32_t i() const;
         JSActivation* activation() const;
-        Arguments* arguments() const;
         CallFrame* callFrame() const;
         CodeBlock* codeBlock() const;
-        TiFunction* function() const;
+        TiObject* function() const;
         TiPropertyNameIterator* propertyNameIterator() const;
         ScopeChainNode* scopeChain() const;
         Instruction* vPC() const;
 
         static Register withInt(int32_t i)
         {
-            Register r;
-            r.u.i = i;
+            Register r = jsNumber(i);
             return r;
         }
 
+        static inline Register withCallee(TiObject* callee);
+
     private:
         union {
-            int32_t i;
             EncodedTiValue value;
-
-            JSActivation* activation;
             CallFrame* callFrame;
             CodeBlock* codeBlock;
-            TiFunction* function;
-            TiPropertyNameIterator* propertyNameIterator;
-            ScopeChainNode* scopeChain;
             Instruction* vPC;
         } u;
     };
@@ -132,13 +123,12 @@ namespace TI {
         return TiValue::decode(u.value);
     }
 
-    // Interpreter functions
-
-    ALWAYS_INLINE Register& Register::operator=(JSActivation* activation)
+    ALWAYS_INLINE EncodedTiValue Register::encodedTiValue() const
     {
-        u.activation = activation;
-        return *this;
+        return u.value;
     }
+
+    // Interpreter functions
 
     ALWAYS_INLINE Register& Register::operator=(CallFrame* callFrame)
     {
@@ -152,40 +142,17 @@ namespace TI {
         return *this;
     }
 
-    ALWAYS_INLINE Register& Register::operator=(TiFunction* function)
-    {
-        u.function = function;
-        return *this;
-    }
-
     ALWAYS_INLINE Register& Register::operator=(Instruction* vPC)
     {
         u.vPC = vPC;
         return *this;
     }
 
-    ALWAYS_INLINE Register& Register::operator=(ScopeChainNode* scopeChain)
-    {
-        u.scopeChain = scopeChain;
-        return *this;
-    }
-
-    ALWAYS_INLINE Register& Register::operator=(TiPropertyNameIterator* propertyNameIterator)
-    {
-        u.propertyNameIterator = propertyNameIterator;
-        return *this;
-    }
-
     ALWAYS_INLINE int32_t Register::i() const
     {
-        return u.i;
+        return jsValue().asInt32();
     }
-    
-    ALWAYS_INLINE JSActivation* Register::activation() const
-    {
-        return u.activation;
-    }
-    
+
     ALWAYS_INLINE CallFrame* Register::callFrame() const
     {
         return u.callFrame;
@@ -195,22 +162,7 @@ namespace TI {
     {
         return u.codeBlock;
     }
-    
-    ALWAYS_INLINE TiFunction* Register::function() const
-    {
-        return u.function;
-    }
-    
-    ALWAYS_INLINE TiPropertyNameIterator* Register::propertyNameIterator() const
-    {
-        return u.propertyNameIterator;
-    }
-    
-    ALWAYS_INLINE ScopeChainNode* Register::scopeChain() const
-    {
-        return u.scopeChain;
-    }
-    
+
     ALWAYS_INLINE Instruction* Register::vPC() const
     {
         return u.vPC;

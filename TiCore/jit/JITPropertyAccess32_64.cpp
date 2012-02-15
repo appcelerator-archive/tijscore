@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,11 +32,9 @@
 
 #include "config.h"
 
-#if USE(JSVALUE32_64)
-
-#include "JIT.h"
-
 #if ENABLE(JIT)
+#if USE(JSVALUE32_64)
+#include "JIT.h"
 
 #include "CodeBlock.h"
 #include "JITInlineMethods.h"
@@ -79,7 +77,7 @@ void JIT::emit_op_put_getter(Instruction* currentInstruction)
     
     JITStubCall stubCall(this, cti_op_put_getter);
     stubCall.addArgument(base);
-    stubCall.addArgument(ImmPtr(&m_codeBlock->identifier(property)));
+    stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(property)));
     stubCall.addArgument(function);
     stubCall.call();
 }
@@ -92,7 +90,7 @@ void JIT::emit_op_put_setter(Instruction* currentInstruction)
     
     JITStubCall stubCall(this, cti_op_put_setter);
     stubCall.addArgument(base);
-    stubCall.addArgument(ImmPtr(&m_codeBlock->identifier(property)));
+    stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(property)));
     stubCall.addArgument(function);
     stubCall.call();
 }
@@ -105,7 +103,7 @@ void JIT::emit_op_del_by_id(Instruction* currentInstruction)
     
     JITStubCall stubCall(this, cti_op_del_by_id);
     stubCall.addArgument(base);
-    stubCall.addArgument(ImmPtr(&m_codeBlock->identifier(property)));
+    stubCall.addArgument(TrustedImmPtr(&m_codeBlock->identifier(property)));
     stubCall.call(dst);
 }
 
@@ -164,7 +162,7 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
     
     JITStubCall stubCall(this, cti_op_get_by_id_generic);
     stubCall.addArgument(base);
-    stubCall.addArgument(ImmPtr(&(m_codeBlock->identifier(ident))));
+    stubCall.addArgument(TrustedImmPtr(&(m_codeBlock->identifier(ident))));
     stubCall.call(dst);
     
     m_propertyAccessInstructionIndex++;
@@ -184,7 +182,7 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     
     JITStubCall stubCall(this, cti_op_put_by_id_generic);
     stubCall.addArgument(base);
-    stubCall.addArgument(ImmPtr(&(m_codeBlock->identifier(ident))));
+    stubCall.addArgument(TrustedImmPtr(&(m_codeBlock->identifier(ident))));
     stubCall.addArgument(value);
     stubCall.call();
     
@@ -222,21 +220,21 @@ void JIT::emit_op_method_check(Instruction* currentInstruction)
     
     BEGIN_UNINTERRUPTED_SEQUENCE(sequenceMethodCheck);
     
-    Jump structureCheck = branchPtrWithPatch(NotEqual, Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)), info.structureToCompare, ImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
-    DataLabelPtr protoStructureToCompare, protoObj = moveWithPatch(ImmPtr(0), regT2);
-    Jump protoStructureCheck = branchPtrWithPatch(NotEqual, Address(regT2, OBJECT_OFFSETOF(TiCell, m_structure)), protoStructureToCompare, ImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
+    Jump structureCheck = branchPtrWithPatch(NotEqual, Address(regT0, TiCell::structureOffset()), info.structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
+    DataLabelPtr protoStructureToCompare, protoObj = moveWithPatch(TrustedImmPtr(0), regT2);
+    Jump protoStructureCheck = branchPtrWithPatch(NotEqual, Address(regT2, TiCell::structureOffset()), protoStructureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
     
     // This will be relinked to load the function without doing a load.
-    DataLabelPtr putFunction = moveWithPatch(ImmPtr(0), regT0);
+    DataLabelPtr putFunction = moveWithPatch(TrustedImmPtr(0), regT0);
     
     END_UNINTERRUPTED_SEQUENCE(sequenceMethodCheck);
     
-    move(Imm32(TiValue::CellTag), regT1);
+    move(TrustedImm32(TiValue::CellTag), regT1);
     Jump match = jump();
     
-    ASSERT(differenceBetween(info.structureToCompare, protoObj) == patchOffsetMethodCheckProtoObj);
-    ASSERT(differenceBetween(info.structureToCompare, protoStructureToCompare) == patchOffsetMethodCheckProtoStruct);
-    ASSERT(differenceBetween(info.structureToCompare, putFunction) == patchOffsetMethodCheckPutFunction);
+    ASSERT_JIT_OFFSET(differenceBetween(info.structureToCompare, protoObj), patchOffsetMethodCheckProtoObj);
+    ASSERT_JIT_OFFSET(differenceBetween(info.structureToCompare, protoStructureToCompare), patchOffsetMethodCheckProtoStruct);
+    ASSERT_JIT_OFFSET(differenceBetween(info.structureToCompare, putFunction), patchOffsetMethodCheckPutFunction);
     
     // Link the failure cases here.
     structureCheck.link(this);
@@ -248,10 +246,10 @@ void JIT::emit_op_method_check(Instruction* currentInstruction)
     
     match.link(this);
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeIndex + OPCODE_LENGTH(op_method_check), dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_method_check), dst, regT1, regT0);
     
     // We've already generated the following get_by_id, so make sure it's skipped over.
-    m_bytecodeIndex += OPCODE_LENGTH(op_get_by_id);
+    m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
 }
 
 void JIT::emitSlow_op_method_check(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -265,7 +263,7 @@ void JIT::emitSlow_op_method_check(Instruction* currentInstruction, Vector<SlowC
     compileGetByIdSlowCase(dst, base, &(m_codeBlock->identifier(ident)), iter, true);
     
     // We've already generated the following get_by_id, so make sure it's skipped over.
-    m_bytecodeIndex += OPCODE_LENGTH(op_get_by_id);
+    m_bytecodeOffset += OPCODE_LENGTH(op_get_by_id);
 }
 
 #else //!ENABLE(JIT_OPTIMIZE_METHOD_CALLS)
@@ -276,11 +274,11 @@ void JIT::emitSlow_op_method_check(Instruction*, Vector<SlowCaseEntry>::iterator
 
 #endif
 
-PassRefPtr<NativeExecutable> JIT::stringGetByValStubGenerator(TiGlobalData* globalData, ExecutablePool* pool)
+JIT::CodePtr JIT::stringGetByValStubGenerator(TiGlobalData* globalData, ExecutablePool* pool)
 {
     JSInterfaceJIT jit;
     JumpList failures;
-    failures.append(jit.branchPtr(NotEqual, Address(regT0), ImmPtr(globalData->jsStringVPtr)));
+    failures.append(jit.branchPtr(NotEqual, Address(regT0), TrustedImmPtr(globalData->jsStringVPtr)));
     failures.append(jit.branchTest32(NonZero, Address(regT0, OBJECT_OFFSETOF(TiString, m_fiberCount))));
     
     // Load string length to regT1, and start the process of loading the data pointer into regT0
@@ -294,18 +292,18 @@ PassRefPtr<NativeExecutable> JIT::stringGetByValStubGenerator(TiGlobalData* glob
     // Load the character
     jit.load16(BaseIndex(regT0, regT2, TimesTwo, 0), regT0);
     
-    failures.append(jit.branch32(AboveOrEqual, regT0, Imm32(0x100)));
-    jit.move(ImmPtr(globalData->smallStrings.singleCharacterStrings()), regT1);
+    failures.append(jit.branch32(AboveOrEqual, regT0, TrustedImm32(0x100)));
+    jit.move(TrustedImmPtr(globalData->smallStrings.singleCharacterStrings()), regT1);
     jit.loadPtr(BaseIndex(regT1, regT0, ScalePtr, 0), regT0);
-    jit.move(Imm32(TiValue::CellTag), regT1); // We null check regT0 on return so this is safe
+    jit.move(TrustedImm32(TiValue::CellTag), regT1); // We null check regT0 on return so this is safe
     jit.ret();
 
     failures.link(&jit);
-    jit.move(Imm32(0), regT0);
+    jit.move(TrustedImm32(0), regT0);
     jit.ret();
     
-    LinkBuffer patchBuffer(&jit, pool, 0);
-    return adoptRef(new NativeExecutable(patchBuffer.finalizeCode()));
+    LinkBuffer patchBuffer(*globalData, &jit, pool);
+    return patchBuffer.finalizeCode().m_code;
 }
 
 void JIT::emit_op_get_by_val(Instruction* currentInstruction)
@@ -316,19 +314,19 @@ void JIT::emit_op_get_by_val(Instruction* currentInstruction)
     
     emitLoad2(base, regT1, regT0, property, regT3, regT2);
     
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     emitJumpSlowCaseIfNotTiCell(base, regT1);
-    addSlowCase(branchPtr(NotEqual, Address(regT0), ImmPtr(m_globalData->jsArrayVPtr)));
+    addSlowCase(branchPtr(NotEqual, Address(regT0), TrustedImmPtr(m_globalData->jsArrayVPtr)));
     
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(TiArray, m_storage)), regT3);
-    addSlowCase(branch32(AboveOrEqual, regT2, Address(regT0, OBJECT_OFFSETOF(TiArray, m_vectorLength))));
+    loadPtr(Address(regT0, TiArray::storageOffset()), regT3);
+    addSlowCase(branch32(AboveOrEqual, regT2, Address(regT0, TiArray::vectorLengthOffset())));
     
-    load32(BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + 4), regT1); // tag
-    load32(BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0])), regT0); // payload
-    addSlowCase(branch32(Equal, regT1, Imm32(TiValue::EmptyValueTag)));
+    load32(BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT1); // tag
+    load32(BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT0); // payload
+    addSlowCase(branch32(Equal, regT1, TrustedImm32(TiValue::EmptyValueTag)));
     
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeIndex + OPCODE_LENGTH(op_get_by_val), dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_val), dst, regT1, regT0);
 }
 
 void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -342,8 +340,8 @@ void JIT::emitSlow_op_get_by_val(Instruction* currentInstruction, Vector<SlowCas
 
     Jump nonCell = jump();
     linkSlowCase(iter); // base array check
-    Jump notString = branchPtr(NotEqual, Address(regT0), ImmPtr(m_globalData->jsStringVPtr));
-    emitNakedCall(m_globalData->getThunk(stringGetByValStubGenerator)->generatedJITCode().addressForCall());
+    Jump notString = branchPtr(NotEqual, Address(regT0), TrustedImmPtr(m_globalData->jsStringVPtr));
+    emitNakedCall(m_globalData->getCTIStub(stringGetByValStubGenerator));
     Jump failed = branchTestPtr(Zero, regT0);
     emitStore(dst, regT1, regT0);
     emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_get_by_val));
@@ -368,26 +366,26 @@ void JIT::emit_op_put_by_val(Instruction* currentInstruction)
     
     emitLoad2(base, regT1, regT0, property, regT3, regT2);
     
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     emitJumpSlowCaseIfNotTiCell(base, regT1);
-    addSlowCase(branchPtr(NotEqual, Address(regT0), ImmPtr(m_globalData->jsArrayVPtr)));
-    addSlowCase(branch32(AboveOrEqual, regT2, Address(regT0, OBJECT_OFFSETOF(TiArray, m_vectorLength))));
+    addSlowCase(branchPtr(NotEqual, Address(regT0), TrustedImmPtr(m_globalData->jsArrayVPtr)));
+    addSlowCase(branch32(AboveOrEqual, regT2, Address(regT0, TiArray::vectorLengthOffset())));
     
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(TiArray, m_storage)), regT3);
+    loadPtr(Address(regT0, TiArray::storageOffset()), regT3);
     
-    Jump empty = branch32(Equal, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + 4), Imm32(TiValue::EmptyValueTag));
+    Jump empty = branch32(Equal, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), TrustedImm32(TiValue::EmptyValueTag));
     
     Label storeResult(this);
     emitLoad(value, regT1, regT0);
-    store32(regT0, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]))); // payload
-    store32(regT1, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + 4)); // tag
+    store32(regT0, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload))); // payload
+    store32(regT1, BaseIndex(regT3, regT2, TimesEight, OBJECT_OFFSETOF(ArrayStorage, m_vector[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag))); // tag
     Jump end = jump();
     
     empty.link(this);
-    add32(Imm32(1), Address(regT3, OBJECT_OFFSETOF(ArrayStorage, m_numValuesInVector)));
+    add32(TrustedImm32(1), Address(regT3, OBJECT_OFFSETOF(ArrayStorage, m_numValuesInVector)));
     branch32(Below, regT2, Address(regT3, OBJECT_OFFSETOF(ArrayStorage, m_length))).linkTo(storeResult, this);
     
-    add32(Imm32(1), regT2, regT0);
+    add32(TrustedImm32(1), regT2, regT0);
     store32(regT0, Address(regT3, OBJECT_OFFSETOF(ArrayStorage, m_length)));
     jump().linkTo(storeResult, this);
     
@@ -421,7 +419,7 @@ void JIT::emit_op_get_by_id(Instruction* currentInstruction)
     emitJumpSlowCaseIfNotTiCell(base, regT1);
     compileGetByIdHotPath();
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeIndex + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_id), dst, regT1, regT0);
 }
 
 void JIT::compileGetByIdHotPath()
@@ -438,23 +436,19 @@ void JIT::compileGetByIdHotPath()
     m_propertyAccessInstructionIndex++;
     
     DataLabelPtr structureToCompare;
-    Jump structureCheck = branchPtrWithPatch(NotEqual, Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)), structureToCompare, ImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
+    Jump structureCheck = branchPtrWithPatch(NotEqual, Address(regT0, TiCell::structureOffset()), structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure)));
     addSlowCase(structureCheck);
-    ASSERT(differenceBetween(hotPathBegin, structureToCompare) == patchOffsetGetByIdStructure);
-    ASSERT(differenceBetween(hotPathBegin, structureCheck) == patchOffsetGetByIdBranchToSlowCase);
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, structureToCompare), patchOffsetGetByIdStructure);
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, structureCheck), patchOffsetGetByIdBranchToSlowCase);
     
-    Label externalLoad = loadPtrWithPatchToLEA(Address(regT0, OBJECT_OFFSETOF(TiObject, m_externalStorage)), regT2);
-    Label externalLoadComplete(this);
-    ASSERT(differenceBetween(hotPathBegin, externalLoad) == patchOffsetGetByIdExternalLoad);
-    ASSERT(differenceBetween(externalLoad, externalLoadComplete) == patchLengthGetByIdExternalLoad);
-    
-    DataLabel32 displacementLabel1 = loadPtrWithAddressOffsetPatch(Address(regT2, patchGetByIdDefaultOffset), regT0); // payload
-    ASSERT(differenceBetween(hotPathBegin, displacementLabel1) == patchOffsetGetByIdPropertyMapOffset1);
-    DataLabel32 displacementLabel2 = loadPtrWithAddressOffsetPatch(Address(regT2, patchGetByIdDefaultOffset), regT1); // tag
-    ASSERT(differenceBetween(hotPathBegin, displacementLabel2) == patchOffsetGetByIdPropertyMapOffset2);
+    loadPtr(Address(regT0, OBJECT_OFFSETOF(TiObject, m_propertyStorage)), regT2);
+    DataLabelCompact displacementLabel1 = loadPtrWithCompactAddressOffsetPatch(Address(regT2, patchGetByIdDefaultOffset), regT0); // payload
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, displacementLabel1), patchOffsetGetByIdPropertyMapOffset1);
+    DataLabelCompact displacementLabel2 = loadPtrWithCompactAddressOffsetPatch(Address(regT2, patchGetByIdDefaultOffset), regT1); // tag
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, displacementLabel2), patchOffsetGetByIdPropertyMapOffset2);
     
     Label putResult(this);
-    ASSERT(differenceBetween(hotPathBegin, putResult) == patchOffsetGetByIdPutResult);
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, putResult), patchOffsetGetByIdPutResult);
     
     END_UNINTERRUPTED_SEQUENCE(sequenceGetByIdHotPath);
 }
@@ -485,12 +479,12 @@ void JIT::compileGetByIdSlowCase(int dst, int base, Identifier* ident, Vector<Sl
 #endif
     JITStubCall stubCall(this, isMethodCheck ? cti_op_get_by_id_method_check : cti_op_get_by_id);
     stubCall.addArgument(regT1, regT0);
-    stubCall.addArgument(ImmPtr(ident));
+    stubCall.addArgument(TrustedImmPtr(ident));
     Call call = stubCall.call(dst);
     
-    END_UNINTERRUPTED_SEQUENCE(sequenceGetByIdSlowCase);
+    END_UNINTERRUPTED_SEQUENCE_FOR_PUT(sequenceGetByIdSlowCase, dst);
     
-    ASSERT(differenceBetween(coldPathBegin, call) == patchOffsetGetByIdSlowCaseCall);
+    ASSERT_JIT_OFFSET(differenceBetween(coldPathBegin, call), patchOffsetGetByIdSlowCaseCall);
     
     // Track the location of the call; this will be used to recover patch information.
     m_propertyAccessCompilationInfo[m_propertyAccessInstructionIndex].callReturnLocation = call;
@@ -518,22 +512,17 @@ void JIT::emit_op_put_by_id(Instruction* currentInstruction)
     
     // It is important that the following instruction plants a 32bit immediate, in order that it can be patched over.
     DataLabelPtr structureToCompare;
-    addSlowCase(branchPtrWithPatch(NotEqual, Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)), structureToCompare, ImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure))));
-    ASSERT(differenceBetween(hotPathBegin, structureToCompare) == patchOffsetPutByIdStructure);
+    addSlowCase(branchPtrWithPatch(NotEqual, Address(regT0, TiCell::structureOffset()), structureToCompare, TrustedImmPtr(reinterpret_cast<void*>(patchGetByIdDefaultStructure))));
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, structureToCompare), patchOffsetPutByIdStructure);
     
-    // Plant a load from a bogus ofset in the object's property map; we will patch this later, if it is to be used.
-    Label externalLoad = loadPtrWithPatchToLEA(Address(regT0, OBJECT_OFFSETOF(TiObject, m_externalStorage)), regT0);
-    Label externalLoadComplete(this);
-    ASSERT(differenceBetween(hotPathBegin, externalLoad) == patchOffsetPutByIdExternalLoad);
-    ASSERT(differenceBetween(externalLoad, externalLoadComplete) == patchLengthPutByIdExternalLoad);
-    
-    DataLabel32 displacementLabel1 = storePtrWithAddressOffsetPatch(regT2, Address(regT0, patchGetByIdDefaultOffset)); // payload
-    DataLabel32 displacementLabel2 = storePtrWithAddressOffsetPatch(regT3, Address(regT0, patchGetByIdDefaultOffset)); // tag
+    loadPtr(Address(regT0, OBJECT_OFFSETOF(TiObject, m_propertyStorage)), regT0);
+    DataLabel32 displacementLabel1 = storePtrWithAddressOffsetPatch(regT2, Address(regT0, patchPutByIdDefaultOffset)); // payload
+    DataLabel32 displacementLabel2 = storePtrWithAddressOffsetPatch(regT3, Address(regT0, patchPutByIdDefaultOffset)); // tag
     
     END_UNINTERRUPTED_SEQUENCE(sequencePutById);
     
-    ASSERT(differenceBetween(hotPathBegin, displacementLabel1) == patchOffsetPutByIdPropertyMapOffset1);
-    ASSERT(differenceBetween(hotPathBegin, displacementLabel2) == patchOffsetPutByIdPropertyMapOffset2);
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, displacementLabel1), patchOffsetPutByIdPropertyMapOffset1);
+    ASSERT_JIT_OFFSET(differenceBetween(hotPathBegin, displacementLabel2), patchOffsetPutByIdPropertyMapOffset2);
 }
 
 void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -547,7 +536,7 @@ void JIT::emitSlow_op_put_by_id(Instruction* currentInstruction, Vector<SlowCase
     
     JITStubCall stubCall(this, direct ? cti_op_put_by_id_direct : cti_op_put_by_id);
     stubCall.addArgument(regT1, regT0);
-    stubCall.addArgument(ImmPtr(&(m_codeBlock->identifier(ident))));
+    stubCall.addArgument(TrustedImmPtr(&(m_codeBlock->identifier(ident))));
     stubCall.addArgument(regT3, regT2); 
     Call call = stubCall.call();
     
@@ -561,9 +550,9 @@ void JIT::compilePutDirectOffset(RegisterID base, RegisterID valueTag, RegisterI
 {
     int offset = cachedOffset;
     if (structure->isUsingInlineStorage())
-        offset += OBJECT_OFFSETOF(TiObject, m_inlineStorage) /  sizeof(Register);
+        offset += TiObject::offsetOfInlineStorage() /  sizeof(Register);
     else
-        loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_externalStorage)), base);
+        loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_propertyStorage)), base);
     emitStore(offset, valueTag, valuePayload, base);
 }
 
@@ -571,50 +560,44 @@ void JIT::compilePutDirectOffset(RegisterID base, RegisterID valueTag, RegisterI
 void JIT::compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, Structure* structure, size_t cachedOffset)
 {
     int offset = cachedOffset;
-    if (structure->isUsingInlineStorage())
-        offset += OBJECT_OFFSETOF(TiObject, m_inlineStorage) / sizeof(Register);
-    else
-        loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_externalStorage)), base);
-    emitLoad(offset, resultTag, resultPayload, base);
-}
-
-void JIT::compileGetDirectOffset(TiObject* base, RegisterID temp, RegisterID resultTag, RegisterID resultPayload, size_t cachedOffset)
-{
-    if (base->isUsingInlineStorage()) {
-        load32(reinterpret_cast<char*>(&base->m_inlineStorage[cachedOffset]), resultPayload);
-        load32(reinterpret_cast<char*>(&base->m_inlineStorage[cachedOffset]) + 4, resultTag);
-        return;
+    if (structure->isUsingInlineStorage()) {
+        offset += TiObject::offsetOfInlineStorage() / sizeof(Register);
+        emitLoad(offset, resultTag, resultPayload, base);
+    } else {
+        RegisterID temp = resultPayload;
+        loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_propertyStorage)), temp);
+        emitLoad(offset, resultTag, resultPayload, temp);
     }
-    
-    size_t offset = cachedOffset * sizeof(TiValue);
-    
-    PropertyStorage* protoPropertyStorage = &base->m_externalStorage;
-    loadPtr(static_cast<void*>(protoPropertyStorage), temp);
-    load32(Address(temp, offset), resultPayload);
-    load32(Address(temp, offset + 4), resultTag);
 }
 
-void JIT::testPrototype(Structure* structure, JumpList& failureCases)
+void JIT::compileGetDirectOffset(TiObject* base, RegisterID resultTag, RegisterID resultPayload, size_t cachedOffset)
 {
-    if (structure->m_prototype.isNull())
-        return;
-    
-    failureCases.append(branchPtr(NotEqual, AbsoluteAddress(&asCell(structure->m_prototype)->m_structure), ImmPtr(asCell(structure->m_prototype)->m_structure)));
+    load32(reinterpret_cast<char*>(&base->m_propertyStorage[cachedOffset]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload), resultPayload);
+    load32(reinterpret_cast<char*>(&base->m_propertyStorage[cachedOffset]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag), resultTag);
 }
 
 void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure* oldStructure, Structure* newStructure, size_t cachedOffset, StructureChain* chain, ReturnAddressPtr returnAddress, bool direct)
 {
-    // It is assumed that regT0 contains the basePayload and regT1 contains the baseTag.  The value can be found on the stack.
-    
+    // The code below assumes that regT0 contains the basePayload and regT1 contains the baseTag.  Restore them from the stack.
+#if CPU(MIPS) || CPU(SH4) || CPU(ARM)
+    // For MIPS, we don't add sizeof(void*) to the stack offset.
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT0);
+    // For MIPS, we don't add sizeof(void*) to the stack offset.
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT1);
+#else
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT0);
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT1);
+#endif
+
     JumpList failureCases;
-    failureCases.append(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
-    failureCases.append(branchPtr(NotEqual, Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)), ImmPtr(oldStructure)));
-    testPrototype(oldStructure, failureCases);
+    failureCases.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
+    failureCases.append(branchPtr(NotEqual, Address(regT0, TiCell::structureOffset()), TrustedImmPtr(oldStructure)));
+    testPrototype(oldStructure->storedPrototype(), failureCases);
     
     if (!direct) {
         // Verify that nothing in the prototype chain has a setter for this property. 
-        for (RefPtr<Structure>* it = chain->head(); *it; ++it)
-            testPrototype(it->get(), failureCases);
+        for (WriteBarrier<Structure>* it = chain->head(); *it; ++it)
+            testPrototype((*it)->storedPrototype(), failureCases);
     }
 
     // Reallocate property storage if needed.
@@ -629,23 +612,37 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
         stubCall.skipArgument(); // base
         stubCall.skipArgument(); // ident
         stubCall.skipArgument(); // value
-        stubCall.addArgument(Imm32(oldStructure->propertyStorageCapacity()));
-        stubCall.addArgument(Imm32(newStructure->propertyStorageCapacity()));
+        stubCall.addArgument(TrustedImm32(oldStructure->propertyStorageCapacity()));
+        stubCall.addArgument(TrustedImm32(newStructure->propertyStorageCapacity()));
         stubCall.call(regT0);
         
         restoreReturnAddressBeforeReturn(regT3);
+
+#if CPU(MIPS) || CPU(SH4) || CPU(ARM)
+        // For MIPS, we don't add sizeof(void*) to the stack offset.
+        load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT0);
+        // For MIPS, we don't add sizeof(void*) to the stack offset.
+        load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT1);
+#else
+        load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT0);
+        load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[0]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT1);
+#endif
     }
+
+    storePtrWithWriteBarrier(TrustedImmPtr(newStructure), regT0, Address(regT0, TiCell::structureOffset()));
     
-    sub32(Imm32(1), AbsoluteAddress(oldStructure->addressOfCount()));
-    add32(Imm32(1), AbsoluteAddress(newStructure->addressOfCount()));
-    storePtr(ImmPtr(newStructure), Address(regT0, OBJECT_OFFSETOF(TiCell, m_structure)));
-    
-    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(struct JITStackFrame, args[2]) + sizeof(void*)), regT3);
-    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(struct JITStackFrame, args[2]) + sizeof(void*) + 4), regT2);
-    
+#if CPU(MIPS) || CPU(SH4) || CPU(ARM)
+    // For MIPS, we don't add sizeof(void*) to the stack offset.
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[2]) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT3);
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[2]) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT2);
+#else
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[2]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.payload)), regT3);
+    load32(Address(stackPointerRegister, OBJECT_OFFSETOF(JITStackFrame, args[2]) + sizeof(void*) + OBJECT_OFFSETOF(TiValue, u.asBits.tag)), regT2);
+#endif
+
     // Write the value
     compilePutDirectOffset(regT0, regT2, regT3, newStructure, cachedOffset);
-    
+
     ret();
     
     ASSERT(!failureCases.empty());
@@ -653,7 +650,7 @@ void JIT::privateCompilePutByIdTransition(StructureStubInfo* stubInfo, Structure
     restoreArgumentReferenceForTrampoline();
     Call failureCall = tailRecursiveCall();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     
     patchBuffer.link(failureCall, FunctionPtr(direct ? cti_op_put_by_id_direct_fail : cti_op_put_by_id_fail));
     
@@ -677,36 +674,11 @@ void JIT::patchGetByIdSelf(CodeBlock* codeBlock, StructureStubInfo* stubInfo, St
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id_self_fail));
     
     int offset = sizeof(TiValue) * cachedOffset;
-    
-    // If we're patching to use inline storage, convert the initial load to a lea; this avoids the extra load
-    // and makes the subsequent load's offset automatically correct
-    if (structure->isUsingInlineStorage())
-        repatchBuffer.repatchLoadPtrToLEA(stubInfo->hotPathBegin.instructionAtOffset(patchOffsetGetByIdExternalLoad));
-    
+
     // Patch the offset into the propoerty map to load from, then patch the Structure to look for.
     repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelPtrAtOffset(patchOffsetGetByIdStructure), structure);
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetGetByIdPropertyMapOffset1), offset); // payload
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetGetByIdPropertyMapOffset2), offset + 4); // tag
-}
-
-void JIT::patchMethodCallProto(CodeBlock* codeBlock, MethodCallLinkInfo& methodCallLinkInfo, TiFunction* callee, Structure* structure, TiObject* proto, ReturnAddressPtr returnAddress)
-{
-    RepatchBuffer repatchBuffer(codeBlock);
-    
-    ASSERT(!methodCallLinkInfo.cachedStructure);
-    methodCallLinkInfo.cachedStructure = structure;
-    structure->ref();
-    
-    Structure* prototypeStructure = proto->structure();
-    methodCallLinkInfo.cachedPrototypeStructure = prototypeStructure;
-    prototypeStructure->ref();
-    
-    repatchBuffer.repatch(methodCallLinkInfo.structureLabel, structure);
-    repatchBuffer.repatch(methodCallLinkInfo.structureLabel.dataLabelPtrAtOffset(patchOffsetMethodCheckProtoObj), proto);
-    repatchBuffer.repatch(methodCallLinkInfo.structureLabel.dataLabelPtrAtOffset(patchOffsetMethodCheckProtoStruct), prototypeStructure);
-    repatchBuffer.repatch(methodCallLinkInfo.structureLabel.dataLabelPtrAtOffset(patchOffsetMethodCheckPutFunction), callee);
-    
-    repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(cti_op_get_by_id));
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelCompactAtOffset(patchOffsetGetByIdPropertyMapOffset1), offset + OBJECT_OFFSETOF(TiValue, u.asBits.payload)); // payload
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelCompactAtOffset(patchOffsetGetByIdPropertyMapOffset2), offset + OBJECT_OFFSETOF(TiValue, u.asBits.tag)); // tag
 }
 
 void JIT::patchPutByIdReplace(CodeBlock* codeBlock, StructureStubInfo* stubInfo, Structure* structure, size_t cachedOffset, ReturnAddressPtr returnAddress, bool direct)
@@ -718,16 +690,11 @@ void JIT::patchPutByIdReplace(CodeBlock* codeBlock, StructureStubInfo* stubInfo,
     repatchBuffer.relinkCallerToFunction(returnAddress, FunctionPtr(direct ? cti_op_put_by_id_direct_generic : cti_op_put_by_id_generic));
     
     int offset = sizeof(TiValue) * cachedOffset;
-    
-    // If we're patching to use inline storage, convert the initial load to a lea; this avoids the extra load
-    // and makes the subsequent load's offset automatically correct
-    if (structure->isUsingInlineStorage())
-        repatchBuffer.repatchLoadPtrToLEA(stubInfo->hotPathBegin.instructionAtOffset(patchOffsetPutByIdExternalLoad));
-    
+
     // Patch the offset into the propoerty map to load from, then patch the Structure to look for.
     repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabelPtrAtOffset(patchOffsetPutByIdStructure), structure);
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetPutByIdPropertyMapOffset1), offset); // payload
-    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetPutByIdPropertyMapOffset2), offset + 4); // tag
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetPutByIdPropertyMapOffset1), offset + OBJECT_OFFSETOF(TiValue, u.asBits.payload)); // payload
+    repatchBuffer.repatch(stubInfo->hotPathBegin.dataLabel32AtOffset(patchOffsetPutByIdPropertyMapOffset2), offset + OBJECT_OFFSETOF(TiValue, u.asBits.tag)); // tag
 }
 
 void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
@@ -737,18 +704,18 @@ void JIT::privateCompilePatchGetArrayLength(ReturnAddressPtr returnAddress)
     // regT0 holds a TiCell*
     
     // Check for array
-    Jump failureCases1 = branchPtr(NotEqual, Address(regT0), ImmPtr(m_globalData->jsArrayVPtr));
+    Jump failureCases1 = branchPtr(NotEqual, Address(regT0), TrustedImmPtr(m_globalData->jsArrayVPtr));
     
     // Checks out okay! - get the length from the storage
-    loadPtr(Address(regT0, OBJECT_OFFSETOF(TiArray, m_storage)), regT2);
+    loadPtr(Address(regT0, TiArray::storageOffset()), regT2);
     load32(Address(regT2, OBJECT_OFFSETOF(ArrayStorage, m_length)), regT2);
     
-    Jump failureCases2 = branch32(Above, regT2, Imm32(INT_MAX));
+    Jump failureCases2 = branch32(Above, regT2, TrustedImm32(INT_MAX));
     move(regT2, regT0);
-    move(Imm32(TiValue::Int32Tag), regT1);
+    move(TrustedImm32(TiValue::Int32Tag), regT1);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -782,37 +749,33 @@ void JIT::privateCompileGetByIdProto(StructureStubInfo* stubInfo, Structure* str
     Jump failureCases1 = checkStructure(regT0, structure);
     
     // Check the prototype object's Structure had not changed.
-    Structure** prototypeStructureAddress = &(protoObject->m_structure);
-#if CPU(X86_64)
-    move(ImmPtr(prototypeStructure), regT3);
-    Jump failureCases2 = branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), regT3);
-#else
-    Jump failureCases2 = branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), ImmPtr(prototypeStructure));
-#endif
+    move(TrustedImmPtr(protoObject), regT3);
+    Jump failureCases2 = branchPtr(NotEqual, Address(regT3, TiCell::structureOffset()), TrustedImmPtr(prototypeStructure));
+
     bool needsStubLink = false;
     // Checks out okay!
     if (slot.cachedPropertyType() == PropertySlot::Getter) {
         needsStubLink = true;
-        compileGetDirectOffset(protoObject, regT2, regT2, regT1, cachedOffset);
+        compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
         stubCall.addArgument(regT1);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
-        stubCall.addArgument(ImmPtr(protoObject));
-        stubCall.addArgument(ImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
-        stubCall.addArgument(ImmPtr(const_cast<Identifier*>(&ident)));
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(protoObject));
+        stubCall.addArgument(TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(const_cast<Identifier*>(&ident)));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else
-        compileGetDirectOffset(protoObject, regT2, regT1, regT0, cachedOffset);
+        compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     
     // Use the patch information to link the failure cases back to the original slow case routine.
     CodeLocationLabel slowCaseBegin = stubInfo->callReturnLocation.labelAtOffset(-patchOffsetGetByIdSlowCaseCall);
@@ -850,30 +813,26 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     bool needsStubLink = false;
     if (slot.cachedPropertyType() == PropertySlot::Getter) {
         needsStubLink = true;
-        if (!structure->isUsingInlineStorage()) {
-            move(regT0, regT1);
-            compileGetDirectOffset(regT1, regT2, regT1, structure, cachedOffset);
-        } else
-            compileGetDirectOffset(regT0, regT2, regT1, structure, cachedOffset);
+        compileGetDirectOffset(regT0, regT2, regT1, structure, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
         stubCall.addArgument(regT1);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
-        stubCall.addArgument(ImmPtr(const_cast<Identifier*>(&ident)));
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(const_cast<Identifier*>(&ident)));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else
         compileGetDirectOffset(regT0, regT1, regT0, structure, cachedOffset);
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -891,9 +850,8 @@ void JIT::privateCompileGetByIdSelfList(StructureStubInfo* stubInfo, Polymorphic
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(patchOffsetGetByIdPutResult));
 
     CodeLocationLabel entryLabel = patchBuffer.finalizeCodeAddendum();
-    
-    structure->ref();
-    polymorphicStructures->list[currentIndex].set(entryLabel, structure);
+
+    polymorphicStructures->list[currentIndex].set(*m_globalData, m_codeBlock->ownerExecutable(), entryLabel, structure);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(patchOffsetGetByIdBranchToSlowCase);
@@ -913,37 +871,32 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     Jump failureCases1 = checkStructure(regT0, structure);
     
     // Check the prototype object's Structure had not changed.
-    Structure** prototypeStructureAddress = &(protoObject->m_structure);
-#if CPU(X86_64)
-    move(ImmPtr(prototypeStructure), regT3);
-    Jump failureCases2 = branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), regT3);
-#else
-    Jump failureCases2 = branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), ImmPtr(prototypeStructure));
-#endif
+    move(TrustedImmPtr(protoObject), regT3);
+    Jump failureCases2 = branchPtr(NotEqual, Address(regT3, TiCell::structureOffset()), TrustedImmPtr(prototypeStructure));
     
     bool needsStubLink = false;
     if (slot.cachedPropertyType() == PropertySlot::Getter) {
         needsStubLink = true;
-        compileGetDirectOffset(protoObject, regT2, regT2, regT1, cachedOffset);
+        compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
         stubCall.addArgument(regT1);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
-        stubCall.addArgument(ImmPtr(protoObject));
-        stubCall.addArgument(ImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
-        stubCall.addArgument(ImmPtr(const_cast<Identifier*>(&ident)));
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(protoObject));
+        stubCall.addArgument(TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(const_cast<Identifier*>(&ident)));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else
-        compileGetDirectOffset(protoObject, regT2, regT1, regT0, cachedOffset);
+        compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
     
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -959,10 +912,8 @@ void JIT::privateCompileGetByIdProtoList(StructureStubInfo* stubInfo, Polymorphi
     patchBuffer.link(success, stubInfo->hotPathBegin.labelAtOffset(patchOffsetGetByIdPutResult));
     
     CodeLocationLabel entryLabel = patchBuffer.finalizeCodeAddendum();
-    
-    structure->ref();
-    prototypeStructure->ref();
-    prototypeStructures->list[currentIndex].set(entryLabel, structure, prototypeStructure);
+
+    prototypeStructures->list[currentIndex].set(callFrame->globalData(), m_codeBlock->ownerExecutable(), entryLabel, structure, prototypeStructure);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(patchOffsetGetByIdBranchToSlowCase);
@@ -981,46 +932,38 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     bucketsOfFail.append(checkStructure(regT0, structure));
     
     Structure* currStructure = structure;
-    RefPtr<Structure>* chainEntries = chain->head();
+    WriteBarrier<Structure>* it = chain->head();
     TiObject* protoObject = 0;
-    for (unsigned i = 0; i < count; ++i) {
+    for (unsigned i = 0; i < count; ++i, ++it) {
         protoObject = asObject(currStructure->prototypeForLookup(callFrame));
-        currStructure = chainEntries[i].get();
-        
-        // Check the prototype object's Structure had not changed.
-        Structure** prototypeStructureAddress = &(protoObject->m_structure);
-#if CPU(X86_64)
-        move(ImmPtr(currStructure), regT3);
-        bucketsOfFail.append(branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), regT3));
-#else
-        bucketsOfFail.append(branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), ImmPtr(currStructure)));
-#endif
+        currStructure = it->get();
+        testPrototype(protoObject, bucketsOfFail);
     }
     ASSERT(protoObject);
     
     bool needsStubLink = false;
     if (slot.cachedPropertyType() == PropertySlot::Getter) {
         needsStubLink = true;
-        compileGetDirectOffset(protoObject, regT2, regT2, regT1, cachedOffset);
+        compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
         stubCall.addArgument(regT1);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
-        stubCall.addArgument(ImmPtr(protoObject));
-        stubCall.addArgument(ImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
-        stubCall.addArgument(ImmPtr(const_cast<Identifier*>(&ident)));
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(protoObject));
+        stubCall.addArgument(TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(const_cast<Identifier*>(&ident)));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else
-        compileGetDirectOffset(protoObject, regT2, regT1, regT0, cachedOffset);
+        compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
 
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1038,9 +981,7 @@ void JIT::privateCompileGetByIdChainList(StructureStubInfo* stubInfo, Polymorphi
     CodeLocationLabel entryLabel = patchBuffer.finalizeCodeAddendum();
     
     // Track the stub we have created so that it will be deleted later.
-    structure->ref();
-    chain->ref();
-    prototypeStructures->list[currentIndex].set(entryLabel, structure, chain);
+    prototypeStructures->list[currentIndex].set(callFrame->globalData(), m_codeBlock->ownerExecutable(), entryLabel, structure, chain);
     
     // Finally patch the jump to slow case back in the hot path to jump here instead.
     CodeLocationJump jumpLocation = stubInfo->hotPathBegin.jumpAtOffset(patchOffsetGetByIdBranchToSlowCase);
@@ -1059,45 +1000,37 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
     bucketsOfFail.append(checkStructure(regT0, structure));
     
     Structure* currStructure = structure;
-    RefPtr<Structure>* chainEntries = chain->head();
+    WriteBarrier<Structure>* it = chain->head();
     TiObject* protoObject = 0;
-    for (unsigned i = 0; i < count; ++i) {
+    for (unsigned i = 0; i < count; ++i, ++it) {
         protoObject = asObject(currStructure->prototypeForLookup(callFrame));
-        currStructure = chainEntries[i].get();
-        
-        // Check the prototype object's Structure had not changed.
-        Structure** prototypeStructureAddress = &(protoObject->m_structure);
-#if CPU(X86_64)
-        move(ImmPtr(currStructure), regT3);
-        bucketsOfFail.append(branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), regT3));
-#else
-        bucketsOfFail.append(branchPtr(NotEqual, AbsoluteAddress(prototypeStructureAddress), ImmPtr(currStructure)));
-#endif
+        currStructure = it->get();
+        testPrototype(protoObject, bucketsOfFail);
     }
     ASSERT(protoObject);
     
     bool needsStubLink = false;
     if (slot.cachedPropertyType() == PropertySlot::Getter) {
         needsStubLink = true;
-        compileGetDirectOffset(protoObject, regT2, regT2, regT1, cachedOffset);
+        compileGetDirectOffset(protoObject, regT2, regT1, cachedOffset);
         JITStubCall stubCall(this, cti_op_get_by_id_getter_stub);
         stubCall.addArgument(regT1);
         stubCall.addArgument(regT0);
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else if (slot.cachedPropertyType() == PropertySlot::Custom) {
         needsStubLink = true;
         JITStubCall stubCall(this, cti_op_get_by_id_custom_stub);
-        stubCall.addArgument(ImmPtr(protoObject));
-        stubCall.addArgument(ImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
-        stubCall.addArgument(ImmPtr(const_cast<Identifier*>(&ident)));
-        stubCall.addArgument(ImmPtr(stubInfo->callReturnLocation.executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(protoObject));
+        stubCall.addArgument(TrustedImmPtr(FunctionPtr(slot.customGetter()).executableAddress()));
+        stubCall.addArgument(TrustedImmPtr(const_cast<Identifier*>(&ident)));
+        stubCall.addArgument(TrustedImmPtr(stubInfo->callReturnLocation.executableAddress()));
         stubCall.call();
     } else
-        compileGetDirectOffset(protoObject, regT2, regT1, regT0, cachedOffset);
+        compileGetDirectOffset(protoObject, regT1, regT0, cachedOffset);
     Jump success = jump();
     
-    LinkBuffer patchBuffer(this, m_codeBlock->executablePool(), 0);
+    LinkBuffer patchBuffer(*m_globalData, this, m_codeBlock->executablePool());
     if (needsStubLink) {
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter) {
             if (iter->to)
@@ -1127,21 +1060,13 @@ void JIT::privateCompileGetByIdChain(StructureStubInfo* stubInfo, Structure* str
 
 #endif // !ENABLE(JIT_OPTIMIZE_PROPERTY_ACCESS)
 
-void JIT::compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, RegisterID structure, RegisterID offset)
+void JIT::compileGetDirectOffset(RegisterID base, RegisterID resultTag, RegisterID resultPayload, RegisterID offset)
 {
-    ASSERT(sizeof(((Structure*)0)->m_propertyStorageCapacity) == sizeof(int32_t));
-    ASSERT(sizeof(TiObject::inlineStorageCapacity) == sizeof(int32_t));
     ASSERT(sizeof(TiValue) == 8);
     
-    Jump notUsingInlineStorage = branch32(NotEqual, Address(structure, OBJECT_OFFSETOF(Structure, m_propertyStorageCapacity)), Imm32(TiObject::inlineStorageCapacity));
-    loadPtr(BaseIndex(base, offset, TimesEight, OBJECT_OFFSETOF(TiObject, m_inlineStorage)+OBJECT_OFFSETOF(TiValue, u.asBits.payload)), resultPayload);
-    loadPtr(BaseIndex(base, offset, TimesEight, OBJECT_OFFSETOF(TiObject, m_inlineStorage)+OBJECT_OFFSETOF(TiValue, u.asBits.tag)), resultTag);
-    Jump finishedLoad = jump();
-    notUsingInlineStorage.link(this);
-    loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_externalStorage)), base);
+    loadPtr(Address(base, OBJECT_OFFSETOF(TiObject, m_propertyStorage)), base);
     loadPtr(BaseIndex(base, offset, TimesEight, OBJECT_OFFSETOF(TiValue, u.asBits.payload)), resultPayload);
     loadPtr(BaseIndex(base, offset, TimesEight, OBJECT_OFFSETOF(TiValue, u.asBits.tag)), resultTag);
-    finishedLoad.link(this);
 }
 
 void JIT::emit_op_get_by_pname(Instruction* currentInstruction)
@@ -1161,15 +1086,15 @@ void JIT::emit_op_get_by_pname(Instruction* currentInstruction)
     emitLoadPayload(iter, regT1);
     
     // Test base's structure
-    loadPtr(Address(regT2, OBJECT_OFFSETOF(TiCell, m_structure)), regT0);
+    loadPtr(Address(regT2, TiCell::structureOffset()), regT0);
     addSlowCase(branchPtr(NotEqual, regT0, Address(regT1, OBJECT_OFFSETOF(TiPropertyNameIterator, m_cachedStructure))));
     load32(addressFor(i), regT3);
-    sub32(Imm32(1), regT3);
+    sub32(TrustedImm32(1), regT3);
     addSlowCase(branch32(AboveOrEqual, regT3, Address(regT1, OBJECT_OFFSETOF(TiPropertyNameIterator, m_numCacheableSlots))));
-    compileGetDirectOffset(regT2, regT1, regT0, regT0, regT3);    
+    compileGetDirectOffset(regT2, regT1, regT0, regT3);    
     
     emitStore(dst, regT1, regT0);
-    map(m_bytecodeIndex + OPCODE_LENGTH(op_get_by_pname), dst, regT1, regT0);
+    map(m_bytecodeOffset + OPCODE_LENGTH(op_get_by_pname), dst, regT1, regT0);
 }
 
 void JIT::emitSlow_op_get_by_pname(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
@@ -1192,7 +1117,5 @@ void JIT::emitSlow_op_get_by_pname(Instruction* currentInstruction, Vector<SlowC
 
 } // namespace TI
 
+#endif // USE(JSVALUE32_64)
 #endif // ENABLE(JIT)
-
-#endif // ENABLE(JSVALUE32_64)
-

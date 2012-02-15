@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -42,7 +42,7 @@ using namespace TI;
 PassRefPtr<OpaqueTiString> OpaqueTiString::create(const UString& ustring)
 {
     if (!ustring.isNull())
-        return adoptRef(new OpaqueTiString(ustring.data(), ustring.size()));
+        return adoptRef(new OpaqueTiString(ustring.characters(), ustring.length()));
     return 0;
 }
 
@@ -50,7 +50,7 @@ UString OpaqueTiString::ustring() const
 {
     if (this && m_characters)
         return UString(m_characters, m_length);
-    return UString::null();
+    return UString();
 }
 
 Identifier OpaqueTiString::identifier(TiGlobalData* globalData) const

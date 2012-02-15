@@ -1,3 +1,10 @@
+/**
+ * Appcelerator Titanium License
+ * This source code and all modifications done by Appcelerator
+ * are licensed under the Apache Public License (version 2) and
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
+ */
+
 // Automatically generated from ../../runtime/DatePrototype.cpp using ../../create_hash_table. DO NOT EDIT!
 
 #include "Lookup.h"
@@ -55,7 +62,7 @@ static const struct HashTableValue dateTableValues[47] = {
    { "setUTCFullYear", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(dateProtoFuncSetUTCFullYear), (intptr_t)3 THUNK_GENERATOR(0) },
    { "setYear", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(dateProtoFuncSetYear), (intptr_t)1 THUNK_GENERATOR(0) },
    { "getYear", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(dateProtoFuncGetYear), (intptr_t)0 THUNK_GENERATOR(0) },
-   { "toJSON", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(dateProtoFuncToJSON), (intptr_t)0 THUNK_GENERATOR(0) },
+   { "toJSON", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(dateProtoFuncToJSON), (intptr_t)1 THUNK_GENERATOR(0) },
    { 0, 0, 0, 0 THUNK_GENERATOR(0) }
 };
 

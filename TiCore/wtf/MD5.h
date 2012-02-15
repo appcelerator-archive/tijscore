@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -53,7 +53,7 @@ public:
     void addBytes(const uint8_t* input, size_t length);
 
     // checksum has a side effect of resetting the state of the object.
-    Vector<uint8_t, 16> checksum();
+    void checksum(Vector<uint8_t, 16>&);
 
 private:
     uint32_t m_buf[4];

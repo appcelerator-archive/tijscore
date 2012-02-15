@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,7 +36,7 @@
 #include "config.h"
 #include "InitializeThreading.h"
 
-#include "Collector.h"
+#include "Heap.h"
 #include "dtoa.h"
 #include "Identifier.h"
 #include "TiGlobalObject.h"
@@ -55,13 +55,17 @@ static pthread_once_t initializeThreadingKeyOnce = PTHREAD_ONCE_INIT;
 
 static void initializeThreadingOnce()
 {
+    // StringImpl::empty() does not construct its static string in a threadsafe fashion,
+    // so ensure it has been initialized from here.
+    StringImpl::empty();
+
     WTI::initializeThreading();
     wtfThreadData();
-    initializeUString();
     TiGlobalData::storeVPtrs();
 #if ENABLE(JSC_MULTIPLE_THREADS)
     s_dtoaP5Mutex = new Mutex;
     initializeDates();
+    RegisterFile::initializeThreading();
 #endif
 }
 

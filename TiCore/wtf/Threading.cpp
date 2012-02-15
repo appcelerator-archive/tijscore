@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,7 +37,9 @@
 
 namespace WTI {
 
-struct NewThreadContext : FastAllocBase {
+struct NewThreadContext {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     NewThreadContext(ThreadFunction entryPoint, void* data, const char* name)
         : entryPoint(entryPoint)
         , data(data)

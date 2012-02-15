@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -42,22 +42,17 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(TiPropertyNameIterator);
 
+const ClassInfo TiPropertyNameIterator::s_info = { "TiPropertyNameIterator", 0, 0, 0 };
+
 inline TiPropertyNameIterator::TiPropertyNameIterator(TiExcState* exec, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlots)
-    : TiCell(exec->globalData().propertyNameIteratorStructure.get())
-    , m_cachedStructure(0)
+    : TiCell(exec->globalData(), exec->globalData().propertyNameIteratorStructure.get())
     , m_numCacheableSlots(numCacheableSlots)
     , m_jsStringsSize(propertyNameArrayData->propertyNameVector().size())
-    , m_jsStrings(new TiValue[m_jsStringsSize])
+    , m_jsStrings(adoptArrayPtr(new WriteBarrier<Unknown>[m_jsStringsSize]))
 {
     PropertyNameArrayData::PropertyNameVector& propertyNameVector = propertyNameArrayData->propertyNameVector();
     for (size_t i = 0; i < m_jsStringsSize; ++i)
-        m_jsStrings[i] = jsOwnedString(exec, propertyNameVector[i].ustring());
-}
-
-TiPropertyNameIterator::~TiPropertyNameIterator()
-{
-    if (m_cachedStructure)
-        m_cachedStructure->clearEnumerationCache(this);
+        m_jsStrings[i].set(exec->globalData(), this, jsOwnedString(exec, propertyNameVector[i].ustring()));
 }
 
 TiPropertyNameIterator* TiPropertyNameIterator::create(TiExcState* exec, TiObject* o)
@@ -84,22 +79,22 @@ TiPropertyNameIterator* TiPropertyNameIterator::create(TiExcState* exec, TiObjec
     
     size_t count = normalizePrototypeChain(exec, o);
     StructureChain* structureChain = o->structure()->prototypeChain(exec);
-    RefPtr<Structure>* structure = structureChain->head();
+    WriteBarrier<Structure>* structure = structureChain->head();
     for (size_t i = 0; i < count; ++i) {
         if (structure[i]->typeInfo().overridesGetPropertyNames())
             return jsPropertyNameIterator;
     }
 
-    jsPropertyNameIterator->setCachedPrototypeChain(structureChain);
-    jsPropertyNameIterator->setCachedStructure(o->structure());
-    o->structure()->setEnumerationCache(jsPropertyNameIterator);
+    jsPropertyNameIterator->setCachedPrototypeChain(exec->globalData(), structureChain);
+    jsPropertyNameIterator->setCachedStructure(exec->globalData(), o->structure());
+    o->structure()->setEnumerationCache(exec->globalData(), jsPropertyNameIterator);
     return jsPropertyNameIterator;
 }
 
 TiValue TiPropertyNameIterator::get(TiExcState* exec, TiObject* base, size_t i)
 {
-    TiValue& identifier = m_jsStrings[i];
-    if (m_cachedStructure == base->structure() && m_cachedPrototypeChain == base->structure()->prototypeChain(exec))
+    TiValue identifier = m_jsStrings[i].get();
+    if (m_cachedStructure.get() == base->structure() && m_cachedPrototypeChain.get() == base->structure()->prototypeChain(exec))
         return identifier;
 
     if (!base->hasProperty(exec, Identifier(exec, asString(identifier)->value(exec))))
@@ -107,9 +102,13 @@ TiValue TiPropertyNameIterator::get(TiExcState* exec, TiObject* base, size_t i)
     return identifier;
 }
 
-void TiPropertyNameIterator::markChildren(MarkStack& markStack)
+void TiPropertyNameIterator::visitChildren(SlotVisitor& visitor)
 {
-    markStack.appendValues(m_jsStrings.get(), m_jsStringsSize, MayContainNullValues);
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    visitor.appendValues(m_jsStrings.get(), m_jsStringsSize, MayContainNullValues);
+    if (m_cachedPrototypeChain)
+        visitor.append(&m_cachedPrototypeChain);
 }
 
 } // namespace TI

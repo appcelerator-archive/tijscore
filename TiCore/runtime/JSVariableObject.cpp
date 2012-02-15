@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -43,7 +43,7 @@ namespace TI {
 
 bool JSVariableObject::deleteProperty(TiExcState* exec, const Identifier& propertyName)
 {
-    if (symbolTable().contains(propertyName.ustring().rep()))
+    if (symbolTable().contains(propertyName.impl()))
         return false;
 
     return TiObject::deleteProperty(exec, propertyName);
@@ -67,9 +67,9 @@ bool JSVariableObject::isVariableObject() const
 
 bool JSVariableObject::symbolTableGet(const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    SymbolTableEntry entry = symbolTable().inlineGet(propertyName.ustring().rep());
+    SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
     if (!entry.isNull()) {
-        descriptor.setDescriptor(registerAt(entry.getIndex()).jsValue(), entry.getAttributes() | DontDelete);
+        descriptor.setDescriptor(registerAt(entry.getIndex()).get(), entry.getAttributes() | DontDelete);
         return true;
     }
     return false;

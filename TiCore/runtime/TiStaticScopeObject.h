@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,39 +38,30 @@
 namespace TI{
     
     class TiStaticScopeObject : public JSVariableObject {
-    protected:
-        using JSVariableObject::JSVariableObjectData;
-        struct TiStaticScopeObjectData : public JSVariableObjectData {
-            TiStaticScopeObjectData()
-                : JSVariableObjectData(&symbolTable, &registerStore + 1)
-            {
-            }
-            SymbolTable symbolTable;
-            Register registerStore;
-        };
-        
     public:
         TiStaticScopeObject(TiExcState* exec, const Identifier& ident, TiValue value, unsigned attributes)
-            : JSVariableObject(exec->globalData().staticScopeStructure, new TiStaticScopeObjectData())
+            : JSVariableObject(exec->globalData(), exec->globalData().staticScopeStructure.get(), &m_symbolTable, reinterpret_cast<Register*>(&m_registerStore + 1))
         {
-            d()->registerStore = value;
-            symbolTable().add(ident.ustring().rep(), SymbolTableEntry(-1, attributes));
+            m_registerStore.set(exec->globalData(), this, value);
+            symbolTable().add(ident.impl(), SymbolTableEntry(-1, attributes));
         }
-        virtual ~TiStaticScopeObject();
-        virtual void markChildren(MarkStack&);
+
+        virtual void visitChildren(SlotVisitor&);
         bool isDynamicScope(bool& requiresDynamicChecks) const;
         virtual TiObject* toThisObject(TiExcState*) const;
+        virtual TiValue toStrictThisObject(TiExcState*) const;
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual void put(TiExcState*, const Identifier&, TiValue, PutPropertySlot&);
         void putWithAttributes(TiExcState*, const Identifier&, TiValue, unsigned attributes);
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); }
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto) { return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesVisitChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
 
     private:
-        TiStaticScopeObjectData* d() { return static_cast<TiStaticScopeObjectData*>(JSVariableObject::d); }
+        SymbolTable m_symbolTable;
+        WriteBarrier<Unknown> m_registerStore;
     };
 
 }

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // The original file was copied from sqlite, and was in the public domain.
@@ -61,6 +61,7 @@
 #include "StringExtras.h"
 #include "text/CString.h"
 #endif
+#include <wtf/StdLibExtras.h>
 
 namespace WTI {
 
@@ -74,14 +75,15 @@ static void expectMD5(CString input, CString expected)
 {
     MD5 md5;
     md5.addBytes(reinterpret_cast<const uint8_t*>(input.data()), input.length());
-    Vector<uint8_t, 16> digest = md5.checksum();
+    Vector<uint8_t, 16> digest;
+    md5.checksum(digest);
     char* buf = 0;
     CString actual = CString::newUninitialized(32, buf);
     for (size_t i = 0; i < 16; i++) {
         snprintf(buf, 3, "%02x", digest.at(i));
         buf += 2;
     }
-    ASSERT_WITH_MESSAGE(actual == expected, "input:%s[%d] actual:%s expected:%s", input.data(), input.length(), actual.data(), expected.data());
+    ASSERT_WITH_MESSAGE(actual == expected, "input:%s[%lu] actual:%s expected:%s", input.data(), static_cast<unsigned long>(input.length()), actual.data(), expected.data());
 }
 
 static void testMD5()
@@ -109,7 +111,7 @@ static void reverseBytes(uint8_t* buf, unsigned longs)
     do {
         uint32_t t = static_cast<uint32_t>(buf[3] << 8 | buf[2]) << 16 | buf[1] << 8 | buf[0];
         ASSERT_WITH_MESSAGE(!(reinterpret_cast<uintptr_t>(buf) % sizeof(t)), "alignment error of buf");
-        *reinterpret_cast<uint32_t *>(buf) = t;
+        *reinterpret_cast_ptr<uint32_t *>(buf) = t;
         buf += 4;
     } while (--longs);
 }
@@ -208,6 +210,7 @@ static void MD5Transform(uint32_t buf[4], const uint32_t in[16])
 
 MD5::MD5()
 {
+    // FIXME: Move unit tests somewhere outside the constructor. See bug 55853.
     testMD5();
     m_buf[0] = 0x67452301;
     m_buf[1] = 0xefcdab89;
@@ -244,7 +247,7 @@ void MD5::addBytes(const uint8_t* input, size_t length)
         }
         memcpy(p, buf, t);
         reverseBytes(m_in, 16);
-        MD5Transform(m_buf, reinterpret_cast<uint32_t*>(m_in)); // m_in is 4-byte aligned.
+        MD5Transform(m_buf, reinterpret_cast_ptr<uint32_t*>(m_in)); // m_in is 4-byte aligned.
         buf += t;
         length -= t;
     }
@@ -254,7 +257,7 @@ void MD5::addBytes(const uint8_t* input, size_t length)
     while (length >= 64) {
         memcpy(m_in, buf, 64);
         reverseBytes(m_in, 16);
-        MD5Transform(m_buf, reinterpret_cast<uint32_t*>(m_in)); // m_in is 4-byte aligned.
+        MD5Transform(m_buf, reinterpret_cast_ptr<uint32_t*>(m_in)); // m_in is 4-byte aligned.
         buf += 64;
         length -= 64;
     }
@@ -263,7 +266,7 @@ void MD5::addBytes(const uint8_t* input, size_t length)
     memcpy(m_in, buf, length);
 }
 
-Vector<uint8_t, 16> MD5::checksum()
+void MD5::checksum(Vector<uint8_t, 16>& digest)
 {
     // Compute number of bytes mod 64
     unsigned count = (m_bits[0] >> 3) & 0x3F;
@@ -281,7 +284,7 @@ Vector<uint8_t, 16> MD5::checksum()
         // Two lots of padding:  Pad the first block to 64 bytes
         memset(p, 0, count);
         reverseBytes(m_in, 16);
-        MD5Transform(m_buf, reinterpret_cast<uint32_t *>(m_in)); // m_in is 4-byte aligned.
+        MD5Transform(m_buf, reinterpret_cast_ptr<uint32_t *>(m_in)); // m_in is 4-byte aligned.
 
         // Now fill the next block with 56 bytes
         memset(m_in, 0, 56);
@@ -293,19 +296,21 @@ Vector<uint8_t, 16> MD5::checksum()
 
     // Append length in bits and transform
     // m_in is 4-byte aligned.
-    (reinterpret_cast<uint32_t*>(m_in))[14] = m_bits[0];
-    (reinterpret_cast<uint32_t*>(m_in))[15] = m_bits[1];
+    (reinterpret_cast_ptr<uint32_t*>(m_in))[14] = m_bits[0];
+    (reinterpret_cast_ptr<uint32_t*>(m_in))[15] = m_bits[1];
 
-    MD5Transform(m_buf, reinterpret_cast<uint32_t*>(m_in));
+    MD5Transform(m_buf, reinterpret_cast_ptr<uint32_t*>(m_in));
     reverseBytes(reinterpret_cast<uint8_t*>(m_buf), 4);
-    Vector<uint8_t, 16> digest;
+
+    // Now, m_buf contains checksum result.
+    if (!digest.isEmpty())
+        digest.clear();
     digest.append(reinterpret_cast<uint8_t*>(m_buf), 16);
 
     // In case it's sensitive
     memset(m_buf, 0, sizeof(m_buf));
     memset(m_bits, 0, sizeof(m_bits));
     memset(m_in, 0, sizeof(m_in));
-    return digest;
 }
 
 } // namespace WTI

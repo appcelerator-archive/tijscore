@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,95 +37,135 @@
 #include "TiStringBuilder.h"
 #include "TiValue.h"
 #include "ObjectPrototype.h"
-#include "PrototypeFunction.h"
 #include "RegExpObject.h"
 #include "RegExp.h"
 #include "RegExpCache.h"
+#include "StringRecursionChecker.h"
+#include "UStringConcatenate.h"
 
 namespace TI {
 
+static EncodedTiValue JSC_HOST_CALL regExpProtoFuncTest(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL regExpProtoFuncExec(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL regExpProtoFuncCompile(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL regExpProtoFuncToString(TiExcState*);
+
+}
+
+#include "RegExpPrototype.lut.h"
+
+namespace TI {
+
+const ClassInfo RegExpPrototype::s_info = { "RegExp", &RegExpObject::s_info, 0, TiExcState::regExpPrototypeTable };
+
+/* Source for RegExpPrototype.lut.h
+@begin regExpPrototypeTable
+  compile   regExpProtoFuncCompile      DontEnum|Function 2
+  exec      regExpProtoFuncExec         DontEnum|Function 1
+  test      regExpProtoFuncTest         DontEnum|Function 1
+  toString  regExpProtoFuncToString     DontEnum|Function 0
+@end
+*/
+
 ASSERT_CLASS_FITS_IN_CELL(RegExpPrototype);
 
-static TiValue JSC_HOST_CALL regExpProtoFuncTest(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL regExpProtoFuncExec(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL regExpProtoFuncCompile(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL regExpProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-// ECMA 15.10.5
-
-const ClassInfo RegExpPrototype::info = { "RegExpPrototype", 0, 0, 0 };
-
-RegExpPrototype::RegExpPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, Structure* prototypeFunctionStructure)
-    : TiObject(structure)
+RegExpPrototype::RegExpPrototype(TiExcState*, TiGlobalObject* globalObject, Structure* structure, RegExp* regExp)
+    : RegExpObject(globalObject, structure, regExp)
 {
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().compile, regExpProtoFuncCompile), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().exec, regExpProtoFuncExec), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().test, regExpProtoFuncTest), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toString, regExpProtoFuncToString), DontEnum);
+}
+
+bool RegExpPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<RegExpObject>(exec, TiExcState::regExpPrototypeTable(exec), this, propertyName, slot);
+}
+
+bool RegExpPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<RegExpObject>(exec, TiExcState::regExpPrototypeTable(exec), this, propertyName, descriptor);
 }
 
 // ------------------------------ Functions ---------------------------
-    
-TiValue JSC_HOST_CALL regExpProtoFuncTest(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+
+EncodedTiValue JSC_HOST_CALL regExpProtoFuncTest(TiExcState* exec)
 {
-    if (!thisValue.inherits(&RegExpObject::info))
-        return throwError(exec, TypeError);
-    return asRegExpObject(thisValue)->test(exec, args);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&RegExpObject::s_info))
+        return throwVMTypeError(exec);
+    return TiValue::encode(asRegExpObject(thisValue)->test(exec));
 }
 
-TiValue JSC_HOST_CALL regExpProtoFuncExec(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL regExpProtoFuncExec(TiExcState* exec)
 {
-    if (!thisValue.inherits(&RegExpObject::info))
-        return throwError(exec, TypeError);
-    return asRegExpObject(thisValue)->exec(exec, args);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&RegExpObject::s_info))
+        return throwVMTypeError(exec);
+    return TiValue::encode(asRegExpObject(thisValue)->exec(exec));
 }
 
-TiValue JSC_HOST_CALL regExpProtoFuncCompile(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL regExpProtoFuncCompile(TiExcState* exec)
 {
-    if (!thisValue.inherits(&RegExpObject::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&RegExpObject::s_info))
+        return throwVMTypeError(exec);
 
-    RefPtr<RegExp> regExp;
-    TiValue arg0 = args.at(0);
-    TiValue arg1 = args.at(1);
+    RegExp* regExp;
+    TiValue arg0 = exec->argument(0);
+    TiValue arg1 = exec->argument(1);
     
-    if (arg0.inherits(&RegExpObject::info)) {
+    if (arg0.inherits(&RegExpObject::s_info)) {
         if (!arg1.isUndefined())
-            return throwError(exec, TypeError, "Cannot supply flags when constructing one RegExp from another.");
+            return throwVMError(exec, createTypeError(exec, "Cannot supply flags when constructing one RegExp from another."));
         regExp = asRegExpObject(arg0)->regExp();
     } else {
-        UString pattern = args.isEmpty() ? UString("") : arg0.toString(exec);
-        UString flags = arg1.isUndefined() ? UString("") : arg1.toString(exec);
-        regExp = exec->globalData().regExpCache()->lookupOrCreate(pattern, flags);
+        UString pattern = !exec->argumentCount() ? UString("") : arg0.toString(exec);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
+
+        RegExpFlags flags = NoFlags;
+        if (!arg1.isUndefined()) {
+            flags = regExpFlags(arg1.toString(exec));
+            if (exec->hadException())
+                return TiValue::encode(jsUndefined());
+            if (flags == InvalidFlags)
+                return throwVMError(exec, createSyntaxError(exec, "Invalid flags supplied to RegExp constructor."));
+        }
+        regExp = RegExp::create(&exec->globalData(), pattern, flags);
     }
 
     if (!regExp->isValid())
-        return throwError(exec, SyntaxError, makeString("Invalid regular expression: ", regExp->errorMessage()));
+        return throwVMError(exec, createSyntaxError(exec, regExp->errorMessage()));
 
-    asRegExpObject(thisValue)->setRegExp(regExp.release());
+    asRegExpObject(thisValue)->setRegExp(exec->globalData(), regExp);
     asRegExpObject(thisValue)->setLastIndex(0);
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL regExpProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL regExpProtoFuncToString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&RegExpObject::info)) {
-        if (thisValue.inherits(&RegExpPrototype::info))
-            return jsNontrivialString(exec, "//");
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&RegExpObject::s_info)) {
+        if (thisValue.inherits(&RegExpPrototype::s_info))
+            return TiValue::encode(jsNontrivialString(exec, "//"));
+        return throwVMTypeError(exec);
     }
+
+    RegExpObject* thisObject = asRegExpObject(thisValue);
+
+    StringRecursionChecker checker(exec, thisObject);
+    if (EncodedTiValue earlyReturnValue = checker.earlyReturnValue())
+        return earlyReturnValue;
 
     char postfix[5] = { '/', 0, 0, 0, 0 };
     int index = 1;
-    if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().global).toBoolean(exec))
+    if (thisObject->get(exec, exec->propertyNames().global).toBoolean(exec))
         postfix[index++] = 'g';
-    if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().ignoreCase).toBoolean(exec))
+    if (thisObject->get(exec, exec->propertyNames().ignoreCase).toBoolean(exec))
         postfix[index++] = 'i';
-    if (asRegExpObject(thisValue)->get(exec, exec->propertyNames().multiline).toBoolean(exec))
+    if (thisObject->get(exec, exec->propertyNames().multiline).toBoolean(exec))
         postfix[index] = 'm';
-    UString source = asRegExpObject(thisValue)->get(exec, exec->propertyNames().source).toString(exec);
+    UString source = thisObject->get(exec, exec->propertyNames().source).toString(exec);
     // If source is empty, use "/(?:)/" to avoid colliding with comment syntax
-    return jsMakeNontrivialString(exec, "/", source.size() ? source : UString("(?:)"), postfix);
+    return TiValue::encode(jsMakeNontrivialString(exec, "/", source.length() ? source : UString("(?:)"), postfix));
 }
 
 } // namespace TI

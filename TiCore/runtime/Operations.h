@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,9 +31,8 @@
 
 #include "ExceptionHelpers.h"
 #include "Interpreter.h"
-#include "JSImmediate.h"
-#include "JSNumberCell.h"
 #include "TiString.h"
+#include "TiValueInlineMethods.h"
 
 namespace TI {
 
@@ -53,7 +52,7 @@ namespace TI {
         if ((length1 + length2) < length1)
             return throwOutOfMemoryError(exec);
 
-        unsigned fiberCount = s1->size() + s2->size();
+        unsigned fiberCount = s1->fiberCount() + s2->fiberCount();
         TiGlobalData* globalData = &exec->globalData();
 
         if (fiberCount <= TiString::s_maxInternalRopeLength)
@@ -69,7 +68,7 @@ namespace TI {
 
     ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, TiString* s2)
     {
-        unsigned length1 = u1.size();
+        unsigned length1 = u1.length();
         if (!length1)
             return s2;
         unsigned length2 = s2->length();
@@ -78,7 +77,7 @@ namespace TI {
         if ((length1 + length2) < length1)
             return throwOutOfMemoryError(exec);
 
-        unsigned fiberCount = 1 + s2->size();
+        unsigned fiberCount = 1 + s2->fiberCount();
         TiGlobalData* globalData = &exec->globalData();
 
         if (fiberCount <= TiString::s_maxInternalRopeLength)
@@ -97,13 +96,13 @@ namespace TI {
         unsigned length1 = s1->length();
         if (!length1)
             return jsString(exec, u2);
-        unsigned length2 = u2.size();
+        unsigned length2 = u2.length();
         if (!length2)
             return s1;
         if ((length1 + length2) < length1)
             return throwOutOfMemoryError(exec);
 
-        unsigned fiberCount = s1->size() + 1;
+        unsigned fiberCount = s1->fiberCount() + 1;
         TiGlobalData* globalData = &exec->globalData();
 
         if (fiberCount <= TiString::s_maxInternalRopeLength)
@@ -119,10 +118,10 @@ namespace TI {
 
     ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, const UString& u2)
     {
-        unsigned length1 = u1.size();
+        unsigned length1 = u1.length();
         if (!length1)
             return jsString(exec, u2);
-        unsigned length2 = u2.size();
+        unsigned length2 = u2.length();
         if (!length2)
             return jsString(exec, u1);
         if ((length1 + length2) < length1)
@@ -134,9 +133,9 @@ namespace TI {
 
     ALWAYS_INLINE TiValue jsString(TiExcState* exec, const UString& u1, const UString& u2, const UString& u3)
     {
-        unsigned length1 = u1.size();
-        unsigned length2 = u2.size();
-        unsigned length3 = u3.size();
+        unsigned length1 = u1.length();
+        unsigned length2 = u2.length();
+        unsigned length3 = u3.length();
         if (!length1)
             return jsString(exec, u2, u3);
         if (!length2)
@@ -161,7 +160,7 @@ namespace TI {
         for (unsigned i = 0; i < count; ++i) {
             TiValue v = strings[i].jsValue();
             if (LIKELY(v.isString()))
-                fiberCount += asString(v)->size();
+                fiberCount += asString(v)->fiberCount();
             else
                 ++fiberCount;
         }
@@ -196,17 +195,17 @@ namespace TI {
         return new (globalData) TiString(globalData, ropeBuilder.release());
     }
 
-    ALWAYS_INLINE TiValue jsString(TiExcState* exec, TiValue thisValue, const ArgList& args)
+    ALWAYS_INLINE TiValue jsString(TiExcState* exec, TiValue thisValue)
     {
         unsigned fiberCount = 0;
         if (LIKELY(thisValue.isString()))
-            fiberCount += asString(thisValue)->size();
+            fiberCount += asString(thisValue)->fiberCount();
         else
             ++fiberCount;
-        for (unsigned i = 0; i < args.size(); ++i) {
-            TiValue v = args.at(i);
+        for (unsigned i = 0; i < exec->argumentCount(); ++i) {
+            TiValue v = exec->argument(i);
             if (LIKELY(v.isString()))
-                fiberCount += asString(v)->size();
+                fiberCount += asString(v)->fiberCount();
             else
                 ++fiberCount;
         }
@@ -223,8 +222,8 @@ namespace TI {
         unsigned length = 0;
         bool overflow = false;
 
-        for (unsigned i = 0; i < args.size(); ++i) {
-            TiValue v = args.at(i);
+        for (unsigned i = 0; i < exec->argumentCount(); ++i) {
+            TiValue v = exec->argument(i);
             if (LIKELY(v.isString()))
                 ropeBuilder.append(asString(v));
             else
@@ -405,7 +404,7 @@ namespace TI {
     {
         double left = 0.0, right;
         if (v1.getNumber(left) && v2.getNumber(right))
-            return jsNumber(callFrame, left + right);
+            return jsNumber(left + right);
         
         if (v1.isString()) {
             return v2.isString()
@@ -419,7 +418,7 @@ namespace TI {
 
     inline size_t normalizePrototypeChain(CallFrame* callFrame, TiValue base, TiValue slotBase, const Identifier& propertyName, size_t& slotOffset)
     {
-        TiCell* cell = asCell(base);
+        TiCell* cell = base.asCell();
         size_t count = 0;
 
         while (slotBase != cell) {
@@ -431,14 +430,14 @@ namespace TI {
             if (v.isNull())
                 return 0;
 
-            cell = asCell(v);
+            cell = v.asCell();
 
             // Since we're accessing a prototype in a loop, it's a good bet that it
             // should not be treated as a dictionary.
             if (cell->structure()->isDictionary()) {
-                asObject(cell)->flattenDictionaryObject();
+                asObject(cell)->flattenDictionaryObject(callFrame->globalData());
                 if (slotBase == cell)
-                    slotOffset = cell->structure()->get(propertyName); 
+                    slotOffset = cell->structure()->get(callFrame->globalData(), propertyName); 
             }
 
             ++count;
@@ -456,18 +455,18 @@ namespace TI {
             if (v.isNull())
                 return count;
 
-            base = asCell(v);
+            base = v.asCell();
 
             // Since we're accessing a prototype in a loop, it's a good bet that it
             // should not be treated as a dictionary.
             if (base->structure()->isDictionary())
-                asObject(base)->flattenDictionaryObject();
+                asObject(base)->flattenDictionaryObject(callFrame->globalData());
 
             ++count;
         }
     }
 
-    ALWAYS_INLINE TiValue resolveBase(CallFrame* callFrame, Identifier& property, ScopeChainNode* scopeChain)
+    ALWAYS_INLINE TiValue resolveBase(CallFrame* callFrame, Identifier& property, ScopeChainNode* scopeChain, bool isStrictPut)
     {
         ScopeChainIterator iter = scopeChain->begin();
         ScopeChainIterator next = iter;
@@ -478,8 +477,13 @@ namespace TI {
         PropertySlot slot;
         TiObject* base;
         while (true) {
-            base = *iter;
-            if (next == end || base->getPropertySlot(callFrame, property, slot))
+            base = iter->get();
+            if (next == end) {
+                if (isStrictPut && !base->getPropertySlot(callFrame, property, slot))
+                    return TiValue();
+                return base;
+            }
+            if (base->getPropertySlot(callFrame, property, slot))
                 return base;
 
             iter = next;

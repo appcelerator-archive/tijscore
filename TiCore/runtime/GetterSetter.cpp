@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,14 +35,18 @@
 
 namespace TI {
 
-void GetterSetter::markChildren(MarkStack& markStack)
+const ClassInfo GetterSetter::s_info = { "GetterSetter", 0, 0, 0 };
+
+void GetterSetter::visitChildren(SlotVisitor& visitor)
 {
-    TiCell::markChildren(markStack);
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    TiCell::visitChildren(visitor);
 
     if (m_getter)
-        markStack.append(m_getter);
+        visitor.append(&m_getter);
     if (m_setter)
-        markStack.append(m_setter);
+        visitor.append(&m_setter);
 }
 
 bool GetterSetter::isGetterSetter() const

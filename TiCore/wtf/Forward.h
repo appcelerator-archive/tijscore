@@ -2,11 +2,11 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
- *  Copyright (C) 2006, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2006, 2009, 2011 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -34,18 +34,38 @@ namespace WTI {
     template<typename T> class ListRefPtr;
     template<typename T> class OwnArrayPtr;
     template<typename T> class OwnPtr;
+    template<typename T> class PassOwnArrayPtr;
     template<typename T> class PassOwnPtr;
     template<typename T> class PassRefPtr;
     template<typename T> class RefPtr;
     template<typename T, size_t inlineCapacity> class Vector;
+
+    class AtomicString;
+    class AtomicStringImpl;
+    class CString;
+    class Decoder;
+    class Encoder;
+    class String;
+    class StringBuffer;
+    class StringImpl;
 }
 
 using WTI::ListRefPtr;
 using WTI::OwnArrayPtr;
 using WTI::OwnPtr;
+using WTI::PassOwnArrayPtr;
 using WTI::PassOwnPtr;
 using WTI::PassRefPtr;
 using WTI::RefPtr;
 using WTI::Vector;
+
+using WTI::AtomicString;
+using WTI::AtomicStringImpl;
+using WTI::CString;
+using WTI::Encoder;
+using WTI::Decoder;
+using WTI::String;
+using WTI::StringBuffer;
+using WTI::StringImpl;
 
 #endif // WTF_Forward_h

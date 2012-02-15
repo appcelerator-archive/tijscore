@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,11 +37,6 @@
 #include "ARMv7Assembler.h"
 
 namespace TI {
-
-const int ARMv7Assembler::JumpSizes[] = { 0xffffffff, sizeof(uint16_t), sizeof(uint16_t),
-    2 * sizeof(uint16_t), 2 * sizeof(uint16_t), 3 * sizeof(uint16_t), 5 * sizeof(uint16_t), 6 * sizeof(uint16_t) };
-const int ARMv7Assembler::JumpPaddingSizes[] = { 0, 5 * sizeof(uint16_t), 6 * sizeof(uint16_t),
-    5 * sizeof(uint16_t), 6 * sizeof(uint16_t) };
 
 }
 

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,17 +33,17 @@
 #include "config.h"
 #include "ConstructData.h"
 
+#include "Executable.h"
+#include "Interpreter.h"
 #include "TiFunction.h"
+#include "TiGlobalObject.h"
 
 namespace TI {
 
-TiObject* construct(TiExcState* exec, TiValue object, ConstructType constructType, const ConstructData& constructData, const ArgList& args)
+TiObject* construct(TiExcState* exec, TiValue constructorObject, ConstructType constructType, const ConstructData& constructData, const ArgList& args)
 {
-    if (constructType == ConstructTypeHost)
-        return constructData.native.function(exec, asObject(object), args);
-    ASSERT(constructType == ConstructTypeJS);
-    // FIXME: Can this be done more efficiently using the constructData?
-    return asFunction(object)->construct(exec, args);
+    ASSERT(constructType == ConstructTypeJS || constructType == ConstructTypeHost);
+    return exec->interpreter()->executeConstruct(exec, asObject(constructorObject), constructType, constructData, args);
 }
 
 } // namespace TI

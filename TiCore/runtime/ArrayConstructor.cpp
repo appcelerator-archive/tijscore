@@ -2,12 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2011 Apple Inc. All rights reserved.
  *  Copyright (C) 2003 Peter Kelly (pmk@post.com)
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *
@@ -33,62 +33,84 @@
 
 #include "ArrayPrototype.h"
 #include "Error.h"
+#include "ExceptionHelpers.h"
 #include "TiArray.h"
 #include "TiFunction.h"
 #include "Lookup.h"
-#include "PrototypeFunction.h"
 
 namespace TI {
 
-ASSERT_CLASS_FITS_IN_CELL(ArrayConstructor);
-    
-static TiValue JSC_HOST_CALL arrayConstructorIsArray(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL arrayConstructorIsArray(TiExcState*);
 
-ArrayConstructor::ArrayConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, ArrayPrototype* arrayPrototype, Structure* prototypeFunctionStructure)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, arrayPrototype->classInfo()->className))
-{
-    // ECMA 15.4.3.1 Array.prototype
-    putDirectWithoutTransition(exec->propertyNames().prototype, arrayPrototype, DontEnum | DontDelete | ReadOnly);
-
-    // no. of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontEnum | DontDelete);
-
-    // ES5
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().isArray, arrayConstructorIsArray), DontEnum);
 }
+
+#include "ArrayConstructor.lut.h"
+
+namespace TI {
+
+const ClassInfo ArrayConstructor::s_info = { "Function", &InternalFunction::s_info, 0, TiExcState::arrayConstructorTable };
+
+/* Source for ArrayConstructor.lut.h
+@begin arrayConstructorTable
+  isArray   arrayConstructorIsArray     DontEnum|Function 1
+@end
+*/
+
+ASSERT_CLASS_FITS_IN_CELL(ArrayConstructor);
+
+ArrayConstructor::ArrayConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, ArrayPrototype* arrayPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, arrayPrototype->classInfo()->className))
+{
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, arrayPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
+}
+
+bool ArrayConstructor::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<InternalFunction>(exec, TiExcState::arrayConstructorTable(exec), this, propertyName, slot);
+}
+
+bool ArrayConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<InternalFunction>(exec, TiExcState::arrayConstructorTable(exec), this, propertyName, descriptor);
+}
+
+// ------------------------------ Functions ---------------------------
 
 static inline TiObject* constructArrayWithSizeQuirk(TiExcState* exec, const ArgList& args)
 {
+    TiGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
+
     // a single numeric argument denotes the array size (!)
     if (args.size() == 1 && args.at(0).isNumber()) {
         uint32_t n = args.at(0).toUInt32(exec);
         if (n != args.at(0).toNumber(exec))
-            return throwError(exec, RangeError, "Array size is not a small enough positive integer.");
-        return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure(), n);
+            return throwError(exec, createRangeError(exec, "Array size is not a small enough positive integer."));
+        return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure(), n, CreateInitialized);
     }
 
     // otherwise the array is constructed with the arguments in it
-    return new (exec) TiArray(exec->lexicalGlobalObject()->arrayStructure(), args);
+    return new (exec) TiArray(exec->globalData(), globalObject->arrayStructure(), args);
 }
 
-static TiObject* constructWithArrayConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithArrayConstructor(TiExcState* exec)
 {
-    return constructArrayWithSizeQuirk(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructArrayWithSizeQuirk(exec, args));
 }
 
-// ECMA 15.4.2
 ConstructType ArrayConstructor::getConstructData(ConstructData& constructData)
 {
     constructData.native.function = constructWithArrayConstructor;
     return ConstructTypeHost;
 }
 
-static TiValue JSC_HOST_CALL callArrayConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callArrayConstructor(TiExcState* exec)
 {
-    return constructArrayWithSizeQuirk(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructArrayWithSizeQuirk(exec, args));
 }
 
-// ECMA 15.6.1
 CallType ArrayConstructor::getCallData(CallData& callData)
 {
     // equivalent to 'new Array(....)'
@@ -96,9 +118,9 @@ CallType ArrayConstructor::getCallData(CallData& callData)
     return CallTypeHost;
 }
 
-TiValue JSC_HOST_CALL arrayConstructorIsArray(TiExcState*, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayConstructorIsArray(TiExcState* exec)
 {
-    return jsBoolean(args.at(0).inherits(&TiArray::info));
+    return TiValue::encode(jsBoolean(exec->argument(0).inherits(&TiArray::s_info)));
 }
 
 } // namespace TI

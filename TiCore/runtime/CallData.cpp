@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,17 +33,16 @@
 #include "config.h"
 #include "CallData.h"
 
+#include "Executable.h"
+#include "Interpreter.h"
 #include "TiFunction.h"
 
 namespace TI {
 
 TiValue call(TiExcState* exec, TiValue functionObject, CallType callType, const CallData& callData, TiValue thisValue, const ArgList& args)
 {
-    if (callType == CallTypeHost)
-        return callData.native.function(exec, asObject(functionObject), thisValue, args);
-    ASSERT(callType == CallTypeJS);
-    // FIXME: Can this be done more efficiently using the callData?
-    return asFunction(functionObject)->call(exec, thisValue, args);
+    ASSERT(callType == CallTypeJS || callType == CallTypeHost);
+    return exec->interpreter()->executeCall(exec, asObject(functionObject), callType, callData, thisValue, args);
 }
 
 } // namespace TI

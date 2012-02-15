@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -52,6 +52,8 @@ public:
     inline QString toString() const;
 
     inline quint64 id() const;
+
+    inline operator TiStringRef() const;
 
 private:
     TiStringRef m_string;
@@ -114,6 +116,16 @@ QString QScriptStringPrivate::toString() const
 quint64 QScriptStringPrivate::id() const
 {
     return reinterpret_cast<quint32>(m_string);
+}
+
+/*!
+    \internal
+    This method should be used for invoking JSC functions.
+    \note This method keeps ownership of an internal TiStringRef.
+*/
+QScriptStringPrivate::operator TiStringRef() const
+{
+    return m_string;
 }
 
 #endif // qscriptstring_p_h

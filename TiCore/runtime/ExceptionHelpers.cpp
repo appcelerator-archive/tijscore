@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,18 +38,20 @@
 
 #include "CodeBlock.h"
 #include "CallFrame.h"
+#include "ErrorInstance.h"
 #include "TiGlobalObjectFunctions.h"
 #include "TiObject.h"
 #include "JSNotAnObject.h"
 #include "Interpreter.h"
 #include "Nodes.h"
+#include "UStringConcatenate.h"
 
 namespace TI {
 
-class InterruptedExecutionError : public TiObject {
+class InterruptedExecutionError : public JSNonFinalObject {
 public:
     InterruptedExecutionError(TiGlobalData* globalData)
-        : TiObject(globalData->interruptedExecutionErrorStructure)
+        : JSNonFinalObject(*globalData, globalData->interruptedExecutionErrorStructure.get())
     {
     }
 
@@ -58,15 +60,15 @@ public:
     virtual UString toString(TiExcState*) const { return "Ti execution exceeded timeout."; }
 };
 
-TiValue createInterruptedExecutionException(TiGlobalData* globalData)
+TiObject* createInterruptedExecutionException(TiGlobalData* globalData)
 {
     return new (globalData) InterruptedExecutionError(globalData);
 }
 
-class TerminatedExecutionError : public TiObject {
+class TerminatedExecutionError : public JSNonFinalObject {
 public:
     TerminatedExecutionError(TiGlobalData* globalData)
-        : TiObject(globalData->terminatedExecutionErrorStructure)
+        : JSNonFinalObject(*globalData, globalData->terminatedExecutionErrorStructure.get())
     {
     }
 
@@ -75,146 +77,81 @@ public:
     virtual UString toString(TiExcState*) const { return "Ti execution terminated."; }
 };
 
-TiValue createTerminatedExecutionException(TiGlobalData* globalData)
+TiObject* createTerminatedExecutionException(TiGlobalData* globalData)
 {
     return new (globalData) TerminatedExecutionError(globalData);
 }
 
-static TiValue createError(TiExcState* exec, ErrorType e, const char* msg)
+TiObject* createStackOverflowError(TiExcState* exec)
 {
-    return Error::create(exec, e, msg, -1, -1, UString());
+    return createRangeError(exec, "Maximum call stack size exceeded.");
 }
 
-TiValue createStackOverflowError(TiExcState* exec)
+TiObject* createStackOverflowError(TiGlobalObject* globalObject)
 {
-    return createError(exec, RangeError, "Maximum call stack size exceeded.");
+    return createRangeError(globalObject, "Maximum call stack size exceeded.");
 }
 
-TiValue createTypeError(TiExcState* exec, const char* message)
+TiObject* createUndefinedVariableError(TiExcState* exec, const Identifier& ident)
 {
-    return createError(exec, TypeError, message);
-}
-
-TiValue createUndefinedVariableError(TiExcState* exec, const Identifier& ident, unsigned bytecodeOffset, CodeBlock* codeBlock)
-{
-    int startOffset = 0;
-    int endOffset = 0;
-    int divotPoint = 0;
-    int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    TiObject* exception = Error::create(exec, ReferenceError, makeString("Can't find variable: ", ident.ustring()), line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
-    exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
-    return exception;
+    UString message(makeUString("Can't find variable: ", ident.ustring()));
+    return createReferenceError(exec, message);
 }
     
-static UString createErrorMessage(TiExcState* exec, CodeBlock* codeBlock, int, int expressionStart, int expressionStop, TiValue value, UString error)
+TiObject* createInvalidParamError(TiExcState* exec, const char* op, TiValue value)
 {
-    if (!expressionStop || expressionStart > codeBlock->source()->length())
-        return makeString(value.toString(exec), " is ", error);
-    if (expressionStart < expressionStop)
-        return makeString("Result of expression '", codeBlock->source()->getRange(expressionStart, expressionStop), "' [", value.toString(exec), "] is ", error, ".");
-
-    // No range information, so give a few characters of context
-    const UChar* data = codeBlock->source()->data();
-    int dataLength = codeBlock->source()->length();
-    int start = expressionStart;
-    int stop = expressionStart;
-    // Get up to 20 characters of context to the left and right of the divot, clamping to the line.
-    // then strip whitespace.
-    while (start > 0 && (expressionStart - start < 20) && data[start - 1] != '\n')
-        start--;
-    while (start < (expressionStart - 1) && isStrWhiteSpace(data[start]))
-        start++;
-    while (stop < dataLength && (stop - expressionStart < 20) && data[stop] != '\n')
-        stop++;
-    while (stop > expressionStart && isStrWhiteSpace(data[stop]))
-        stop--;
-    return makeString("Result of expression near '...", codeBlock->source()->getRange(start, stop), "...' [", value.toString(exec), "] is ", error, ".");
-}
-
-TiObject* createInvalidParamError(TiExcState* exec, const char* op, TiValue value, unsigned bytecodeOffset, CodeBlock* codeBlock)
-{
-    int startOffset = 0;
-    int endOffset = 0;
-    int divotPoint = 0;
-    int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    UString errorMessage = createErrorMessage(exec, codeBlock, line, divotPoint, divotPoint + endOffset, value, makeString("not a valid argument for '", op, "'"));
-    TiObject* exception = Error::create(exec, TypeError, errorMessage, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
-    exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
+    UString errorMessage = makeUString("'", value.toString(exec), "' is not a valid argument for '", op, "'");
+    TiObject* exception = createTypeError(exec, errorMessage);
+    ASSERT(exception->isErrorInstance());
+    static_cast<ErrorInstance*>(exception)->setAppendSourceToMessage();
     return exception;
 }
 
-TiObject* createNotAConstructorError(TiExcState* exec, TiValue value, unsigned bytecodeOffset, CodeBlock* codeBlock)
+TiObject* createNotAConstructorError(TiExcState* exec, TiValue value)
 {
-    int startOffset = 0;
-    int endOffset = 0;
-    int divotPoint = 0;
-    int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-
-    // We're in a "new" expression, so we need to skip over the "new.." part
-    int startPoint = divotPoint - (startOffset ? startOffset - 4 : 0); // -4 for "new "
-    const UChar* data = codeBlock->source()->data();
-    while (startPoint < divotPoint && isStrWhiteSpace(data[startPoint]))
-        startPoint++;
-    
-    UString errorMessage = createErrorMessage(exec, codeBlock, line, startPoint, divotPoint, value, "not a constructor");
-    TiObject* exception = Error::create(exec, TypeError, errorMessage, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
-    exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
+    UString errorMessage = makeUString("'", value.toString(exec), "' is not a constructor");
+    TiObject* exception = createTypeError(exec, errorMessage);
+    ASSERT(exception->isErrorInstance());
+    static_cast<ErrorInstance*>(exception)->setAppendSourceToMessage();
     return exception;
 }
 
-TiValue createNotAFunctionError(TiExcState* exec, TiValue value, unsigned bytecodeOffset, CodeBlock* codeBlock)
+TiObject* createNotAFunctionError(TiExcState* exec, TiValue value)
 {
-    int startOffset = 0;
-    int endOffset = 0;
-    int divotPoint = 0;
-    int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    UString errorMessage = createErrorMessage(exec, codeBlock, line, divotPoint - startOffset, divotPoint, value, "not a function");
-    TiObject* exception = Error::create(exec, TypeError, errorMessage, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());    
-    exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
+    UString errorMessage = makeUString("'", value.toString(exec), "' is not a function");
+    TiObject* exception = createTypeError(exec, errorMessage);
+    ASSERT(exception->isErrorInstance());
+    static_cast<ErrorInstance*>(exception)->setAppendSourceToMessage();
     return exception;
 }
 
-JSNotAnObjectErrorStub* createNotAnObjectErrorStub(TiExcState* exec, bool isNull)
+TiObject* createNotAnObjectError(TiExcState* exec, TiValue value)
 {
-    return new (exec) JSNotAnObjectErrorStub(exec, isNull);
-}
-
-TiObject* createNotAnObjectError(TiExcState* exec, JSNotAnObjectErrorStub* error, unsigned bytecodeOffset, CodeBlock* codeBlock)
-{
-    // Both op_construct and op_instanceof require a use of op_get_by_id to get
-    // the prototype property from an object. The exception messages for exceptions
-    // thrown by these instances op_get_by_id need to reflect this.
-    OpcodeID followingOpcodeID;
-    if (codeBlock->getByIdExceptionInfoForBytecodeOffset(exec, bytecodeOffset, followingOpcodeID)) {
-        ASSERT(followingOpcodeID == op_construct || followingOpcodeID == op_instanceof);
-        if (followingOpcodeID == op_construct)
-            return createNotAConstructorError(exec, error->isNull() ? jsNull() : jsUndefined(), bytecodeOffset, codeBlock);
-        return createInvalidParamError(exec, "instanceof", error->isNull() ? jsNull() : jsUndefined(), bytecodeOffset, codeBlock);
-    }
-
-    int startOffset = 0;
-    int endOffset = 0;
-    int divotPoint = 0;
-    int line = codeBlock->expressionRangeForBytecodeOffset(exec, bytecodeOffset, divotPoint, startOffset, endOffset);
-    UString errorMessage = createErrorMessage(exec, codeBlock, line, divotPoint - startOffset, divotPoint, error->isNull() ? jsNull() : jsUndefined(), "not an object");
-    TiObject* exception = Error::create(exec, TypeError, errorMessage, line, codeBlock->ownerExecutable()->sourceID(), codeBlock->ownerExecutable()->sourceURL());
-    exception->putWithAttributes(exec, Identifier(exec, expressionBeginOffsetPropertyName), jsNumber(exec, divotPoint - startOffset), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionCaretOffsetPropertyName), jsNumber(exec, divotPoint), ReadOnly | DontDelete);
-    exception->putWithAttributes(exec, Identifier(exec, expressionEndOffsetPropertyName), jsNumber(exec, divotPoint + endOffset), ReadOnly | DontDelete);
+    UString errorMessage = makeUString("'", value.toString(exec), "' is not an object");
+    TiObject* exception = createTypeError(exec, errorMessage);
+    ASSERT(exception->isErrorInstance());
+    static_cast<ErrorInstance*>(exception)->setAppendSourceToMessage();
     return exception;
 }
 
-TiValue throwOutOfMemoryError(TiExcState* exec)
+TiObject* createErrorForInvalidGlobalAssignment(TiExcState* exec, const UString& propertyName)
 {
-    return throwError(exec, GeneralError, "Out of memory");
+    return createReferenceError(exec, makeUString("Strict mode forbids implicit creation of global property '", propertyName, "'"));
+}
+
+TiObject* createOutOfMemoryError(TiGlobalObject* globalObject)
+{
+    return createError(globalObject, "Out of memory");
+}
+
+TiObject* throwOutOfMemoryError(TiExcState* exec)
+{
+    return throwError(exec, createOutOfMemoryError(exec->lexicalGlobalObject()));
+}
+
+TiObject* throwStackOverflowError(TiExcState* exec)
+{
+    return throwError(exec, createStackOverflowError(exec));
 }
 
 } // namespace TI

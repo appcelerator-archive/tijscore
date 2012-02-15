@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,9 +30,7 @@
 
 #include "StringImpl.h"
 
-// FIXME: This is a temporary layering violation while we move string code to WTF.
-// Landing the file moves in one patch, will follow on with patches to change the namespaces.
-namespace WebCore {
+namespace WTI {
 
 class AtomicStringImpl : public StringImpl
 {
@@ -41,5 +39,7 @@ public:
 };
 
 }
+
+using WTI::AtomicStringImpl;
 
 #endif

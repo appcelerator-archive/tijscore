@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,99 +34,98 @@
 #define Structure_h
 
 #include "Identifier.h"
+#include "TiCell.h"
 #include "TiType.h"
 #include "TiValue.h"
 #include "PropertyMapHashTable.h"
 #include "PropertyNameArray.h"
 #include "Protect.h"
-#include "StructureChain.h"
 #include "StructureTransitionTable.h"
 #include "TiTypeInfo.h"
 #include "UString.h"
-#include "WeakGCPtr.h"
+#include "Weak.h"
+#include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 
-#ifndef NDEBUG
-#define DUMP_PROPERTYMAP_STATS 0
-#else
-#define DUMP_PROPERTYMAP_STATS 0
-#endif
 
 namespace TI {
 
     class MarkStack;
     class PropertyNameArray;
     class PropertyNameArrayData;
+    class StructureChain;
+    typedef MarkStack SlotVisitor;
+
+    struct ClassInfo;
 
     enum EnumerationMode {
         ExcludeDontEnumProperties,
         IncludeDontEnumProperties
     };
 
-    class Structure : public RefCounted<Structure> {
+    class Structure : public TiCell {
     public:
-        friend class JIT;
         friend class StructureTransitionTable;
-        static PassRefPtr<Structure> create(TiValue prototype, const TypeInfo& typeInfo, unsigned anonymousSlotCount)
+        static Structure* create(TiGlobalData& globalData, TiValue prototype, const TypeInfo& typeInfo, unsigned anonymousSlotCount, const ClassInfo* classInfo)
         {
-            return adoptRef(new Structure(prototype, typeInfo, anonymousSlotCount));
+            ASSERT(globalData.structureStructure);
+            ASSERT(classInfo);
+            return new (&globalData) Structure(globalData, prototype, typeInfo, anonymousSlotCount, classInfo);
         }
-
-        static void startIgnoringLeaks();
-        static void stopIgnoringLeaks();
 
         static void dumpStatistics();
 
-        static PassRefPtr<Structure> addPropertyTransition(Structure*, const Identifier& propertyName, unsigned attributes, TiCell* specificValue, size_t& offset);
-        static PassRefPtr<Structure> addPropertyTransitionToExistingStructure(Structure*, const Identifier& propertyName, unsigned attributes, TiCell* specificValue, size_t& offset);
-        static PassRefPtr<Structure> removePropertyTransition(Structure*, const Identifier& propertyName, size_t& offset);
-        static PassRefPtr<Structure> changePrototypeTransition(Structure*, TiValue prototype);
-        static PassRefPtr<Structure> despecifyFunctionTransition(Structure*, const Identifier&);
-        static PassRefPtr<Structure> getterSetterTransition(Structure*);
-        static PassRefPtr<Structure> toCacheableDictionaryTransition(Structure*);
-        static PassRefPtr<Structure> toUncacheableDictionaryTransition(Structure*);
+        static Structure* addPropertyTransition(TiGlobalData&, Structure*, const Identifier& propertyName, unsigned attributes, TiCell* specificValue, size_t& offset);
+        static Structure* addPropertyTransitionToExistingStructure(Structure*, const Identifier& propertyName, unsigned attributes, TiCell* specificValue, size_t& offset);
+        static Structure* removePropertyTransition(TiGlobalData&, Structure*, const Identifier& propertyName, size_t& offset);
+        static Structure* changePrototypeTransition(TiGlobalData&, Structure*, TiValue prototype);
+        static Structure* despecifyFunctionTransition(TiGlobalData&, Structure*, const Identifier&);
+        static Structure* getterSetterTransition(TiGlobalData&, Structure*);
+        static Structure* toCacheableDictionaryTransition(TiGlobalData&, Structure*);
+        static Structure* toUncacheableDictionaryTransition(TiGlobalData&, Structure*);
+        static Structure* sealTransition(TiGlobalData&, Structure*);
+        static Structure* freezeTransition(TiGlobalData&, Structure*);
+        static Structure* preventExtensionsTransition(TiGlobalData&, Structure*);
 
-        PassRefPtr<Structure> flattenDictionaryStructure(TiObject*);
+        bool isSealed(TiGlobalData&);
+        bool isFrozen(TiGlobalData&);
+        bool isExtensible() const { return !m_preventExtensions; }
+        bool didTransition() const { return m_didTransition; }
+
+        Structure* flattenDictionaryStructure(TiGlobalData&, TiObject*);
 
         ~Structure();
 
         // These should be used with caution.  
-        size_t addPropertyWithoutTransition(const Identifier& propertyName, unsigned attributes, TiCell* specificValue);
-        size_t removePropertyWithoutTransition(const Identifier& propertyName);
-        void setPrototypeWithoutTransition(TiValue prototype) { m_prototype = prototype; }
+        size_t addPropertyWithoutTransition(TiGlobalData&, const Identifier& propertyName, unsigned attributes, TiCell* specificValue);
+        size_t removePropertyWithoutTransition(TiGlobalData&, const Identifier& propertyName);
+        void setPrototypeWithoutTransition(TiGlobalData& globalData, TiValue prototype) { m_prototype.set(globalData, this, prototype); }
         
         bool isDictionary() const { return m_dictionaryKind != NoneDictionaryKind; }
         bool isUncacheableDictionary() const { return m_dictionaryKind == UncachedDictionaryKind; }
 
-        const TypeInfo& typeInfo() const { return m_typeInfo; }
+        const TypeInfo& typeInfo() const { ASSERT(structure()->classInfo() == &s_info); return m_typeInfo; }
 
-        TiValue storedPrototype() const { return m_prototype; }
+        TiValue storedPrototype() const { return m_prototype.get(); }
         TiValue prototypeForLookup(TiExcState*) const;
         StructureChain* prototypeChain(TiExcState*) const;
+        void visitChildren(SlotVisitor&);
 
-        Structure* previousID() const { return m_previous.get(); }
+        Structure* previousID() const { ASSERT(structure()->classInfo() == &s_info); return m_previous.get(); }
 
         void growPropertyStorageCapacity();
-        unsigned propertyStorageCapacity() const { return m_propertyStorageCapacity; }
-        unsigned propertyStorageSize() const { return m_anonymousSlotCount + (m_propertyTable ? m_propertyTable->keyCount + (m_propertyTable->deletedOffsets ? m_propertyTable->deletedOffsets->size() : 0) : static_cast<unsigned>(m_offset + 1)); }
+        unsigned propertyStorageCapacity() const { ASSERT(structure()->classInfo() == &s_info); return m_propertyStorageCapacity; }
+        unsigned propertyStorageSize() const { ASSERT(structure()->classInfo() == &s_info); return m_anonymousSlotCount + (m_propertyTable ? m_propertyTable->propertyStorageSize() : static_cast<unsigned>(m_offset + 1)); }
         bool isUsingInlineStorage() const;
 
-        size_t get(const Identifier& propertyName);
-        size_t get(const UString::Rep* rep, unsigned& attributes, TiCell*& specificValue);
-        size_t get(const Identifier& propertyName, unsigned& attributes, TiCell*& specificValue)
+        size_t get(TiGlobalData&, const Identifier& propertyName);
+        size_t get(TiGlobalData&, StringImpl* propertyName, unsigned& attributes, TiCell*& specificValue);
+        size_t get(TiGlobalData& globalData, const Identifier& propertyName, unsigned& attributes, TiCell*& specificValue)
         {
             ASSERT(!propertyName.isNull());
-            return get(propertyName.ustring().rep(), attributes, specificValue);
-        }
-        bool transitionedFor(const TiCell* specificValue)
-        {
-            return m_specificValueInPrevious == specificValue;
-        }
-        bool hasTransition(UString::Rep*, unsigned attributes);
-        bool hasTransition(const Identifier& propertyName, unsigned attributes)
-        {
-            return hasTransition(propertyName._ustring.rep(), attributes);
+            ASSERT(structure()->classInfo() == &s_info);
+            return get(globalData, propertyName.impl(), attributes, specificValue);
         }
 
         bool hasGetterSetterProperties() const { return m_hasGetterSetterProperties; }
@@ -137,48 +136,74 @@ namespace TI {
         bool hasAnonymousSlots() const { return !!m_anonymousSlotCount; }
         unsigned anonymousSlotCount() const { return m_anonymousSlotCount; }
         
-        bool isEmpty() const { return m_propertyTable ? !m_propertyTable->keyCount : m_offset == noOffset; }
+        bool isEmpty() const { return m_propertyTable ? m_propertyTable->isEmpty() : m_offset == noOffset; }
 
-        void despecifyDictionaryFunction(const Identifier& propertyName);
+        void despecifyDictionaryFunction(TiGlobalData&, const Identifier& propertyName);
         void disableSpecificFunctionTracking() { m_specificFunctionThrashCount = maxSpecificFunctionThrashCount; }
 
-        void setEnumerationCache(TiPropertyNameIterator* enumerationCache); // Defined in TiPropertyNameIterator.h.
-        void clearEnumerationCache(TiPropertyNameIterator* enumerationCache); // Defined in TiPropertyNameIterator.h.
+        void setEnumerationCache(TiGlobalData&, TiPropertyNameIterator* enumerationCache); // Defined in TiPropertyNameIterator.h.
         TiPropertyNameIterator* enumerationCache(); // Defined in TiPropertyNameIterator.h.
-        void getPropertyNames(PropertyNameArray&, EnumerationMode mode);
-        
-    private:
+        void getPropertyNames(TiGlobalData&, PropertyNameArray&, EnumerationMode mode);
 
-        Structure(TiValue prototype, const TypeInfo&, unsigned anonymousSlotCount);
+        const ClassInfo* classInfo() const { return m_classInfo; }
+
+        static ptrdiff_t prototypeOffset()
+        {
+            return OBJECT_OFFSETOF(Structure, m_prototype);
+        }
+
+        static ptrdiff_t typeInfoFlagsOffset()
+        {
+            return OBJECT_OFFSETOF(Structure, m_typeInfo) + TypeInfo::flagsOffset();
+        }
+
+        static ptrdiff_t typeInfoTypeOffset()
+        {
+            return OBJECT_OFFSETOF(Structure, m_typeInfo) + TypeInfo::typeOffset();
+        }
+
+        static Structure* createStructure(TiGlobalData& globalData)
+        {
+            ASSERT(!globalData.structureStructure);
+            return new (&globalData) Structure(globalData);
+        }
+        
+        static JS_EXPORTDATA const ClassInfo s_info;
+
+    private:
+        Structure(TiGlobalData&, TiValue prototype, const TypeInfo&, unsigned anonymousSlotCount, const ClassInfo*);
+        Structure(TiGlobalData&);
+        Structure(TiGlobalData&, const Structure*);
+
+        static Structure* create(TiGlobalData& globalData, const Structure* structure)
+        {
+            ASSERT(globalData.structureStructure);
+            return new (&globalData) Structure(globalData, structure);
+        }
         
         typedef enum { 
             NoneDictionaryKind = 0,
             CachedDictionaryKind = 1,
             UncachedDictionaryKind = 2
         } DictionaryKind;
-        static PassRefPtr<Structure> toDictionaryTransition(Structure*, DictionaryKind);
+        static Structure* toDictionaryTransition(TiGlobalData&, Structure*, DictionaryKind);
 
-        size_t put(const Identifier& propertyName, unsigned attributes, TiCell* specificValue);
+        size_t putSpecificValue(TiGlobalData&, const Identifier& propertyName, unsigned attributes, TiCell* specificValue);
         size_t remove(const Identifier& propertyName);
 
-        void expandPropertyMapHashTable();
-        void rehashPropertyMapHashTable();
-        void rehashPropertyMapHashTable(unsigned newTableSize);
-        void createPropertyMapHashTable();
-        void createPropertyMapHashTable(unsigned newTableSize);
-        void insertIntoPropertyMapHashTable(const PropertyMapEntry&);
+        void createPropertyMap(unsigned keyCount = 0);
         void checkConsistency();
 
-        bool despecifyFunction(const Identifier&);
-        void despecifyAllFunctions();
+        bool despecifyFunction(TiGlobalData&, const Identifier&);
+        void despecifyAllFunctions(TiGlobalData&);
 
-        PropertyMapHashTable* copyPropertyTable();
-        void materializePropertyMap();
-        void materializePropertyMapIfNecessary()
+        PassOwnPtr<PropertyTable> copyPropertyTable(TiGlobalData&, Structure* owner);
+        void materializePropertyMap(TiGlobalData&);
+        void materializePropertyMapIfNecessary(TiGlobalData& globalData)
         {
-            if (m_propertyTable || !m_previous)             
-                return;
-            materializePropertyMap();
+            ASSERT(structure()->classInfo() == &s_info);
+            if (!m_propertyTable && m_previous)
+                materializePropertyMap(globalData);
         }
 
         signed char transitionCount() const
@@ -187,24 +212,8 @@ namespace TI {
             return m_offset == noOffset ? 0 : m_offset + 1;
         }
 
-        typedef std::pair<Structure*, Structure*> Transition;
-        typedef HashMap<StructureTransitionTableHash::Key, Transition, StructureTransitionTableHash, StructureTransitionTableHashTraits> TransitionTable;
-
-        inline bool transitionTableContains(const StructureTransitionTableHash::Key& key, TiCell* specificValue);
-        inline void transitionTableRemove(const StructureTransitionTableHash::Key& key, TiCell* specificValue);
-        inline void transitionTableAdd(const StructureTransitionTableHash::Key& key, Structure* structure, TiCell* specificValue);
-        inline bool transitionTableHasTransition(const StructureTransitionTableHash::Key& key) const;
-        inline Structure* transitionTableGet(const StructureTransitionTableHash::Key& key, TiCell* specificValue) const;
-
-        TransitionTable* transitionTable() const { ASSERT(!m_isUsingSingleSlot); return m_transitions.m_table; }
-        inline void setTransitionTable(TransitionTable* table);
-        Structure* singleTransition() const { ASSERT(m_isUsingSingleSlot); return m_transitions.m_singleTransition; }
-        void setSingleTransition(Structure* structure) { ASSERT(m_isUsingSingleSlot); m_transitions.m_singleTransition = structure; }
-        
         bool isValid(TiExcState*, StructureChain* cachedPrototypeChain) const;
 
-        static const unsigned emptyEntryIndex = 0;
-    
         static const signed char s_maxTransitionLength = 64;
 
         static const signed char noOffset = -1;
@@ -213,22 +222,20 @@ namespace TI {
 
         TypeInfo m_typeInfo;
 
-        TiValue m_prototype;
-        mutable RefPtr<StructureChain> m_cachedPrototypeChain;
+        WriteBarrier<Unknown> m_prototype;
+        mutable WriteBarrier<StructureChain> m_cachedPrototypeChain;
 
-        RefPtr<Structure> m_previous;
-        RefPtr<UString::Rep> m_nameInPrevious;
-        TiCell* m_specificValueInPrevious;
+        WriteBarrier<Structure> m_previous;
+        RefPtr<StringImpl> m_nameInPrevious;
+        WriteBarrier<TiCell> m_specificValueInPrevious;
 
-        // 'm_isUsingSingleSlot' indicates whether we are using the single transition optimisation.
-        union {
-            TransitionTable* m_table;
-            Structure* m_singleTransition;
-        } m_transitions;
+        const ClassInfo* m_classInfo;
 
-        WeakGCPtr<TiPropertyNameIterator> m_enumerationCache;
+        StructureTransitionTable m_transitionTable;
 
-        PropertyMapHashTable* m_propertyTable;
+        WriteBarrier<TiPropertyNameIterator> m_enumerationCache;
+
+        OwnPtr<PropertyTable> m_propertyTable;
 
         uint32_t m_propertyStorageCapacity;
 
@@ -249,53 +256,70 @@ namespace TI {
 #endif
         unsigned m_specificFunctionThrashCount : 2;
         unsigned m_anonymousSlotCount : 5;
-        unsigned m_isUsingSingleSlot : 1;
-        // 4 free bits
+        unsigned m_preventExtensions : 1;
+        unsigned m_didTransition : 1;
+        // 3 free bits
     };
 
-    inline size_t Structure::get(const Identifier& propertyName)
+    inline size_t Structure::get(TiGlobalData& globalData, const Identifier& propertyName)
     {
-        ASSERT(!propertyName.isNull());
-
-        materializePropertyMapIfNecessary();
+        ASSERT(structure()->classInfo() == &s_info);
+        materializePropertyMapIfNecessary(globalData);
         if (!m_propertyTable)
-            return WTI::notFound;
+            return notFound;
 
-        UString::Rep* rep = propertyName._ustring.rep();
+        PropertyMapEntry* entry = m_propertyTable->find(propertyName.impl()).first;
+        ASSERT(!entry || entry->offset >= m_anonymousSlotCount);
+        return entry ? entry->offset : notFound;
+    }
 
-        unsigned i = rep->existingHash();
+    inline bool TiCell::isObject() const
+    {
+        return m_structure->typeInfo().type() == ObjectType;
+    }
 
-#if DUMP_PROPERTYMAP_STATS
-        ++numProbes;
+    inline bool TiCell::isString() const
+    {
+        return m_structure->typeInfo().type() == StringType;
+    }
+
+    inline const ClassInfo* TiCell::classInfo() const
+    {
+#if ENABLE(GC_VALIDATION)
+        return m_structure.unvalidatedGet()->classInfo();
+#else
+        return m_structure->classInfo();
 #endif
+    }
 
-        unsigned entryIndex = m_propertyTable->entryIndices[i & m_propertyTable->sizeMask];
-        if (entryIndex == emptyEntryIndex)
-            return WTI::notFound;
+    inline Structure* TiCell::createDummyStructure(TiGlobalData& globalData)
+    {
+        return Structure::create(globalData, jsNull(), TypeInfo(UnspecifiedType), AnonymousSlotCount, &s_dummyCellInfo);
+    }
 
-        if (rep == m_propertyTable->entries()[entryIndex - 1].key)
-            return m_propertyTable->entries()[entryIndex - 1].offset;
+    inline bool TiValue::needsThisConversion() const
+    {
+        if (UNLIKELY(!isCell()))
+            return true;
+        return asCell()->structure()->typeInfo().needsThisConversion();
+    }
 
-#if DUMP_PROPERTYMAP_STATS
-        ++numCollisions;
-#endif
+    ALWAYS_INLINE void MarkStack::internalAppend(TiCell* cell)
+    {
+        ASSERT(!m_isCheckingForDefaultMarkViolation);
+        ASSERT(cell);
+        if (Heap::testAndSetMarked(cell))
+            return;
+        if (cell->structure() && cell->structure()->typeInfo().type() >= CompoundType)
+            m_values.append(cell);
+    }
 
-        unsigned k = 1 | WTI::doubleHash(rep->existingHash());
-
-        while (1) {
-            i += k;
-
-#if DUMP_PROPERTYMAP_STATS
-            ++numRehashes;
-#endif
-
-            entryIndex = m_propertyTable->entryIndices[i & m_propertyTable->sizeMask];
-            if (entryIndex == emptyEntryIndex)
-                return WTI::notFound;
-
-            if (rep == m_propertyTable->entries()[entryIndex - 1].key)
-                return m_propertyTable->entries()[entryIndex - 1].offset;
-        }
+    inline StructureTransitionTable::Hash::Key StructureTransitionTable::keyForWeakGCMapFinalizer(void*, Structure* structure)
+    {
+        // Newer versions of the STL have an std::make_pair function that takes rvalue references.
+        // When either of the parameters are bitfields, the C++ compiler will try to bind them as lvalues, which is invalid. To work around this, use unary "+" to make the parameter an rvalue.
+        // See https://bugs.webkit.org/show_bug.cgi?id=59261 for more details.
+        return Hash::Key(structure->m_nameInPrevious.get(), +structure->m_attributesInPrevious);
     }
 
 } // namespace TI

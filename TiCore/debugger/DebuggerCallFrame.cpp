@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,9 +41,6 @@
 #include "Interpreter.h"
 #include "Parser.h"
 
-#include "Arguments.h"
-#include "TiLock.h"
-
 namespace TI {
 
 const UString* DebuggerCallFrame::functionName() const
@@ -54,14 +51,10 @@ const UString* DebuggerCallFrame::functionName() const
     if (!m_callFrame->callee())
         return 0;
 
-    TiFunction* function = NULL;
-    if(m_callFrame->callee()) {
-        function = asFunction(m_callFrame->callee());
-    }
-    
-    if (!function)
+    TiObject* function = m_callFrame->callee();
+    if (!function || !function->inherits(&TiFunction::s_info))
         return 0;
-    return &function->name(m_callFrame);
+    return &asFunction(function)->name(m_callFrame);
 }
     
 UString DebuggerCallFrame::calculatedFunctionName() const
@@ -69,76 +62,13 @@ UString DebuggerCallFrame::calculatedFunctionName() const
     if (!m_callFrame->codeBlock())
         return UString();
 
-    if (!m_callFrame->callee())
+    TiObject* function = m_callFrame->callee();
+    if (!function || !function->inherits(&TiFunction::s_info))
         return UString();
 
-    TiFunction* function = NULL;
-    if (m_callFrame->callee()) {
-        function = asFunction(m_callFrame->callee());
-    }
-    
-    if (!function)
-        return UString();
-    return function->calculatedDisplayName(m_callFrame);
+    return asFunction(function)->calculatedDisplayName(m_callFrame);
 }
 
-TiValue DebuggerCallFrame::functionArguments() const
-{
-    // CallFrame === TiExecState, so we can grab the interpreter and the argument information directly
-    if (!m_callFrame->codeBlock())
-        return jsNull();
-    
-    TiFunction* function = NULL;
-    if (m_callFrame->callee()) {
-        function = asFunction(m_callFrame->callee());
-    }
-    
-    if (!function)
-        return jsNull();
-    
-    return m_callFrame->interpreter()->retrieveArguments(m_callFrame, function);
-}
-    
-UString DebuggerCallFrame::functionArgumentList() const
-{
-    if (!m_callFrame->codeBlock())
-        return UString("");
-    
-    TiFunction* function = NULL;
-    if (m_callFrame->callee()) {
-        function = asFunction(m_callFrame->callee());
-    }
-    
-    if (!function || function->isHostFunction())
-        return UString("");
-    
-    FunctionExecutable* executable = function->jsExecutable();
-    return executable->paramString();
-}
-
-TiObject* DebuggerCallFrame::function() const
-{
-    if (!m_callFrame->codeBlock())
-        return 0;
-    
-    TiFunction* function = NULL;
-    if (m_callFrame->callee()) {
-        function = asFunction(m_callFrame->callee());
-    }
-    
-    if (!function)
-        return 0;
-    
-    return function;
-}
-
-bool DebuggerCallFrame::usingArguments() const
-{
-    if (!m_callFrame->codeBlock())
-        return false;
-    return m_callFrame->codeBlock()->usesArguments();
-}
-    
 DebuggerCallFrame::Type DebuggerCallFrame::type() const
 {
     if (m_callFrame->callee())
@@ -149,23 +79,36 @@ DebuggerCallFrame::Type DebuggerCallFrame::type() const
 
 TiObject* DebuggerCallFrame::thisObject() const
 {
-    if (!m_callFrame->codeBlock())
+    CodeBlock* codeBlock = m_callFrame->codeBlock();
+    if (!codeBlock)
         return 0;
 
-    return asObject(m_callFrame->thisValue());
+    TiValue thisValue = m_callFrame->uncheckedR(codeBlock->thisRegister()).jsValue();
+    if (!thisValue.isObject())
+        return 0;
+
+    return asObject(thisValue);
 }
 
 TiValue DebuggerCallFrame::evaluate(const UString& script, TiValue& exception) const
 {
     if (!m_callFrame->codeBlock())
         return TiValue();
+    
+    TiGlobalData& globalData = m_callFrame->globalData();
+    EvalExecutable* eval = EvalExecutable::create(m_callFrame, makeSource(script), m_callFrame->codeBlock()->isStrictMode());
+    if (globalData.exception) {
+        exception = globalData.exception;
+        globalData.exception = TiValue();
+    }
 
-    RefPtr<EvalExecutable> eval = EvalExecutable::create(m_callFrame, makeSource(script));
-    TiObject* error = eval->compile(m_callFrame, m_callFrame->scopeChain());
-    if (error)
-        return error;
-
-    return m_callFrame->scopeChain()->globalData->interpreter->execute(eval.get(), m_callFrame, thisObject(), m_callFrame->scopeChain(), &exception);
+    TiValue result = globalData.interpreter->execute(eval, m_callFrame, thisObject(), m_callFrame->scopeChain());
+    if (globalData.exception) {
+        exception = globalData.exception;
+        globalData.exception = TiValue();
+    }
+    ASSERT(result);
+    return result;
 }
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,56 +28,71 @@
 #ifndef RegExpObject_h
 #define RegExpObject_h
 
-#include "TiObject.h"
+#include "TiObjectWithGlobalObject.h"
 #include "RegExp.h"
 
 namespace TI {
-
-    class RegExpObject : public TiObject {
+    
+    class RegExpObject : public TiObjectWithGlobalObject {
     public:
-        RegExpObject(NonNullPassRefPtr<Structure>, NonNullPassRefPtr<RegExp>);
+        typedef TiObjectWithGlobalObject Base;
+
+        RegExpObject(TiGlobalObject*, Structure*, RegExp*);
         virtual ~RegExpObject();
 
-        void setRegExp(PassRefPtr<RegExp> r) { d->regExp = r; }
+        void setRegExp(TiGlobalData& globalData, RegExp* r) { d->regExp.set(globalData, this, r); }
         RegExp* regExp() const { return d->regExp.get(); }
 
-        void setLastIndex(double lastIndex) { d->lastIndex = lastIndex; }
-        double lastIndex() const { return d->lastIndex; }
+        void setLastIndex(size_t lastIndex)
+        {
+            d->lastIndex.setWithoutWriteBarrier(jsNumber(lastIndex));
+        }
+        void setLastIndex(TiGlobalData& globalData, TiValue lastIndex)
+        {
+            d->lastIndex.set(globalData, this, lastIndex);
+        }
+        TiValue getLastIndex() const
+        {
+            return d->lastIndex.get();
+        }
 
-        TiValue test(TiExcState*, const ArgList&);
-        TiValue exec(TiExcState*, const ArgList&);
+        TiValue test(TiExcState*);
+        TiValue exec(TiExcState*);
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
+        static JS_EXPORTDATA const ClassInfo s_info;
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | TiObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesVisitChildren | OverridesGetOwnPropertySlot | TiObjectWithGlobalObject::StructureFlags;
 
     private:
-        bool match(TiExcState*, const ArgList&);
+        virtual void visitChildren(SlotVisitor&);
 
-        virtual CallType getCallData(CallData&);
+        bool match(TiExcState*);
 
-        struct RegExpObjectData : FastAllocBase {
-            RegExpObjectData(NonNullPassRefPtr<RegExp> regExp, double lastIndex)
-                : regExp(regExp)
-                , lastIndex(lastIndex)
+        struct RegExpObjectData {
+            WTF_MAKE_FAST_ALLOCATED;
+        public:
+            RegExpObjectData(TiGlobalData& globalData, RegExpObject* owner, RegExp* regExp)
+                : regExp(globalData, owner, regExp)
             {
+                lastIndex.setWithoutWriteBarrier(jsNumber(0));
             }
 
-            RefPtr<RegExp> regExp;
-            double lastIndex;
+            WriteBarrier<RegExp> regExp;
+            WriteBarrier<Unknown> lastIndex;
         };
-
+#if COMPILER(MSVC)
+        friend void WTI::deleteOwnedPtr<RegExpObjectData>(RegExpObjectData*);
+#endif
         OwnPtr<RegExpObjectData> d;
     };
 
@@ -85,7 +100,7 @@ namespace TI {
 
     inline RegExpObject* asRegExpObject(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&RegExpObject::info));
+        ASSERT(asObject(value)->inherits(&RegExpObject::s_info));
         return static_cast<RegExpObject*>(asObject(value));
     }
 

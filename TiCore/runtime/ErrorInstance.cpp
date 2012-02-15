@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,11 +30,34 @@
 
 namespace TI {
 
-const ClassInfo ErrorInstance::info = { "Error", 0, 0, 0 };
+const ClassInfo ErrorInstance::s_info = { "Error", &JSNonFinalObject::s_info, 0, 0 };
 
-ErrorInstance::ErrorInstance(NonNullPassRefPtr<Structure> structure)
-    : TiObject(structure)
+ErrorInstance::ErrorInstance(TiGlobalData* globalData, Structure* structure)
+    : JSNonFinalObject(*globalData, structure)
+    , m_appendSourceToMessage(false)
 {
+    ASSERT(inherits(&s_info));
+    putDirect(*globalData, globalData->propertyNames->message, jsString(globalData, ""));
+}
+
+ErrorInstance::ErrorInstance(TiGlobalData* globalData, Structure* structure, const UString& message)
+    : JSNonFinalObject(*globalData, structure)
+    , m_appendSourceToMessage(false)
+{
+    ASSERT(inherits(&s_info));
+    putDirect(*globalData, globalData->propertyNames->message, jsString(globalData, message));
+}
+
+ErrorInstance* ErrorInstance::create(TiGlobalData* globalData, Structure* structure, const UString& message)
+{
+    return new (globalData) ErrorInstance(globalData, structure, message);
+}
+
+ErrorInstance* ErrorInstance::create(TiExcState* exec, Structure* structure, TiValue message)
+{
+    if (message.isUndefined())
+        return new (exec) ErrorInstance(&exec->globalData(), structure);
+    return new (exec) ErrorInstance(&exec->globalData(), structure, message.toString(exec));
 }
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -47,6 +47,7 @@ namespace TI {
         TimeoutChecker();
 
         void setTimeoutInterval(unsigned timeoutInterval) { m_timeoutInterval = timeoutInterval; }
+        unsigned timeoutInterval() const { return m_timeoutInterval; }
         
         unsigned ticksUntilNextCheck() { return m_ticksUntilNextCheck; }
         

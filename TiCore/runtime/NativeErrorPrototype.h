@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,14 +28,14 @@
 #ifndef NativeErrorPrototype_h
 #define NativeErrorPrototype_h
 
-#include "TiObject.h"
+#include "TiObjectWithGlobalObject.h"
 
 namespace TI {
     class NativeErrorConstructor;
 
-    class NativeErrorPrototype : public TiObject {
+    class NativeErrorPrototype : public TiObjectWithGlobalObject {
     public:
-        NativeErrorPrototype(TiExcState*, NonNullPassRefPtr<Structure>, const UString&, NativeErrorConstructor*);
+        NativeErrorPrototype(TiExcState*, TiGlobalObject*, Structure*, const UString&, NativeErrorConstructor*);
     };
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -93,7 +93,7 @@ namespace TI {
 
         CacheEntry& lookup(double d) { return m_cache[WTI::FloatHash<double>::hash(d) & (cacheSize - 1)]; }
 
-        CacheEntry m_cache[cacheSize];
+        FixedArray<CacheEntry, cacheSize> m_cache;
     };
 
 } // namespace TI

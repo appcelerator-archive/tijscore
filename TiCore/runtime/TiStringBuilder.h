@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,6 +35,7 @@
 
 #include "ExceptionHelpers.h"
 #include "TiString.h"
+#include "UStringConcatenate.h"
 #include "Vector.h"
 
 namespace TI {
@@ -72,7 +73,7 @@ public:
 
     void append(const UString& str)
     {
-        m_okay &= buffer.tryAppend(str.data(), str.size());
+        m_okay &= buffer.tryAppend(str.characters(), str.length());
     }
 
     TiValue build(TiExcState* exec)
@@ -93,7 +94,7 @@ protected:
 template<typename StringType1, typename StringType2>
 inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, StringType2 string2)
 {
-    PassRefPtr<UStringImpl> result = tryMakeString(string1, string2);
+    PassRefPtr<StringImpl> result = WTI::tryMakeString(string1, string2);
     if (!result)
         return throwOutOfMemoryError(exec);
     return jsNontrivialString(exec, result);
@@ -102,7 +103,7 @@ inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, Str
 template<typename StringType1, typename StringType2, typename StringType3>
 inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, StringType2 string2, StringType3 string3)
 {
-    PassRefPtr<UStringImpl> result = tryMakeString(string1, string2, string3);
+    PassRefPtr<StringImpl> result = WTI::tryMakeString(string1, string2, string3);
     if (!result)
         return throwOutOfMemoryError(exec);
     return jsNontrivialString(exec, result);
@@ -111,7 +112,7 @@ inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, Str
 template<typename StringType1, typename StringType2, typename StringType3, typename StringType4>
 inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, StringType2 string2, StringType3 string3, StringType4 string4)
 {
-    PassRefPtr<UStringImpl> result = tryMakeString(string1, string2, string3, string4);
+    PassRefPtr<StringImpl> result = WTI::tryMakeString(string1, string2, string3, string4);
     if (!result)
         return throwOutOfMemoryError(exec);
     return jsNontrivialString(exec, result);
@@ -120,7 +121,7 @@ inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, Str
 template<typename StringType1, typename StringType2, typename StringType3, typename StringType4, typename StringType5>
 inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, StringType2 string2, StringType3 string3, StringType4 string4, StringType5 string5)
 {
-    PassRefPtr<UStringImpl> result = tryMakeString(string1, string2, string3, string4, string5);
+    PassRefPtr<StringImpl> result = WTI::tryMakeString(string1, string2, string3, string4, string5);
     if (!result)
         return throwOutOfMemoryError(exec);
     return jsNontrivialString(exec, result);
@@ -129,7 +130,7 @@ inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, Str
 template<typename StringType1, typename StringType2, typename StringType3, typename StringType4, typename StringType5, typename StringType6>
 inline TiValue jsMakeNontrivialString(TiExcState* exec, StringType1 string1, StringType2 string2, StringType3 string3, StringType4 string4, StringType5 string5, StringType6 string6)
 {
-    PassRefPtr<UStringImpl> result = tryMakeString(string1, string2, string3, string4, string5, string6);
+    PassRefPtr<StringImpl> result = WTI::tryMakeString(string1, string2, string3, string4, string5, string6);
     if (!result)
         return throwOutOfMemoryError(exec);
     return jsNontrivialString(exec, result);

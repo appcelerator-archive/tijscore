@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -56,13 +56,9 @@ namespace TI {
         }
 
         TiGlobalObject* dynamicGlobalObject() const { return m_callFrame->dynamicGlobalObject(); }
-        const ScopeChainNode* scopeChain() const { return m_callFrame->scopeChain(); }
+        ScopeChainNode* scopeChain() const { return m_callFrame->scopeChain(); }
         const UString* functionName() const;
         UString calculatedFunctionName() const;
-        TiValue functionArguments() const;
-        UString functionArgumentList() const;
-        TiObject* function() const;
-        bool usingArguments() const;
         Type type() const;
         TiObject* thisObject() const;
         TiValue evaluate(const UString&, TiValue& exception) const;

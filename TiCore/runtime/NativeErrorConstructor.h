@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,19 +38,24 @@ namespace TI {
 
     class NativeErrorConstructor : public InternalFunction {
     public:
-        NativeErrorConstructor(TiExcState*, NonNullPassRefPtr<Structure> structure, NonNullPassRefPtr<Structure> prototypeStructure, const UString&);
+        NativeErrorConstructor(TiExcState*, TiGlobalObject*, Structure*, Structure* prototypeStructure, const UString&);
 
-        static const ClassInfo info;
+        static const ClassInfo s_info;
 
-        ErrorInstance* construct(TiExcState*, const ArgList&);
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+        Structure* errorStructure() { return m_errorStructure.get(); }
 
     private:
+        static const unsigned StructureFlags = OverridesVisitChildren | InternalFunction::StructureFlags;
         virtual ConstructType getConstructData(ConstructData&);
         virtual CallType getCallData(CallData&);
+        virtual void visitChildren(SlotVisitor&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-
-        RefPtr<Structure> m_errorStructure;
+        WriteBarrier<Structure> m_errorStructure;
     };
 
 } // namespace TI

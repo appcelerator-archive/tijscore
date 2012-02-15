@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,22 +33,14 @@
 #include "config.h"
 #include "JSZombie.h"
 #include "ClassInfo.h"
+#include "TiObject.h"
+#include "ScopeChain.h"
 
 #if ENABLE(JSC_ZOMBIES)
 
 namespace TI {
 
 const ClassInfo JSZombie::s_info = { "Zombie", 0, 0, 0 };
-
-Structure* JSZombie::leakedZombieStructure() {
-    static Structure* structure = 0;
-    if (!structure) {
-        Structure::startIgnoringLeaks();
-        structure = Structure::create(jsNull(), TypeInfo(UnspecifiedType)).releaseRef();
-        Structure::stopIgnoringLeaks();
-    }
-    return structure;
-}
 
 }
 

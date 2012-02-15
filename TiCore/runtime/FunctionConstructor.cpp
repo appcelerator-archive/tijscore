@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,6 +29,7 @@
 #include "FunctionConstructor.h"
 
 #include "Debugger.h"
+#include "ExceptionHelpers.h"
 #include "FunctionPrototype.h"
 #include "TiFunction.h"
 #include "TiGlobalObject.h"
@@ -36,24 +37,26 @@
 #include "Lexer.h"
 #include "Nodes.h"
 #include "Parser.h"
-#include "StringBuilder.h"
+#include "UStringBuilder.h"
+#include "UStringConcatenate.h"
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(FunctionConstructor);
 
-FunctionConstructor::FunctionConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, FunctionPrototype* functionPrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, functionPrototype->classInfo()->className))
+FunctionConstructor::FunctionConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, FunctionPrototype* functionPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, functionPrototype->classInfo()->className))
 {
-    putDirectWithoutTransition(exec->propertyNames().prototype, functionPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, functionPrototype, DontEnum | DontDelete | ReadOnly);
 
     // Number of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontDelete | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontDelete | DontEnum);
 }
 
-static TiObject* constructWithFunctionConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithFunctionConstructor(TiExcState* exec)
 {
-    return constructFunction(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructFunction(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 ConstructType FunctionConstructor::getConstructData(ConstructData& constructData)
@@ -62,9 +65,10 @@ ConstructType FunctionConstructor::getConstructData(ConstructData& constructData
     return ConstructTypeHost;
 }
 
-static TiValue JSC_HOST_CALL callFunctionConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callFunctionConstructor(TiExcState* exec)
 {
-    return constructFunction(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructFunction(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 // ECMA 15.3.1 The Function Constructor Called as a Function
@@ -75,7 +79,14 @@ CallType FunctionConstructor::getCallData(CallData& callData)
 }
 
 // ECMA 15.3.2 The Function Constructor
-TiObject* constructFunction(TiExcState* exec, const ArgList& args, const Identifier& functionName, const UString& sourceURL, int lineNumber)
+TiObject* constructFunction(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args, const Identifier& functionName, const UString& sourceURL, int lineNumber)
+{
+    if (!globalObject->isEvalEnabled())
+        return throwError(exec, createEvalError(exec, "Function constructor is disabled"));
+    return constructFunctionSkippingEvalEnabledCheck(exec, globalObject, args, functionName, sourceURL, lineNumber);
+}
+
+TiObject* constructFunctionSkippingEvalEnabledCheck(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args, const Identifier& functionName, const UString& sourceURL, int lineNumber)
 {
     // Functions need to have a space following the opening { due to for web compatibility
     // see https://bugs.webkit.org/show_bug.cgi?id=24350
@@ -84,9 +95,9 @@ TiObject* constructFunction(TiExcState* exec, const ArgList& args, const Identif
     if (args.isEmpty())
         program = "(function() { \n})";
     else if (args.size() == 1)
-        program = makeString("(function() { ", args.at(0).toString(exec), "\n})");
+        program = makeUString("(function() { ", args.at(0).toString(exec), "\n})");
     else {
-        StringBuilder builder;
+        UStringBuilder builder;
         builder.append("(function(");
         builder.append(args.at(0).toString(exec));
         for (size_t i = 1; i < args.size() - 1; i++) {
@@ -96,25 +107,26 @@ TiObject* constructFunction(TiExcState* exec, const ArgList& args, const Identif
         builder.append(") { ");
         builder.append(args.at(args.size() - 1).toString(exec));
         builder.append("\n})");
-        program = builder.build();
+        program = builder.toUString();
     }
 
-    int errLine;
-    UString errMsg;
+    TiGlobalData& globalData = globalObject->globalData();
     SourceCode source = makeSource(program, sourceURL, lineNumber);
-    RefPtr<FunctionExecutable> function = FunctionExecutable::fromGlobalCode(functionName, exec, exec->dynamicGlobalObject()->debugger(), source, &errLine, &errMsg);
-    if (!function)
-        return throwError(exec, SyntaxError, errMsg, errLine, source.provider()->asID(), source.provider()->url());
+    TiObject* exception = 0;
+    FunctionExecutable* function = FunctionExecutable::fromGlobalCode(functionName, exec, exec->dynamicGlobalObject()->debugger(), source, &exception);
+    if (!function) {
+        ASSERT(exception);
+        return throwError(exec, exception);
+    }
 
-    TiGlobalObject* globalObject = exec->lexicalGlobalObject();
-    ScopeChain scopeChain(globalObject, globalObject->globalData(), globalObject, exec->globalThisValue());
-    return new (exec) TiFunction(exec, function, scopeChain.node());
+    ScopeChainNode* scopeChain = new (exec) ScopeChainNode(0, globalObject, &globalData, globalObject, exec->globalThisValue());
+    return new (exec) TiFunction(exec, function, scopeChain);
 }
 
 // ECMA 15.3.2 The Function Constructor
-TiObject* constructFunction(TiExcState* exec, const ArgList& args)
+TiObject* constructFunction(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args)
 {
-    return constructFunction(exec, args, Identifier(exec, "anonymous"), UString(), 1);
+    return constructFunction(exec, globalObject, args, Identifier(exec, "anonymous"), UString(), 1);
 }
 
 } // namespace TI

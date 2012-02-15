@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,26 +36,21 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(ErrorConstructor);
 
-ErrorConstructor::ErrorConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, ErrorPrototype* errorPrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, errorPrototype->classInfo()->className))
+ErrorConstructor::ErrorConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, ErrorPrototype* errorPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, errorPrototype->classInfo()->className))
 {
     // ECMA 15.11.3.1 Error.prototype
-    putDirectWithoutTransition(exec->propertyNames().prototype, errorPrototype, DontEnum | DontDelete | ReadOnly);
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), DontDelete | ReadOnly | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, errorPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), DontDelete | ReadOnly | DontEnum);
 }
 
 // ECMA 15.9.3
-ErrorInstance* constructError(TiExcState* exec, const ArgList& args)
-{
-    ErrorInstance* obj = new (exec) ErrorInstance(exec->lexicalGlobalObject()->errorStructure());
-    if (!args.at(0).isUndefined())
-        obj->putDirect(exec->propertyNames().message, jsString(exec, args.at(0).toString(exec)));
-    return obj;
-}
 
-static TiObject* constructWithErrorConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithErrorConstructor(TiExcState* exec)
 {
-    return constructError(exec, args);
+    TiValue message = exec->argumentCount() ? exec->argument(0) : jsUndefined();
+    Structure* errorStructure = asInternalFunction(exec->callee())->globalObject()->errorStructure();
+    return TiValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
 ConstructType ErrorConstructor::getConstructData(ConstructData& constructData)
@@ -64,11 +59,11 @@ ConstructType ErrorConstructor::getConstructData(ConstructData& constructData)
     return ConstructTypeHost;
 }
 
-// ECMA 15.9.2
-static TiValue JSC_HOST_CALL callErrorConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callErrorConstructor(TiExcState* exec)
 {
-    // "Error()" gives the sames result as "new Error()"
-    return constructError(exec, args);
+    TiValue message = exec->argumentCount() ? exec->argument(0) : jsUndefined();
+    Structure* errorStructure = asInternalFunction(exec->callee())->globalObject()->errorStructure();
+    return TiValue::encode(ErrorInstance::create(exec, errorStructure, message));
 }
 
 CallType ErrorConstructor::getCallData(CallData& callData)
