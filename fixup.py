@@ -72,7 +72,7 @@ copyright_ext = (
 
 #['jsAPIValueWrapper','TiAPIValueWrapper'],
 
-COPYRIGHT_NOW = "2012"
+COPYRIGHT_NOW = date.today().strftime('%Y')
 COPYRIGHT = """/**
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
