@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,9 +31,10 @@
 */
 
 #include "config.h"
-#include "JIT.h"
 
 #if ENABLE(JIT)
+#if USE(JSVALUE32_64)
+#include "JIT.h"
 
 #include "CodeBlock.h"
 #include "JITInlineMethods.h"
@@ -53,8 +54,6 @@ using namespace std;
 
 namespace TI {
 
-#if USE(JSVALUE32_64)
-
 void JIT::emit_op_negate(Instruction* currentInstruction)
 {
     unsigned dst = currentInstruction[1].u.operand;
@@ -62,17 +61,17 @@ void JIT::emit_op_negate(Instruction* currentInstruction)
 
     emitLoad(src, regT1, regT0);
 
-    Jump srcNotInt = branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag));
-    addSlowCase(branchTest32(Zero, regT0, Imm32(0x7fffffff)));
+    Jump srcNotInt = branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag));
+    addSlowCase(branchTest32(Zero, regT0, TrustedImm32(0x7fffffff)));
     neg32(regT0);
     emitStoreInt32(dst, regT0, (dst == src));
 
     Jump end = jump();
 
     srcNotInt.link(this);
-    addSlowCase(branch32(Above, regT1, Imm32(TiValue::LowestTag)));
+    addSlowCase(branch32(Above, regT1, TrustedImm32(TiValue::LowestTag)));
 
-    xor32(Imm32(1 << 31), regT1);
+    xor32(TrustedImm32(1 << 31), regT1);
     store32(regT1, tagFor(dst));
     if (dst != src)
         store32(regT0, payloadFor(dst));
@@ -104,7 +103,7 @@ void JIT::emit_op_jnless(Instruction* currentInstruction)
     // Character less.
     if (isOperandConstantImmediateChar(op1)) {
         emitLoad(op2, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -113,7 +112,7 @@ void JIT::emit_op_jnless(Instruction* currentInstruction)
     }
     if (isOperandConstantImmediateChar(op2)) {
         emitLoad(op1, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -123,16 +122,16 @@ void JIT::emit_op_jnless(Instruction* currentInstruction)
     if (isOperandConstantImmediateInt(op1)) {
         // Int32 less.
         emitLoad(op2, regT3, regT2);
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(LessThanOrEqual, regT2, Imm32(getConstantOperand(op1).asInt32())), target);
     } else if (isOperandConstantImmediateInt(op2)) {
         emitLoad(op1, regT1, regT0);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(GreaterThanOrEqual, regT0, Imm32(getConstantOperand(op2).asInt32())), target);
     } else {
         emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(GreaterThanOrEqual, regT0, regT2), target);
     }
 
@@ -193,7 +192,7 @@ void JIT::emit_op_jless(Instruction* currentInstruction)
     // Character less.
     if (isOperandConstantImmediateChar(op1)) {
         emitLoad(op2, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -202,7 +201,7 @@ void JIT::emit_op_jless(Instruction* currentInstruction)
     }
     if (isOperandConstantImmediateChar(op2)) {
         emitLoad(op1, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -211,16 +210,16 @@ void JIT::emit_op_jless(Instruction* currentInstruction)
     } 
     if (isOperandConstantImmediateInt(op1)) {
         emitLoad(op2, regT3, regT2);
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(GreaterThan, regT2, Imm32(getConstantOperand(op1).asInt32())), target);
     } else if (isOperandConstantImmediateInt(op2)) {
         emitLoad(op1, regT1, regT0);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(LessThan, regT0, Imm32(getConstantOperand(op2).asInt32())), target);
     } else {
         emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(LessThan, regT0, regT2), target);
     }
 
@@ -280,7 +279,7 @@ void JIT::emit_op_jlesseq(Instruction* currentInstruction, bool invert)
     // Character less.
     if (isOperandConstantImmediateChar(op1)) {
         emitLoad(op2, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -289,7 +288,7 @@ void JIT::emit_op_jlesseq(Instruction* currentInstruction, bool invert)
     }
     if (isOperandConstantImmediateChar(op2)) {
         emitLoad(op1, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::CellTag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::CellTag)));
         JumpList failures;
         emitLoadCharacterString(regT0, regT0, failures);
         addSlowCase(failures);
@@ -298,16 +297,16 @@ void JIT::emit_op_jlesseq(Instruction* currentInstruction, bool invert)
     }
     if (isOperandConstantImmediateInt(op1)) {
         emitLoad(op2, regT3, regT2);
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(invert ? LessThan : GreaterThanOrEqual, regT2, Imm32(getConstantOperand(op1).asInt32())), target);
     } else if (isOperandConstantImmediateInt(op2)) {
         emitLoad(op1, regT1, regT0);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(invert ? GreaterThan : LessThanOrEqual, regT0, Imm32(getConstantOperand(op2).asInt32())), target);
     } else {
         emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-        notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-        notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+        notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
         addJump(branch32(invert ? GreaterThan : LessThanOrEqual, regT0, regT2), target);
     }
 
@@ -376,7 +375,7 @@ void JIT::emit_op_lshift(Instruction* currentInstruction)
 
     if (isOperandConstantImmediateInt(op2)) {
         emitLoad(op1, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         lshift32(Imm32(getConstantOperand(op2).asInt32()), regT0);
         emitStoreInt32(dst, regT0, dst == op1);
         return;
@@ -384,8 +383,8 @@ void JIT::emit_op_lshift(Instruction* currentInstruction)
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
     if (!isOperandConstantImmediateInt(op1))
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     lshift32(regT2, regT0);
     emitStoreInt32(dst, regT0, dst == op1 || dst == op2);
 }
@@ -418,7 +417,7 @@ void JIT::emitRightShift(Instruction* currentInstruction, bool isUnsigned)
     // shift arguments, so any changes must be updated there as well.
     if (isOperandConstantImmediateInt(op2)) {
         emitLoad(op1, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         int shift = getConstantOperand(op2).asInt32();
         if (isUnsigned) {
             if (shift)
@@ -427,7 +426,7 @@ void JIT::emitRightShift(Instruction* currentInstruction, bool isUnsigned)
             // a toUint conversion, which can result in a value we can represent
             // as an immediate int.
             if (shift < 0 || !(shift & 31))
-                addSlowCase(branch32(LessThan, regT0, Imm32(0)));
+                addSlowCase(branch32(LessThan, regT0, TrustedImm32(0)));
         } else if (shift) { // signed right shift by zero is simply toInt conversion
             rshift32(Imm32(shift & 0x1f), regT0);
         }
@@ -437,11 +436,11 @@ void JIT::emitRightShift(Instruction* currentInstruction, bool isUnsigned)
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
     if (!isOperandConstantImmediateInt(op1))
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     if (isUnsigned) {
         urshift32(regT2, regT0);
-        addSlowCase(branch32(LessThan, regT0, Imm32(0)));
+        addSlowCase(branch32(LessThan, regT0, TrustedImm32(0)));
     } else
         rshift32(regT2, regT0);
     emitStoreInt32(dst, regT0, dst == op1 || dst == op2);
@@ -458,14 +457,14 @@ void JIT::emitRightShiftSlowCase(Instruction* currentInstruction, Vector<SlowCas
         linkSlowCase(iter); // int32 check
         if (supportsFloatingPointTruncate()) {
             JumpList failures;
-            failures.append(branch32(AboveOrEqual, regT1, Imm32(TiValue::LowestTag)));
+            failures.append(branch32(AboveOrEqual, regT1, TrustedImm32(TiValue::LowestTag)));
             emitLoadDouble(op1, fpRegT0);
             failures.append(branchTruncateDoubleToInt32(fpRegT0, regT0));
             if (isUnsigned) {
                 if (shift)
                     urshift32(Imm32(shift & 0x1f), regT0);
                 if (shift < 0 || !(shift & 31))
-                    failures.append(branch32(LessThan, regT0, Imm32(0)));
+                    failures.append(branch32(LessThan, regT0, TrustedImm32(0)));
             } else if (shift)
                 rshift32(Imm32(shift & 0x1f), regT0);
             emitStoreInt32(dst, regT0, false);
@@ -480,9 +479,9 @@ void JIT::emitRightShiftSlowCase(Instruction* currentInstruction, Vector<SlowCas
         if (!isOperandConstantImmediateInt(op1)) {
             linkSlowCase(iter); // int32 check -- op1 is not an int
             if (supportsFloatingPointTruncate()) {
-                Jump notDouble = branch32(Above, regT1, Imm32(TiValue::LowestTag)); // op1 is not a double
+                Jump notDouble = branch32(Above, regT1, TrustedImm32(TiValue::LowestTag)); // op1 is not a double
                 emitLoadDouble(op1, fpRegT0);
-                Jump notInt = branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)); // op2 is not an int
+                Jump notInt = branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)); // op2 is not an int
                 Jump cantTruncate = branchTruncateDoubleToInt32(fpRegT0, regT0);
                 if (isUnsigned)
                     urshift32(regT2, regT0);
@@ -543,15 +542,15 @@ void JIT::emit_op_bitand(Instruction* currentInstruction)
     int32_t constant;
     if (getOperandConstantImmediateInt(op1, op2, op, constant)) {
         emitLoad(op, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         and32(Imm32(constant), regT0);
         emitStoreInt32(dst, regT0, (op == dst));
         return;
     }
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     and32(regT2, regT0);
     emitStoreInt32(dst, regT0, (op1 == dst || op2 == dst));
 }
@@ -584,15 +583,15 @@ void JIT::emit_op_bitor(Instruction* currentInstruction)
     int32_t constant;
     if (getOperandConstantImmediateInt(op1, op2, op, constant)) {
         emitLoad(op, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         or32(Imm32(constant), regT0);
         emitStoreInt32(dst, regT0, (op == dst));
         return;
     }
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     or32(regT2, regT0);
     emitStoreInt32(dst, regT0, (op1 == dst || op2 == dst));
 }
@@ -625,15 +624,15 @@ void JIT::emit_op_bitxor(Instruction* currentInstruction)
     int32_t constant;
     if (getOperandConstantImmediateInt(op1, op2, op, constant)) {
         emitLoad(op, regT1, regT0);
-        addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
         xor32(Imm32(constant), regT0);
         emitStoreInt32(dst, regT0, (op == dst));
         return;
     }
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
     xor32(regT2, regT0);
     emitStoreInt32(dst, regT0, (op1 == dst || op2 == dst));
 }
@@ -662,7 +661,7 @@ void JIT::emit_op_bitnot(Instruction* currentInstruction)
     unsigned src = currentInstruction[2].u.operand;
 
     emitLoad(src, regT1, regT0);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
 
     not32(regT0);
     emitStoreInt32(dst, regT0, (dst == src));
@@ -687,14 +686,14 @@ void JIT::emit_op_post_inc(Instruction* currentInstruction)
     unsigned srcDst = currentInstruction[2].u.operand;
 
     emitLoad(srcDst, regT1, regT0);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
 
     if (dst == srcDst) // x = x++ is a noop for ints.
         return;
 
     emitStoreInt32(dst, regT0);
 
-    addSlowCase(branchAdd32(Overflow, Imm32(1), regT0));
+    addSlowCase(branchAdd32(Overflow, TrustedImm32(1), regT0));
     emitStoreInt32(srcDst, regT0, true);
 }
 
@@ -721,14 +720,14 @@ void JIT::emit_op_post_dec(Instruction* currentInstruction)
     unsigned srcDst = currentInstruction[2].u.operand;
 
     emitLoad(srcDst, regT1, regT0);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
 
     if (dst == srcDst) // x = x-- is a noop for ints.
         return;
 
     emitStoreInt32(dst, regT0);
 
-    addSlowCase(branchSub32(Overflow, Imm32(1), regT0));
+    addSlowCase(branchSub32(Overflow, TrustedImm32(1), regT0));
     emitStoreInt32(srcDst, regT0, true);
 }
 
@@ -743,7 +742,7 @@ void JIT::emitSlow_op_post_dec(Instruction* currentInstruction, Vector<SlowCaseE
 
     JITStubCall stubCall(this, cti_op_post_dec);
     stubCall.addArgument(srcDst);
-    stubCall.addArgument(Imm32(srcDst));
+    stubCall.addArgument(TrustedImm32(srcDst));
     stubCall.call(dst);
 }
 
@@ -755,8 +754,8 @@ void JIT::emit_op_pre_inc(Instruction* currentInstruction)
 
     emitLoad(srcDst, regT1, regT0);
 
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branchAdd32(Overflow, Imm32(1), regT0));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branchAdd32(Overflow, TrustedImm32(1), regT0));
     emitStoreInt32(srcDst, regT0, true);
 }
 
@@ -780,8 +779,8 @@ void JIT::emit_op_pre_dec(Instruction* currentInstruction)
 
     emitLoad(srcDst, regT1, regT0);
 
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branchSub32(Overflow, Imm32(1), regT0));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branchSub32(Overflow, TrustedImm32(1), regT0));
     emitStoreInt32(srcDst, regT0, true);
 }
 
@@ -825,8 +824,8 @@ void JIT::emit_op_add(Instruction* currentInstruction)
     }
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
     // Int32 case.
     addSlowCase(branchAdd32(Overflow, regT2, regT0));
@@ -848,7 +847,7 @@ void JIT::emitAdd32Constant(unsigned dst, unsigned op, int32_t constant, ResultT
 {
     // Int32 case.
     emitLoad(op, regT1, regT0);
-    Jump notInt32 = branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag));
+    Jump notInt32 = branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag));
     addSlowCase(branchAdd32(Overflow, Imm32(constant), regT0));
     emitStoreInt32(dst, regT0, (op == dst));
 
@@ -861,7 +860,7 @@ void JIT::emitAdd32Constant(unsigned dst, unsigned op, int32_t constant, ResultT
 
     notInt32.link(this);
     if (!opType.definitelyIsNumber())
-        addSlowCase(branch32(Above, regT1, Imm32(TiValue::LowestTag)));
+        addSlowCase(branch32(Above, regT1, TrustedImm32(TiValue::LowestTag)));
     move(Imm32(constant), regT2);
     convertInt32ToDouble(regT2, fpRegT0);
     emitLoadDouble(op, fpRegT1);
@@ -934,8 +933,8 @@ void JIT::emit_op_sub(Instruction* currentInstruction)
     }
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
     // Int32 case.
     addSlowCase(branchSub32(Overflow, regT2, regT0));
@@ -957,7 +956,7 @@ void JIT::emitSub32Constant(unsigned dst, unsigned op, int32_t constant, ResultT
 {
     // Int32 case.
     emitLoad(op, regT1, regT0);
-    Jump notInt32 = branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag));
+    Jump notInt32 = branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag));
     addSlowCase(branchSub32(Overflow, Imm32(constant), regT0));
     emitStoreInt32(dst, regT0, (op == dst));
 
@@ -970,7 +969,7 @@ void JIT::emitSub32Constant(unsigned dst, unsigned op, int32_t constant, ResultT
 
     notInt32.link(this);
     if (!opType.definitelyIsNumber())
-        addSlowCase(branch32(Above, regT1, Imm32(TiValue::LowestTag)));
+        addSlowCase(branch32(Above, regT1, TrustedImm32(TiValue::LowestTag)));
     move(Imm32(constant), regT2);
     convertInt32ToDouble(regT2, fpRegT0);
     emitLoadDouble(op, fpRegT1);
@@ -1027,15 +1026,15 @@ void JIT::emitBinaryDoubleOp(OpcodeID opcodeID, unsigned dst, unsigned op1, unsi
 
         // Verify Op1 is double.
         if (!types.first().definitelyIsNumber())
-            addSlowCase(branch32(Above, regT1, Imm32(TiValue::LowestTag)));
+            addSlowCase(branch32(Above, regT1, TrustedImm32(TiValue::LowestTag)));
 
         if (!op2IsInRegisters)
             emitLoad(op2, regT3, regT2);
 
-        Jump doubleOp2 = branch32(Below, regT3, Imm32(TiValue::LowestTag));
+        Jump doubleOp2 = branch32(Below, regT3, TrustedImm32(TiValue::LowestTag));
 
         if (!types.second().definitelyIsNumber())
-            addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+            addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
         convertInt32ToDouble(regT2, fpRegT0);
         Jump doTheMath = jump();
@@ -1104,7 +1103,7 @@ void JIT::emitBinaryDoubleOp(OpcodeID opcodeID, unsigned dst, unsigned op1, unsi
 
         // Verify op2 is double.
         if (!types.second().definitelyIsNumber())
-            addSlowCase(branch32(Above, regT3, Imm32(TiValue::LowestTag)));
+            addSlowCase(branch32(Above, regT3, TrustedImm32(TiValue::LowestTag)));
 
         // Do the math.
         switch (opcodeID) {
@@ -1165,8 +1164,8 @@ void JIT::emit_op_mul(Instruction* currentInstruction)
     JumpList notInt32Op2;
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
     // Int32 case.
     move(regT0, regT3);
@@ -1197,7 +1196,7 @@ void JIT::emitSlow_op_mul(Instruction* currentInstruction, Vector<SlowCaseEntry>
     linkSlowCase(iter); // zero result check
 
     Jump negZero = branchOr32(Signed, regT2, regT3);
-    emitStoreInt32(dst, Imm32(0), (op1 == dst || op2 == dst));
+    emitStoreInt32(dst, TrustedImm32(0), (op1 == dst || op2 == dst));
 
     emitJumpSlowToHot(jump(), OPCODE_LENGTH(op_mul));
 
@@ -1248,22 +1247,12 @@ void JIT::emit_op_div(Instruction* currentInstruction)
 
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
 
-    notInt32Op1.append(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    notInt32Op2.append(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    notInt32Op1.append(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    notInt32Op2.append(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
     convertInt32ToDouble(regT0, fpRegT0);
     convertInt32ToDouble(regT2, fpRegT1);
     divDouble(fpRegT1, fpRegT0);
-
-    JumpList doubleResult;
-    branchConvertDoubleToInt32(fpRegT0, regT0, doubleResult, fpRegT1);
-
-    // Int32 result.
-    emitStoreInt32(dst, regT0, (op1 == dst || op2 == dst));
-    end.append(jump());
-
-    // Double result.
-    doubleResult.link(this);
     emitStoreDouble(dst, fpRegT0);
     end.append(jump());
 
@@ -1301,7 +1290,7 @@ void JIT::emitSlow_op_div(Instruction* currentInstruction, Vector<SlowCaseEntry>
 
 /* ------------------------------ BEGIN: OP_MOD ------------------------------ */
 
-#if CPU(X86) || CPU(X86_64)
+#if CPU(X86) || CPU(X86_64) || CPU(MIPS)
 
 void JIT::emit_op_mod(Instruction* currentInstruction)
 {
@@ -1309,34 +1298,47 @@ void JIT::emit_op_mod(Instruction* currentInstruction)
     unsigned op1 = currentInstruction[2].u.operand;
     unsigned op2 = currentInstruction[3].u.operand;
 
-    if (isOperandConstantImmediateInt(op2) && getConstantOperand(op2).asInt32() != 0) {
-        emitLoad(op1, X86Registers::edx, X86Registers::eax);
-        move(Imm32(getConstantOperand(op2).asInt32()), X86Registers::ecx);
-        addSlowCase(branch32(NotEqual, X86Registers::edx, Imm32(TiValue::Int32Tag)));
-        if (getConstantOperand(op2).asInt32() == -1)
-            addSlowCase(branch32(Equal, X86Registers::eax, Imm32(0x80000000))); // -2147483648 / -1 => EXC_ARITHMETIC
-    } else {
-        emitLoad2(op1, X86Registers::edx, X86Registers::eax, op2, X86Registers::ebx, X86Registers::ecx);
-        addSlowCase(branch32(NotEqual, X86Registers::edx, Imm32(TiValue::Int32Tag)));
-        addSlowCase(branch32(NotEqual, X86Registers::ebx, Imm32(TiValue::Int32Tag)));
+#if CPU(X86) || CPU(X86_64)
+    // Make sure registers are correct for x86 IDIV instructions.
+    ASSERT(regT0 == X86Registers::eax);
+    ASSERT(regT1 == X86Registers::edx);
+    ASSERT(regT2 == X86Registers::ecx);
+    ASSERT(regT3 == X86Registers::ebx);
+#endif
 
-        addSlowCase(branch32(Equal, X86Registers::eax, Imm32(0x80000000))); // -2147483648 / -1 => EXC_ARITHMETIC
-        addSlowCase(branch32(Equal, X86Registers::ecx, Imm32(0))); // divide by 0
+    if (isOperandConstantImmediateInt(op2) && getConstantOperand(op2).asInt32() != 0) {
+        emitLoad(op1, regT1, regT0);
+        move(Imm32(getConstantOperand(op2).asInt32()), regT2);
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+        if (getConstantOperand(op2).asInt32() == -1)
+            addSlowCase(branch32(Equal, regT0, TrustedImm32(0x80000000))); // -2147483648 / -1 => EXC_ARITHMETIC
+    } else {
+        emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
+        addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+        addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
+
+        addSlowCase(branch32(Equal, regT0, TrustedImm32(0x80000000))); // -2147483648 / -1 => EXC_ARITHMETIC
+        addSlowCase(branch32(Equal, regT2, TrustedImm32(0))); // divide by 0
     }
 
-    move(X86Registers::eax, X86Registers::ebx); // Save dividend payload, in case of 0.
+    move(regT0, regT3); // Save dividend payload, in case of 0.
+#if CPU(X86) || CPU(X86_64)
     m_assembler.cdq();
-    m_assembler.idivl_r(X86Registers::ecx);
+    m_assembler.idivl_r(regT2);
+#elif CPU(MIPS)
+    m_assembler.div(regT0, regT2);
+    m_assembler.mfhi(regT1);
+#endif
 
     // If the remainder is zero and the dividend is negative, the result is -0.
-    Jump storeResult1 = branchTest32(NonZero, X86Registers::edx);
-    Jump storeResult2 = branchTest32(Zero, X86Registers::ebx, Imm32(0x80000000)); // not negative
-    emitStore(dst, jsNumber(m_globalData, -0.0));
+    Jump storeResult1 = branchTest32(NonZero, regT1);
+    Jump storeResult2 = branchTest32(Zero, regT3, TrustedImm32(0x80000000)); // not negative
+    emitStore(dst, jsNumber(-0.0));
     Jump end = jump();
 
     storeResult1.link(this);
     storeResult2.link(this);
-    emitStoreInt32(dst, X86Registers::edx, (op1 == dst || op2 == dst));
+    emitStoreInt32(dst, regT1, (op1 == dst || op2 == dst));
     end.link(this);
 }
 
@@ -1363,7 +1365,7 @@ void JIT::emitSlow_op_mod(Instruction* currentInstruction, Vector<SlowCaseEntry>
     stubCall.call(dst);
 }
 
-#else // CPU(X86) || CPU(X86_64)
+#else // CPU(X86) || CPU(X86_64) || CPU(MIPS)
 
 void JIT::emit_op_mod(Instruction* currentInstruction)
 {
@@ -1371,14 +1373,14 @@ void JIT::emit_op_mod(Instruction* currentInstruction)
     unsigned op1 = currentInstruction[2].u.operand;
     unsigned op2 = currentInstruction[3].u.operand;
 
-#if ENABLE(JIT_OPTIMIZE_MOD)
+#if ENABLE(JIT_USE_SOFT_MODULO)
     emitLoad2(op1, regT1, regT0, op2, regT3, regT2);
-    addSlowCase(branch32(NotEqual, regT1, Imm32(TiValue::Int32Tag)));
-    addSlowCase(branch32(NotEqual, regT3, Imm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT1, TrustedImm32(TiValue::Int32Tag)));
+    addSlowCase(branch32(NotEqual, regT3, TrustedImm32(TiValue::Int32Tag)));
 
-    addSlowCase(branch32(Equal, regT2, Imm32(0)));
+    addSlowCase(branch32(Equal, regT2, TrustedImm32(0)));
 
-    emitNakedCall(m_globalData->jitStubs.ctiSoftModulo());
+    emitNakedCall(m_globalData->jitStubs->ctiSoftModulo());
 
     emitStoreInt32(dst, regT0, (op1 == dst || op2 == dst));
 #else
@@ -1391,7 +1393,9 @@ void JIT::emit_op_mod(Instruction* currentInstruction)
 
 void JIT::emitSlow_op_mod(Instruction* currentInstruction, Vector<SlowCaseEntry>::iterator& iter)
 {
-#if ENABLE(JIT_OPTIMIZE_MOD)
+    UNUSED_PARAM(currentInstruction);
+    UNUSED_PARAM(iter);
+#if ENABLE(JIT_USE_SOFT_MODULO)
     unsigned result = currentInstruction[1].u.operand;
     unsigned op1 = currentInstruction[2].u.operand;
     unsigned op2 = currentInstruction[3].u.operand;
@@ -1413,8 +1417,7 @@ void JIT::emitSlow_op_mod(Instruction* currentInstruction, Vector<SlowCaseEntry>
 
 /* ------------------------------ END: OP_MOD ------------------------------ */
 
+} // namespace TI
+
 #endif // USE(JSVALUE32_64)
-
-}
-
 #endif // ENABLE(JIT)

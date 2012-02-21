@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,7 +36,20 @@ namespace TI {
 
     class ObjectConstructor : public InternalFunction {
     public:
-        ObjectConstructor(TiExcState*, NonNullPassRefPtr<Structure>, ObjectPrototype*, Structure* prototypeFunctionStructure);
+        ObjectConstructor(TiExcState*, TiGlobalObject*, Structure*, ObjectPrototype*);
+
+        virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
+        virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
+
+        static const ClassInfo s_info;
+
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+    protected:
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | InternalFunction::StructureFlags;
 
     private:
         virtual ConstructType getConstructData(ConstructData&);

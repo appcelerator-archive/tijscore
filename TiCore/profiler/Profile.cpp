@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -49,7 +49,7 @@ Profile::Profile(const UString& title, unsigned uid)
 {
     // FIXME: When multi-threading is supported this will be a vector and calls
     // into the profiler will need to know which thread it is executing on.
-    m_head = ProfileNode::create(CallIdentifier("Thread_1", UString(), 0), 0, 0);
+    m_head = ProfileNode::create(0, CallIdentifier("Thread_1", UString(), 0), 0, 0);
 }
 
 Profile::~Profile()
@@ -113,7 +113,7 @@ void Profile::debugPrintData() const
     m_head->debugPrintData(0);
 }
 
-typedef pair<UString::Rep*, unsigned> NameCountPair;
+typedef pair<StringImpl*, unsigned> NameCountPair;
 
 static inline bool functionNameCountPairComparator(const NameCountPair& a, const NameCountPair& b)
 {
@@ -134,7 +134,7 @@ void Profile::debugPrintDataSampleStyle() const
 
     std::sort(sortedFunctions.begin(), sortedFunctions.end(), functionNameCountPairComparator);
     for (NameCountPairVector::iterator it = sortedFunctions.begin(); it != sortedFunctions.end(); ++it)
-        printf("        %-12d%s\n", (*it).second, UString((*it).first).UTF8String().data());
+        printf("        %-12d%s\n", (*it).second, UString((*it).first).utf8().data());
 
     printf("\nSort by top of stack, same collapsed (when >= 5):\n");
 }

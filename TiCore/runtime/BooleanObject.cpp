@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,11 +32,12 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(BooleanObject);
 
-const ClassInfo BooleanObject::info = { "Boolean", 0, 0, 0 };
+const ClassInfo BooleanObject::s_info = { "Boolean", &JSWrapperObject::s_info, 0, 0 };
 
-BooleanObject::BooleanObject(NonNullPassRefPtr<Structure> structure)
-    : JSWrapperObject(structure)
+BooleanObject::BooleanObject(TiGlobalData& globalData, Structure* structure)
+    : JSWrapperObject(globalData, structure)
 {
+    ASSERT(inherits(&s_info));
 }
 
 } // namespace TI

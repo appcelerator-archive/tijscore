@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,11 +36,12 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(NumberObject);
 
-const ClassInfo NumberObject::info = { "Number", 0, 0, 0 };
+const ClassInfo NumberObject::s_info = { "Number", &JSWrapperObject::s_info, 0, 0 };
 
-NumberObject::NumberObject(NonNullPassRefPtr<Structure> structure)
-    : JSWrapperObject(structure)
+NumberObject::NumberObject(TiGlobalData& globalData, Structure* structure)
+    : JSWrapperObject(globalData, structure)
 {
+    ASSERT(inherits(&s_info));
 }
 
 TiValue NumberObject::getJSNumber()
@@ -48,10 +49,10 @@ TiValue NumberObject::getJSNumber()
     return internalValue();
 }
 
-NumberObject* constructNumber(TiExcState* exec, TiValue number)
+NumberObject* constructNumber(TiExcState* exec, TiGlobalObject* globalObject, TiValue number)
 {
-    NumberObject* object = new (exec) NumberObject(exec->lexicalGlobalObject()->numberObjectStructure());
-    object->setInternalValue(number);
+    NumberObject* object = new (exec) NumberObject(exec->globalData(), globalObject->numberObjectStructure());
+    object->setInternalValue(exec->globalData(), number);
     return object;
 }
 

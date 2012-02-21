@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,18 +40,18 @@ namespace TI {
         static StringObjectThatMasqueradesAsUndefined* create(TiExcState* exec, const UString& string)
         {
             return new (exec) StringObjectThatMasqueradesAsUndefined(exec,
-                createStructure(exec->lexicalGlobalObject()->stringPrototype()), string);
+                createStructure(exec->globalData(), exec->lexicalGlobalObject()->stringPrototype()), string);
         }
 
     private:
-        StringObjectThatMasqueradesAsUndefined(TiExcState* exec, NonNullPassRefPtr<Structure> structure, const UString& string)
+        StringObjectThatMasqueradesAsUndefined(TiExcState* exec, Structure* structure, const UString& string)
             : StringObject(exec, structure, string)
         {
         }
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) 
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto) 
         { 
-            return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+            return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); 
         }
 
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | MasqueradesAsUndefined | OverridesGetPropertyNames | StringObject::StructureFlags;

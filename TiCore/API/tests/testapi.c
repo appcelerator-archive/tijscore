@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,6 +38,10 @@
 #define ASSERT_DISABLED 0
 #include <wtf/Assertions.h>
 #include <wtf/UnusedParam.h>
+
+#if OS(WINDOWS)
+#include <windows.h>
+#endif
 
 #if COMPILER(MSVC)
 
@@ -314,8 +318,19 @@ static TiValueRef MyObject_convertToType(TiContextRef context, TiObjectRef objec
     return TiValueMakeNull(context);
 }
 
+static bool MyObject_set_nullGetForwardSet(TiContextRef ctx, TiObjectRef object, TiStringRef propertyName, TiValueRef value, TiValueRef* exception)
+{
+    UNUSED_PARAM(ctx);
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(propertyName);
+    UNUSED_PARAM(value);
+    UNUSED_PARAM(exception);
+    return false; // Forward to parent class.
+}
+
 static TiStaticValue evilStaticValues[] = {
     { "nullGetSet", 0, 0, kTiPropertyAttributeNone },
+    { "nullGetForwardSet", 0, MyObject_set_nullGetForwardSet, kTiPropertyAttributeNone },
     { 0, 0, 0, 0 }
 };
 
@@ -354,6 +369,111 @@ static TiClassRef MyObject_class(TiContextRef context)
     static TiClassRef jsClass;
     if (!jsClass)
         jsClass = TiClassCreate(&MyObject_definition);
+    
+    return jsClass;
+}
+
+static TiValueRef PropertyCatchalls_getProperty(TiContextRef context, TiObjectRef object, TiStringRef propertyName, TiValueRef* exception)
+{
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(propertyName);
+    UNUSED_PARAM(exception);
+
+    if (TiStringIsEqualToUTF8CString(propertyName, "x")) {
+        static size_t count;
+        if (count++ < 5)
+            return NULL;
+
+        // Swallow all .x gets after 5, returning null.
+        return TiValueMakeNull(context);
+    }
+
+    if (TiStringIsEqualToUTF8CString(propertyName, "y")) {
+        static size_t count;
+        if (count++ < 5)
+            return NULL;
+
+        // Swallow all .y gets after 5, returning null.
+        return TiValueMakeNull(context);
+    }
+    
+    if (TiStringIsEqualToUTF8CString(propertyName, "z")) {
+        static size_t count;
+        if (count++ < 5)
+            return NULL;
+
+        // Swallow all .y gets after 5, returning null.
+        return TiValueMakeNull(context);
+    }
+
+    return NULL;
+}
+
+static bool PropertyCatchalls_setProperty(TiContextRef context, TiObjectRef object, TiStringRef propertyName, TiValueRef value, TiValueRef* exception)
+{
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(propertyName);
+    UNUSED_PARAM(value);
+    UNUSED_PARAM(exception);
+
+    if (TiStringIsEqualToUTF8CString(propertyName, "x")) {
+        static size_t count;
+        if (count++ < 5)
+            return false;
+
+        // Swallow all .x sets after 4.
+        return true;
+    }
+
+    return false;
+}
+
+static void PropertyCatchalls_getPropertyNames(TiContextRef context, TiObjectRef object, TiPropertyNameAccumulatorRef propertyNames)
+{
+    UNUSED_PARAM(context);
+    UNUSED_PARAM(object);
+
+    static size_t count;
+    static const char* numbers[] = { "0", "1", "2", "3", "4", "5", "6", "7", "8", "9" };
+    
+    // Provide a property of a different name every time.
+    TiStringRef propertyName = TiStringCreateWithUTF8CString(numbers[count++ % 10]);
+    TiPropertyNameAccumulatorAddName(propertyNames, propertyName);
+    TiStringRelease(propertyName);
+}
+
+TiClassDefinition PropertyCatchalls_definition = {
+    0,
+    kTiClassAttributeNone,
+    
+    "PropertyCatchalls",
+    NULL,
+    
+    NULL,
+    NULL,
+    
+    NULL,
+    NULL,
+    NULL,
+    PropertyCatchalls_getProperty,
+    PropertyCatchalls_setProperty,
+    NULL,
+    PropertyCatchalls_getPropertyNames,
+    NULL,
+    NULL,
+    NULL,
+    NULL,
+};
+
+static TiClassRef PropertyCatchalls_class(TiContextRef context)
+{
+    UNUSED_PARAM(context);
+
+    static TiClassRef jsClass;
+    if (!jsClass)
+        jsClass = TiClassCreate(&PropertyCatchalls_definition);
     
     return jsClass;
 }
@@ -771,8 +891,68 @@ static void makeGlobalNumberValue(TiContextRef context) {
     v = NULL;
 }
 
+static bool assertTrue(bool value, const char* message)
+{
+    if (!value) {
+        if (message)
+            fprintf(stderr, "assertTrue failed: '%s'\n", message);
+        else
+            fprintf(stderr, "assertTrue failed.\n");
+        failed = 1;
+    }
+    return value;
+}
+
+static bool checkForCycleInPrototypeChain()
+{
+    bool result = true;
+    TiGlobalContextRef context = TiGlobalContextCreate(0);
+    TiObjectRef object1 = TiObjectMake(context, /* jsClass */ 0, /* data */ 0);
+    TiObjectRef object2 = TiObjectMake(context, /* jsClass */ 0, /* data */ 0);
+    TiObjectRef object3 = TiObjectMake(context, /* jsClass */ 0, /* data */ 0);
+
+    TiObjectSetPrototype(context, object1, TiValueMakeNull(context));
+    ASSERT(TiValueIsNull(context, TiObjectGetPrototype(context, object1)));
+
+    // object1 -> object1
+    TiObjectSetPrototype(context, object1, object1);
+    result &= assertTrue(TiValueIsNull(context, TiObjectGetPrototype(context, object1)), "It is possible to assign self as a prototype");
+
+    // object1 -> object2 -> object1
+    TiObjectSetPrototype(context, object2, object1);
+    ASSERT(TiValueIsStrictEqual(context, TiObjectGetPrototype(context, object2), object1));
+    TiObjectSetPrototype(context, object1, object2);
+    result &= assertTrue(TiValueIsNull(context, TiObjectGetPrototype(context, object1)), "It is possible to close a prototype chain cycle");
+
+    // object1 -> object2 -> object3 -> object1
+    TiObjectSetPrototype(context, object2, object3);
+    ASSERT(TiValueIsStrictEqual(context, TiObjectGetPrototype(context, object2), object3));
+    TiObjectSetPrototype(context, object1, object2);
+    ASSERT(TiValueIsStrictEqual(context, TiObjectGetPrototype(context, object1), object2));
+    TiObjectSetPrototype(context, object3, object1);
+    result &= assertTrue(!TiValueIsStrictEqual(context, TiObjectGetPrototype(context, object3), object1), "It is possible to close a prototype chain cycle");
+
+    TiValueRef exception;
+    TiStringRef code = TiStringCreateWithUTF8CString("o = { }; p = { }; o.__proto__ = p; p.__proto__ = o");
+    TiStringRef file = TiStringCreateWithUTF8CString("");
+    result &= assertTrue(!TiEvalScript(context, code, /* thisObject*/ 0, file, 1, &exception)
+                         , "An exception should be thrown");
+
+    TiStringRelease(code);
+    TiStringRelease(file);
+    TiGlobalContextRelease(context);
+    return result;
+}
+
 int main(int argc, char* argv[])
 {
+#if OS(WINDOWS)
+    // Cygwin calls ::SetErrorMode(SEM_FAILCRITICALERRORS), which we will inherit. This is bad for
+    // testing/debugging, as it causes the post-mortem debugger not to be invoked. We reset the
+    // error mode here to work around Cygwin's behavior. See <http://webkit.org/b/55222>.
+    ::SetErrorMode(0);
+#endif
+
     const char *scriptPath = "testapi.js";
     if (argc > 1) {
         scriptPath = argv[1];
@@ -865,6 +1045,11 @@ int main(int argc, char* argv[])
     ASSERT(TiValueGetType(context, jsCFEmptyString) == kTITypeString);
     ASSERT(TiValueGetType(context, jsCFEmptyStringWithCharacters) == kTITypeString);
 
+    TiObjectRef propertyCatchalls = TiObjectMake(context, PropertyCatchalls_class(context), NULL);
+    TiStringRef propertyCatchallsString = TiStringCreateWithUTF8CString("PropertyCatchalls");
+    TiObjectSetProperty(context, globalObject, propertyCatchallsString, propertyCatchalls, kTiPropertyAttributeNone, NULL);
+    TiStringRelease(propertyCatchallsString);
+
     TiObjectRef myObject = TiObjectMake(context, MyObject_class(context), NULL);
     TiStringRef myObjectIString = TiStringCreateWithUTF8CString("MyObject");
     TiObjectSetProperty(context, globalObject, myObjectIString, myObject, kTiPropertyAttributeNone, NULL);
@@ -881,21 +1066,21 @@ int main(int argc, char* argv[])
     TiStringRelease(EmptyObjectIString);
     
     TiStringRef lengthStr = TiStringCreateWithUTF8CString("length");
-    aHeapRef = TiObjectMakeArray(context, 0, 0, 0);
+    TiObjectRef aStackRef = TiObjectMakeArray(context, 0, 0, 0);
+    aHeapRef = aStackRef;
     TiObjectSetProperty(context, aHeapRef, lengthStr, TiValueMakeNumber(context, 10), 0, 0);
     TiStringRef privatePropertyName = TiStringCreateWithUTF8CString("privateProperty");
     if (!TiObjectSetPrivateProperty(context, myObject, privatePropertyName, aHeapRef)) {
         printf("FAIL: Could not set private property.\n");
-        failed = 1;        
-    } else {
+        failed = 1;
+    } else
         printf("PASS: Set private property.\n");
-    }
+    aStackRef = 0;
     if (TiObjectSetPrivateProperty(context, aHeapRef, privatePropertyName, aHeapRef)) {
         printf("FAIL: TiObjectSetPrivateProperty should fail on non-API objects.\n");
-        failed = 1;        
-    } else {
+        failed = 1;
+    } else
         printf("PASS: Did not allow TiObjectSetPrivateProperty on a non-API object.\n");
-    }
     if (TiObjectGetPrivateProperty(context, myObject, privatePropertyName) != aHeapRef) {
         printf("FAIL: Could not retrieve private property.\n");
         failed = 1;
@@ -906,25 +1091,37 @@ int main(int argc, char* argv[])
         failed = 1;
     } else
         printf("PASS: TiObjectGetPrivateProperty return NULL.\n");
-    
+
     if (TiObjectGetProperty(context, myObject, privatePropertyName, 0) == aHeapRef) {
         printf("FAIL: Accessed private property through ordinary property lookup.\n");
         failed = 1;
     } else
         printf("PASS: Cannot access private property through ordinary property lookup.\n");
-    
+
     TiGarbageCollect(context);
-    
+
     for (int i = 0; i < 10000; i++)
         TiObjectMake(context, 0, 0);
 
+    aHeapRef = TiValueToObject(context, TiObjectGetPrivateProperty(context, myObject, privatePropertyName), 0);
     if (TiValueToNumber(context, TiObjectGetProperty(context, aHeapRef, lengthStr, 0), 0) != 10) {
         printf("FAIL: Private property has been collected.\n");
         failed = 1;
     } else
         printf("PASS: Private property does not appear to have been collected.\n");
     TiStringRelease(lengthStr);
-    
+
+    if (!TiObjectSetPrivateProperty(context, myObject, privatePropertyName, 0)) {
+        printf("FAIL: Could not set private property to NULL.\n");
+        failed = 1;
+    } else
+        printf("PASS: Set private property to NULL.\n");
+    if (TiObjectGetPrivateProperty(context, myObject, privatePropertyName)) {
+        printf("FAIL: Could not retrieve private property.\n");
+        failed = 1;
+    } else
+        printf("PASS: Retrieved private property.\n");
+
     TiStringRef validJSON = TiStringCreateWithUTF8CString("{\"aProperty\":true}");
     TiValueRef jsonObject = TiValueMakeFromJSONString(context, validJSON);
     TiStringRelease(validJSON);
@@ -1352,6 +1549,13 @@ int main(int argc, char* argv[])
     TiClassRelease(prototypeLoopClass);
 
     printf("PASS: Infinite prototype chain does not occur.\n");
+
+    if (checkForCycleInPrototypeChain())
+        printf("PASS: A cycle in a prototype chain can't be created.\n");
+    else {
+        printf("FAIL: A cycle in a prototype chain can be created.\n");
+        failed = true;
+    }
 
     if (failed) {
         printf("FAIL: Some tests failed.\n");

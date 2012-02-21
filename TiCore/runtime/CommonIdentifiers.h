@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -46,25 +46,18 @@
     macro(compile) \
     macro(configurable) \
     macro(constructor) \
-    macro(create) \
-    macro(defineProperty) \
-    macro(defineProperties) \
     macro(enumerable) \
     macro(eval) \
     macro(exec) \
     macro(fromCharCode) \
     macro(global) \
     macro(get) \
-    macro(getPrototypeOf) \
-    macro(getOwnPropertyDescriptor) \
-    macro(getOwnPropertyNames) \
     macro(hasOwnProperty) \
     macro(ignoreCase) \
     macro(index) \
     macro(input) \
     macro(isArray) \
     macro(isPrototypeOf) \
-    macro(keys) \
     macro(length) \
     macro(message) \
     macro(multiline) \
@@ -89,9 +82,48 @@
     macro(writable) \
     macro(displayName)
 
+#define JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(macro) \
+    macro(null) \
+    macro(true) \
+    macro(false) \
+    macro(break) \
+    macro(case) \
+    macro(catch) \
+    macro(const) \
+    macro(default) \
+    macro(finally) \
+    macro(for) \
+    macro(instanceof) \
+    macro(new) \
+    macro(var) \
+    macro(continue) \
+    macro(function) \
+    macro(return) \
+    macro(void) \
+    macro(delete) \
+    macro(if) \
+    macro(this) \
+    macro(do) \
+    macro(while) \
+    macro(else) \
+    macro(in) \
+    macro(switch) \
+    macro(throw) \
+    macro(try) \
+    macro(typeof) \
+    macro(with) \
+    macro(debugger) \
+    macro(class) \
+    macro(enum) \
+    macro(export) \
+    macro(extends) \
+    macro(import) \
+    macro(super)
+
 namespace TI {
 
-    class CommonIdentifiers : public Noncopyable {
+    class CommonIdentifiers {
+        WTF_MAKE_NONCOPYABLE(CommonIdentifiers); WTF_MAKE_FAST_ALLOCATED;
     private:
         CommonIdentifiers(TiGlobalData*);
         friend class TiGlobalData;
@@ -101,7 +133,13 @@ namespace TI {
         const Identifier emptyIdentifier;
         const Identifier underscoreProto;
         const Identifier thisIdentifier;
+        const Identifier useStrictIdentifier;
 
+        
+#define JSC_IDENTIFIER_DECLARE_KEYWORD_NAME_GLOBAL(name) const Identifier name##Keyword;
+        JSC_COMMON_IDENTIFIERS_EACH_KEYWORD(JSC_IDENTIFIER_DECLARE_KEYWORD_NAME_GLOBAL)
+#undef JSC_IDENTIFIER_DECLARE_KEYWORD_NAME_GLOBAL
+        
 #define JSC_IDENTIFIER_DECLARE_PROPERTY_NAME_GLOBAL(name) const Identifier name;
         JSC_COMMON_IDENTIFIERS_EACH_PROPERTY_NAME(JSC_IDENTIFIER_DECLARE_PROPERTY_NAME_GLOBAL)
 #undef JSC_IDENTIFIER_DECLARE_PROPERTY_NAME_GLOBAL

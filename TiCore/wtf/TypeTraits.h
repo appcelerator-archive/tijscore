@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
  /*
@@ -33,6 +33,9 @@
 
 #if (defined(__GLIBCXX__) && (__GLIBCXX__ >= 20070724) && defined(__GXX_EXPERIMENTAL_CXX0X__)) || (defined(_MSC_VER) && (_MSC_VER >= 1600))
 #include <type_traits>
+#if defined(__GXX_EXPERIMENTAL_CXX0X__)
+#include <tr1/memory>
+#endif
 #endif
 
 namespace WTI {
@@ -46,6 +49,7 @@ namespace WTI {
     //   IsSameType<T, U>::value
     //
     //   RemovePointer<T>::Type
+    //   RemoveReference<T>::Type
     //   RemoveConst<T>::Type
     //   RemoveVolatile<T>::Type
     //   RemoveConstVolatile<T>::Type
@@ -69,12 +73,16 @@ namespace WTI {
     template<> struct IsInteger<wchar_t>            { static const bool value = true; };
 #endif
 
+    template<typename T> struct IsFloatingPoint     { static const bool value = false; };
+    template<> struct IsFloatingPoint<float>        { static const bool value = true; };
+    template<> struct IsFloatingPoint<double>       { static const bool value = true; };
+    template<> struct IsFloatingPoint<long double>  { static const bool value = true; };
+
+    template<typename T> struct IsArithmetic     { static const bool value = IsInteger<T>::value || IsFloatingPoint<T>::value; };
+
     // IsPod is misnamed as it doesn't cover all plain old data (pod) types.
     // Specifically, it doesn't allow for enums or for structs.
-    template <typename T> struct IsPod           { static const bool value = IsInteger<T>::value; };
-    template <> struct IsPod<float>              { static const bool value = true; };
-    template <> struct IsPod<double>             { static const bool value = true; };
-    template <> struct IsPod<long double>        { static const bool value = true; };
+    template <typename T> struct IsPod           { static const bool value = IsArithmetic<T>::value; };
     template <typename P> struct IsPod<P*>       { static const bool value = true; };
 
     template<typename T> class IsConvertibleToInteger {
@@ -170,6 +178,14 @@ namespace WTI {
     };
 
     template <typename T> struct RemovePointer<T*> {
+        typedef T Type;
+    };
+
+    template <typename T> struct RemoveReference {
+        typedef T Type;
+    };
+
+    template <typename T> struct RemoveReference<T&> {
         typedef T Type;
     };
 

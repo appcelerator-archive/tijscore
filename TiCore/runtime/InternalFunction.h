@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,42 +31,45 @@
 #ifndef InternalFunction_h
 #define InternalFunction_h
 
-#include "TiObject.h"
+#include "TiObjectWithGlobalObject.h"
 #include "Identifier.h"
 
 namespace TI {
 
     class FunctionPrototype;
 
-    class InternalFunction : public TiObject {
+    class InternalFunction : public TiObjectWithGlobalObject {
     public:
-        virtual const ClassInfo* classInfo() const; 
-        static JS_EXPORTDATA const ClassInfo info;
+        static JS_EXPORTDATA const ClassInfo s_info;
 
         const UString& name(TiExcState*);
         const UString displayName(TiExcState*);
         const UString calculatedDisplayName(TiExcState*);
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) 
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto) 
         { 
-            return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+            return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); 
         }
 
     protected:
         static const unsigned StructureFlags = ImplementsHasInstance | TiObject::StructureFlags;
 
-        InternalFunction(NonNullPassRefPtr<Structure> structure) : TiObject(structure) { }
-        InternalFunction(TiGlobalData*, NonNullPassRefPtr<Structure>, const Identifier&);
+        // Only used to allow us to determine the TiFunction vptr
+        InternalFunction(VPtrStealingHackType);
+
+        InternalFunction(TiGlobalData*, TiGlobalObject*, Structure*, const Identifier&);
 
     private:
         virtual CallType getCallData(CallData&) = 0;
+
+        virtual void vtableAnchor();
     };
 
     InternalFunction* asInternalFunction(TiValue);
 
     inline InternalFunction* asInternalFunction(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&InternalFunction::info));
+        ASSERT(asObject(value)->inherits(&InternalFunction::s_info));
         return static_cast<InternalFunction*>(asObject(value));
     }
 

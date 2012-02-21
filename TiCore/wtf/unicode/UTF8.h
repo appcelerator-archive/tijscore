@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,7 +36,7 @@
 #include "Unicode.h"
 
 namespace WTI {
-  namespace Unicode {
+namespace Unicode {
 
     // Given a first byte, gives the length of the UTF-8 sequence it begins.
     // Returns 0 for bytes that are not legal starts of UTF-8 sequences.
@@ -76,7 +76,12 @@ namespace WTI {
     ConversionResult convertUTF16ToUTF8(
                     const UChar** sourceStart, const UChar* sourceEnd, 
                     char** targetStart, char* targetEnd, bool strict = true);
-  }
-}
+
+    unsigned calculateStringHashAndLengthFromUTF8(const char* data, const char* dataEnd, unsigned& dataLength, unsigned& utf16Length);
+
+    bool equalUTF16WithUTF8(const UChar* a, const UChar* aEnd, const char* b, const char* bEnd);
+
+} // namespace Unicode
+} // namespace WTI
 
 #endif // WTF_UTF8_h

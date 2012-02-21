@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -48,9 +48,13 @@ typedef struct HRGN__* HRGN;
 #if PLATFORM(BREWMP)
 // Forward delcarations at this point avoid the need to include BREW includes
 // in WTF headers.
+typedef struct _ISocket ISocket;
 typedef struct _IFileMgr IFileMgr;
 typedef struct _IFile IFile;
 typedef struct IBitmap IBitmap;
+typedef struct ISSL ISSL;
+typedef struct IMemGroup IMemGroup;
+typedef struct IMemSpace IMemSpace;
 #endif
 
 namespace WTI {
@@ -76,6 +80,10 @@ namespace WTI {
     void deleteOwnedPtr(IFileMgr*);
     void deleteOwnedPtr(IFile*);
     void deleteOwnedPtr(IBitmap*);
+    void deleteOwnedPtr(ISSL*);
+    void deleteOwnedPtr(ISocket*);
+    void deleteOwnedPtr(IMemGroup*);
+    void deleteOwnedPtr(IMemSpace*);
 #endif
 
 } // namespace WTI

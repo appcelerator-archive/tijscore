@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -45,13 +45,15 @@ namespace TI {
 
     class TiExcState;
     class TiGlobalData;
+    class TiGlobalObject;
     class TiObject;
     class TiValue;
     class ProfileGenerator;
     class UString;
     struct CallIdentifier;    
 
-    class Profiler : public FastAllocBase {
+    class Profiler {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         static Profiler** enabledProfilerReference()
         {
@@ -63,11 +65,14 @@ namespace TI {
 
         void startProfiling(TiExcState*, const UString& title);
         PassRefPtr<Profile> stopProfiling(TiExcState*, const UString& title);
+        void stopProfiling(TiGlobalObject*);
 
-        void willExecute(TiExcState*, TiValue function);
-        void willExecute(TiExcState*, const UString& sourceURL, int startingLineNumber);
-        void didExecute(TiExcState*, TiValue function);
-        void didExecute(TiExcState*, const UString& sourceURL, int startingLineNumber);
+        void willExecute(TiExcState* callerCallFrame, TiValue function);
+        void willExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber);
+        void didExecute(TiExcState* callerCallFrame, TiValue function);
+        void didExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber);
+
+        void exceptionUnwind(TiExcState* handlerCallFrame);
 
         const Vector<RefPtr<ProfileGenerator> >& currentProfiles() { return m_currentProfiles; };
 

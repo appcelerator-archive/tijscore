@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,14 +36,14 @@ namespace TI {
 
     class BooleanConstructor : public InternalFunction {
     public:
-        BooleanConstructor(TiExcState*, NonNullPassRefPtr<Structure>, BooleanPrototype*);
+        BooleanConstructor(TiExcState*, TiGlobalObject*, Structure*, BooleanPrototype*);
 
     private:
         virtual ConstructType getConstructData(ConstructData&);
         virtual CallType getCallData(CallData&);
     };
 
-    TiObject* constructBooleanFromImmediateBoolean(TiExcState*, TiValue);
+    TiObject* constructBooleanFromImmediateBoolean(TiExcState*, TiGlobalObject*, TiValue);
     TiObject* constructBoolean(TiExcState*, const ArgList&);
 
 } // namespace TI

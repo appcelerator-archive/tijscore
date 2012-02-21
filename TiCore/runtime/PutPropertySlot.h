@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // -*- mode: c++; c-basic-offset: 4 -*-
@@ -45,9 +45,10 @@ namespace TI {
     public:
         enum Type { Uncachable, ExistingProperty, NewProperty };
 
-        PutPropertySlot()
+        PutPropertySlot(bool isStrictMode = false)
             : m_type(Uncachable)
             , m_base(0)
+            , m_isStrictMode(isStrictMode)
         {
         }
 
@@ -68,15 +69,18 @@ namespace TI {
         Type type() const { return m_type; }
         TiObject* base() const { return m_base; }
 
+        bool isStrictMode() const { return m_isStrictMode; }
         bool isCacheable() const { return m_type != Uncachable; }
         size_t cachedOffset() const {
             ASSERT(isCacheable());
             return m_offset;
         }
+
     private:
         Type m_type;
         TiObject* m_base;
         size_t m_offset;
+        bool m_isStrictMode;
     };
 
 } // namespace TI

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -63,18 +63,18 @@ public:
             fastFree(m_cache);
     }
 
-    TiValue operator() (TiExcState* exec, double operand)
+    TiValue operator() (double operand)
     {
         if (UNLIKELY(!m_cache))
             initialize();
         CacheEntry* entry = &m_cache[hash(operand)];
 
         if (entry->operand == operand)
-            return jsDoubleNumber(exec, entry->result);
+            return jsDoubleNumber(entry->result);
         double result = orignalFunction(operand);
         entry->operand = operand;
         entry->result = result;
-        return jsDoubleNumber(exec, result);
+        return jsDoubleNumber(result);
     }
 
 private:

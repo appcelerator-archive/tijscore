@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -64,7 +64,11 @@ namespace TI {
     const CodeFeatures WithFeature = 1 << 4;
     const CodeFeatures CatchFeature = 1 << 5;
     const CodeFeatures ThisFeature = 1 << 6;
-    const CodeFeatures AllFeatures = EvalFeature | ClosureFeature | AssignFeature | ArgumentsFeature | WithFeature | CatchFeature | ThisFeature;
+    const CodeFeatures StrictModeFeature = 1 << 7;
+    const CodeFeatures ShadowsArgumentsFeature = 1 << 8;
+    
+    
+    const CodeFeatures AllFeatures = EvalFeature | ClosureFeature | AssignFeature | ArgumentsFeature | WithFeature | CatchFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature;
 
     enum Operator {
         OpEqual,
@@ -87,6 +91,8 @@ namespace TI {
         OpLogicalAnd,
         OpLogicalOr
     };
+
+    typedef HashSet<RefPtr<StringImpl>, IdentifierRepHash> IdentifierSet;
 
     namespace DeclarationStacks {
         enum VarAttrs { IsConstant = 1, HasInitializer = 2 };
@@ -159,6 +165,7 @@ namespace TI {
         virtual bool isCommaNode() const { return false; }
         virtual bool isSimpleArray() const { return false; }
         virtual bool isAdd() const { return false; }
+        virtual bool isSubtract() const { return false; }
         virtual bool hasConditionContextCodegen() const { return false; }
 
         virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label*, Label*, bool) { ASSERT_NOT_REACHED(); }
@@ -272,9 +279,7 @@ namespace TI {
         uint16_t endOffset() const { return m_endOffset; }
 
     protected:
-        RegisterID* emitThrowError(BytecodeGenerator&, ErrorType, const char* message);
-        RegisterID* emitThrowError(BytecodeGenerator&, ErrorType, const char* message, const UString&);
-        RegisterID* emitThrowError(BytecodeGenerator&, ErrorType, const char* message, const Identifier&);
+        RegisterID* emitThrowReferenceError(BytecodeGenerator&, const UString& message);
 
     private:
         uint32_t m_divot;
@@ -411,12 +416,13 @@ namespace TI {
 
     class PropertyNode : public ParserArenaFreeable {
     public:
-        enum Type { Constant, Getter, Setter };
+        enum Type { Constant = 1, Getter = 2, Setter = 4 };
 
         PropertyNode(TiGlobalData*, const Identifier& name, ExpressionNode* value, Type);
         PropertyNode(TiGlobalData*, double name, ExpressionNode* value, Type);
 
         const Identifier& name() const { return m_name; }
+        Type type() const { return m_type; }
 
     private:
         friend class PropertyListNode;
@@ -812,6 +818,9 @@ namespace TI {
 
         RegisterID* emitStrcat(BytecodeGenerator& generator, RegisterID* destination, RegisterID* lhs = 0, ReadModifyResolveNode* emitExpressionInfoForMe = 0);
 
+        ExpressionNode* lhs() { return m_expr1; };
+        ExpressionNode* rhs() { return m_expr2; };
+
     private:
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
 
@@ -860,6 +869,8 @@ namespace TI {
     class SubNode : public BinaryOpNode {
     public:
         SubNode(TiGlobalData*, ExpressionNode* expr1, ExpressionNode* expr2, bool rightHasAssignments);
+
+        virtual bool isSubtract() const { return true; }
     };
 
     class LeftShiftNode : public BinaryOpNode {
@@ -1149,6 +1160,7 @@ namespace TI {
     public:
         BlockNode(TiGlobalData*, SourceElements* = 0);
 
+        StatementNode* singleStatement() const;
         StatementNode* lastStatement() const;
 
     private:
@@ -1300,6 +1312,8 @@ namespace TI {
     public:
         ReturnNode(TiGlobalData*, ExpressionNode* value);
 
+        ExpressionNode* value() { return m_value; }
+
     private:
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
 
@@ -1369,17 +1383,20 @@ namespace TI {
         ParameterNode* m_next;
     };
 
-    struct ScopeNodeData : FastAllocBase {
+    struct ScopeNodeData {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         typedef DeclarationStacks::VarStack VarStack;
         typedef DeclarationStacks::FunctionStack FunctionStack;
 
-        ScopeNodeData(ParserArena&, SourceElements*, VarStack*, FunctionStack*, int numConstants);
+        ScopeNodeData(ParserArena&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, int numConstants);
 
         ParserArena m_arena;
         VarStack m_varStack;
         FunctionStack m_functionStack;
         int m_numConstants;
         SourceElements* m_statements;
+        IdentifierSet m_capturedVariables;
     };
 
     class ScopeNode : public StatementNode, public ParserArenaRefCounted {
@@ -1387,8 +1404,8 @@ namespace TI {
         typedef DeclarationStacks::VarStack VarStack;
         typedef DeclarationStacks::FunctionStack FunctionStack;
 
-        ScopeNode(TiGlobalData*);
-        ScopeNode(TiGlobalData*, const SourceCode&, SourceElements*, VarStack*, FunctionStack*, CodeFeatures, int numConstants);
+        ScopeNode(TiGlobalData*, bool inStrictContext);
+        ScopeNode(TiGlobalData*, const SourceCode&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, CodeFeatures, int numConstants);
 
         using ParserArenaRefCounted::operator new;
 
@@ -1403,10 +1420,15 @@ namespace TI {
         CodeFeatures features() { return m_features; }
 
         bool usesEval() const { return m_features & EvalFeature; }
-        bool usesArguments() const { return m_features & ArgumentsFeature; }
+        bool usesArguments() const { return (m_features & ArgumentsFeature) && !(m_features & ShadowsArgumentsFeature); }
+        bool isStrictMode() const { return m_features & StrictModeFeature; }
         void setUsesArguments() { m_features |= ArgumentsFeature; }
         bool usesThis() const { return m_features & ThisFeature; }
-        bool needsActivation() const { return m_features & (EvalFeature | ClosureFeature | WithFeature | CatchFeature); }
+        bool needsActivationForMoreThanVariables() const { ASSERT(m_data); return m_features & (EvalFeature | WithFeature | CatchFeature); }
+        bool needsActivation() const { ASSERT(m_data); return (hasCapturedVariables()) || (m_features & (EvalFeature | WithFeature | CatchFeature)); }
+        bool hasCapturedVariables() const { return !!m_data->m_capturedVariables.size(); }
+        size_t capturedVariableCount() const { return m_data->m_capturedVariables.size(); }
+        bool captures(const Identifier& ident) { return m_data->m_capturedVariables.contains(ident.impl()); }
 
         VarStack& varStack() { ASSERT(m_data); return m_data->m_varStack; }
         FunctionStack& functionStack() { ASSERT(m_data); return m_data->m_functionStack; }
@@ -1434,29 +1456,32 @@ namespace TI {
 
     class ProgramNode : public ScopeNode {
     public:
-        static PassRefPtr<ProgramNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        static const bool isFunctionNode = false;
+        static PassRefPtr<ProgramNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         static const bool scopeIsFunction = false;
 
     private:
-        ProgramNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        ProgramNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
     };
 
     class EvalNode : public ScopeNode {
     public:
-        static PassRefPtr<EvalNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        static const bool isFunctionNode = false;
+        static PassRefPtr<EvalNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         static const bool scopeIsFunction = false;
 
     private:
-        EvalNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        EvalNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
     };
 
     class FunctionParameters : public Vector<Identifier>, public RefCounted<FunctionParameters> {
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         static PassRefPtr<FunctionParameters> create(ParameterNode* firstParameter) { return adoptRef(new FunctionParameters(firstParameter)); }
 
@@ -1466,8 +1491,9 @@ namespace TI {
 
     class FunctionBodyNode : public ScopeNode {
     public:
-        static FunctionBodyNode* create(TiGlobalData*);
-        static PassRefPtr<FunctionBodyNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        static const bool isFunctionNode = true;
+        static FunctionBodyNode* create(TiGlobalData*, bool isStrictMode);
+        static PassRefPtr<FunctionBodyNode> create(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         FunctionParameters* parameters() const { return m_parameters.get(); }
         size_t parameterCount() const { return m_parameters->size(); }
@@ -1482,8 +1508,8 @@ namespace TI {
         static const bool scopeIsFunction = true;
 
     private:
-        FunctionBodyNode(TiGlobalData*);
-        FunctionBodyNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, const SourceCode&, CodeFeatures, int numConstants);
+        FunctionBodyNode(TiGlobalData*, bool inStrictContext);
+        FunctionBodyNode(TiGlobalData*, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         Identifier m_ident;
         RefPtr<FunctionParameters> m_parameters;

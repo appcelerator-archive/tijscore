@@ -1,15 +1,15 @@
 10
 
 dir
-82066
-http://svn.webkit.org/repository/webkit/releases/WebKitGTK/webkit-1.4.0/Source/JavaScriptCore/JavaScriptCore.xcodeproj
+107585
+http://svn.webkit.org/repository/webkit/trunk/Source/JavaScriptCore/JavaScriptCore.xcodeproj
 http://svn.webkit.org/repository/webkit
 
 
 
-2011-03-17T21:51:06.083121Z
-81389
-jeffm@apple.com
+2012-02-12T23:35:40.084940Z
+107513
+weinig@apple.com
 has-props
 
 
@@ -32,11 +32,11 @@ file
 
 
 
-2011-03-27T14:57:14.000000Z
-5a0d600050556d5557c46ae5ee4fb6a2
-2011-03-16T20:09:07.556723Z
-81272
-oliver@apple.com
+2012-02-13T18:52:40.000000Z
+60c2a735b1c5110a8c7d2bbf0813a41f
+2012-02-12T23:35:40.084940Z
+107513
+weinig@apple.com
 has-props
 
 
@@ -58,5 +58,5 @@ has-props
 
 
 
-304340
+392456
 

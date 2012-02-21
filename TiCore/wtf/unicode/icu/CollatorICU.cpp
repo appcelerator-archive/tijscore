@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -66,9 +66,9 @@ Collator::Collator(const char* locale)
 
 PassOwnPtr<Collator> Collator::userDefault()
 {
-#if OS(DARWIN) && PLATFORM(CF)
+#if OS(DARWIN) && USE(CF)
     // Mac OS X doesn't set UNIX locale to match user-selected one, so ICU default doesn't work.
-#if !defined(BUILDING_ON_TIGER) && !defined(BUILDING_ON_LEOPARD) && !OS(IPHONE_OS)
+#if !defined(BUILDING_ON_LEOPARD) && !OS(IOS)
     RetainPtr<CFLocaleRef> currentLocale(AdoptCF, CFLocaleCopyCurrent());
     CFStringRef collationOrder = (CFStringRef)CFLocaleGetValue(currentLocale.get(), kCFLocaleCollatorIdentifier);
 #else
@@ -76,13 +76,12 @@ PassOwnPtr<Collator> Collator::userDefault()
     CFStringRef collationOrder = collationOrderRetainer.get();
 #endif
     char buf[256];
-    if (collationOrder) {
-        CFStringGetCString(collationOrder, buf, sizeof(buf), kCFStringEncodingASCII);
-        return new Collator(buf);
-    } else
-        return new Collator("");
+    if (!collationOrder)
+        return adoptPtr(new Collator(""));
+    CFStringGetCString(collationOrder, buf, sizeof(buf), kCFStringEncodingASCII);
+    return adoptPtr(new Collator(buf));
 #else
-    return new Collator(0);
+    return adoptPtr(new Collator(0));
 #endif
 }
 

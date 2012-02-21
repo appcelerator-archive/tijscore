@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -52,7 +52,7 @@ namespace TI {
 static double getCount()
 {
 #if OS(WINDOWS)
-    static LARGE_INTEGER frequency = {0};
+    static LARGE_INTEGER frequency;
     if (!frequency.QuadPart)
         QueryPerformanceFrequency(&frequency);
     LARGE_INTEGER counter;
@@ -63,8 +63,9 @@ static double getCount()
 #endif
 }
 
-ProfileNode::ProfileNode(const CallIdentifier& callIdentifier, ProfileNode* headNode, ProfileNode* parentNode)
-    : m_callIdentifier(callIdentifier)
+ProfileNode::ProfileNode(TiExcState* callerCallFrame, const CallIdentifier& callIdentifier, ProfileNode* headNode, ProfileNode* parentNode)
+    : m_callerCallFrame(callerCallFrame)
+    , m_callIdentifier(callIdentifier)
     , m_head(headNode)
     , m_parent(parentNode)
     , m_nextSibling(0)
@@ -79,8 +80,9 @@ ProfileNode::ProfileNode(const CallIdentifier& callIdentifier, ProfileNode* head
     startTimer();
 }
 
-ProfileNode::ProfileNode(ProfileNode* headNode, ProfileNode* nodeToCopy)
-    : m_callIdentifier(nodeToCopy->callIdentifier())
+ProfileNode::ProfileNode(TiExcState* callerCallFrame, ProfileNode* headNode, ProfileNode* nodeToCopy)
+    : m_callerCallFrame(callerCallFrame)
+    , m_callIdentifier(nodeToCopy->callIdentifier())
     , m_head(headNode)
     , m_parent(nodeToCopy->parent())
     , m_nextSibling(0)
@@ -94,7 +96,7 @@ ProfileNode::ProfileNode(ProfileNode* headNode, ProfileNode* nodeToCopy)
 {
 }
 
-ProfileNode* ProfileNode::willExecute(const CallIdentifier& callIdentifier)
+ProfileNode* ProfileNode::willExecute(TiExcState* callerCallFrame, const CallIdentifier& callIdentifier)
 {
     for (StackIterator currentChild = m_children.begin(); currentChild != m_children.end(); ++currentChild) {
         if ((*currentChild)->callIdentifier() == callIdentifier) {
@@ -103,7 +105,7 @@ ProfileNode* ProfileNode::willExecute(const CallIdentifier& callIdentifier)
         }
     }
 
-    RefPtr<ProfileNode> newChild = ProfileNode::create(callIdentifier, m_head ? m_head : this, this); // If this ProfileNode has no head it is the head.
+    RefPtr<ProfileNode> newChild = ProfileNode::create(callerCallFrame, callIdentifier, m_head ? m_head : this, this); // If this ProfileNode has no head it is the head.
     if (m_children.size())
         m_children.last()->setNextSibling(newChild.get());
     m_children.append(newChild.release());
@@ -301,11 +303,11 @@ void ProfileNode::debugPrintData(int indentLevel) const
         printf("  ");
 
     printf("Function Name %s %d SelfTime %.3fms/%.3f%% TotalTime %.3fms/%.3f%% VSelf %.3fms VTotal %.3fms Visible %s Next Sibling %s\n",
-        functionName().UTF8String().data(), 
+        functionName().utf8().data(), 
         m_numberOfCalls, m_actualSelfTime, selfPercent(), m_actualTotalTime, totalPercent(),
         m_visibleSelfTime, m_visibleTotalTime, 
         (m_visible ? "True" : "False"),
-        m_nextSibling ? m_nextSibling->functionName().UTF8String().data() : "");
+        m_nextSibling ? m_nextSibling->functionName().utf8().data() : "");
 
     ++indentLevel;
 
@@ -320,13 +322,13 @@ double ProfileNode::debugPrintDataSampleStyle(int indentLevel, FunctionCallHashC
     printf("    ");
 
     // Print function names
-    const char* name = functionName().UTF8String().data();
+    const char* name = functionName().utf8().data();
     double sampleCount = m_actualTotalTime * 1000;
     if (indentLevel) {
         for (int i = 0; i < indentLevel; ++i)
             printf("  ");
 
-         countedFunctions.add(functionName().rep());
+         countedFunctions.add(functionName().impl());
 
         printf("%.0f %s\n", sampleCount ? sampleCount : 1, name);
     } else
@@ -346,7 +348,7 @@ double ProfileNode::debugPrintDataSampleStyle(int indentLevel, FunctionCallHashC
         while (indentLevel--)
             printf("  ");
 
-        printf("%.0f %s\n", sampleCount - sumOfChildrensCount, functionName().UTF8String().data());
+        printf("%.0f %s\n", sampleCount - sumOfChildrensCount, functionName().utf8().data());
     }
 
     return m_actualTotalTime;

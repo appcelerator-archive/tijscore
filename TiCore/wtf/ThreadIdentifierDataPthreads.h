@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,14 +38,14 @@
 #ifndef ThreadIdentifierDataPthreads_h
 #define ThreadIdentifierDataPthreads_h
 
-#include <wtf/Noncopyable.h>
 #include <wtf/Threading.h>
 
 namespace WTI {
 
 // Holds ThreadIdentifier in the thread-specific storage and employs pthreads-specific 2-pass destruction to reliably remove
 // ThreadIdentifier from threadMap. It assumes regular ThreadSpecific types don't use multiple-pass destruction.
-class ThreadIdentifierData : public Noncopyable {
+class ThreadIdentifierData {
+    WTF_MAKE_NONCOPYABLE(ThreadIdentifierData);
 public:
     ~ThreadIdentifierData();
 

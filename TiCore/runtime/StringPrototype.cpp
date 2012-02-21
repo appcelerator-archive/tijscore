@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -53,40 +53,38 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(StringPrototype);
 
-static TiValue JSC_HOST_CALL stringProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncCharAt(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncCharCodeAt(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncConcat(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncIndexOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncLastIndexOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncMatch(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSearch(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSlice(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSplit(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncLocaleCompare(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-static TiValue JSC_HOST_CALL stringProtoFuncBig(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSmall(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncBlink(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncBold(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncFixed(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncItalics(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncStrike(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSub(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncSup(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncFontcolor(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncAnchor(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncLink(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-static TiValue JSC_HOST_CALL stringProtoFuncTrim(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncTrimLeft(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL stringProtoFuncTrimRight(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncToString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncCharAt(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncCharCodeAt(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncConcat(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncIndexOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncLastIndexOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncMatch(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSearch(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSlice(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSplit(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncLocaleCompare(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncBig(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSmall(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncBlink(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncBold(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncFixed(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncItalics(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncStrike(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSub(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncSup(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncFontcolor(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncAnchor(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncLink(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncTrim(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncTrimLeft(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL stringProtoFuncTrimRight(TiExcState*);
 
 }
 
@@ -94,7 +92,7 @@ static TiValue JSC_HOST_CALL stringProtoFuncTrimRight(TiExcState*, TiObject*, Ti
 
 namespace TI {
 
-const ClassInfo StringPrototype::info = { "String", &StringObject::info, 0, TiExcState::stringTable };
+const ClassInfo StringPrototype::s_info = { "String", &StringObject::s_info, 0, TiExcState::stringTable };
 
 /* Source for StringPrototype.lut.h
 @begin stringTable 26
@@ -140,11 +138,14 @@ const ClassInfo StringPrototype::info = { "String", &StringObject::info, 0, TiEx
 */
 
 // ECMA 15.5.4
-StringPrototype::StringPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure)
+StringPrototype::StringPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure)
     : StringObject(exec, structure)
 {
+    ASSERT(inherits(&s_info));
+
+    putAnonymousValue(exec->globalData(), 0, globalObject);
     // The constructor will be added later, after StringConstructor has been built
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 0), DontDelete | ReadOnly | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(0), DontDelete | ReadOnly | DontEnum);
 }
 
 bool StringPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
@@ -159,19 +160,19 @@ bool StringPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifie
 
 // ------------------------------ Functions --------------------------
 
-static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacement, const UString& source, const int* ovector, RegExp* reg, unsigned i)
+static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacement, const UString& source, const int* ovector, RegExp* reg, size_t i)
 {
     Vector<UChar> substitutedReplacement;
     int offset = 0;
     do {
-        if (i + 1 == replacement.size())
+        if (i + 1 == replacement.length())
             break;
 
         UChar ref = replacement[i + 1];
         if (ref == '$') {
             // "$$" -> "$"
             ++i;
-            substitutedReplacement.append(replacement.data() + offset, i - offset);
+            substitutedReplacement.append(replacement.characters() + offset, i - offset);
             offset = i + 1;
             continue;
         }
@@ -187,13 +188,13 @@ static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacem
             backrefLength = ovector[0];
         } else if (ref == '\'') {
             backrefStart = ovector[1];
-            backrefLength = source.size() - backrefStart;
+            backrefLength = source.length() - backrefStart;
         } else if (reg && ref >= '0' && ref <= '9') {
             // 1- and 2-digit back references are allowed
             unsigned backrefIndex = ref - '0';
             if (backrefIndex > reg->numSubpatterns())
                 continue;
-            if (replacement.size() > i + 2) {
+            if (replacement.length() > i + 2) {
                 ref = replacement[i + 2];
                 if (ref >= '0' && ref <= '9') {
                     backrefIndex = 10 * backrefIndex + ref - '0';
@@ -211,14 +212,15 @@ static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacem
             continue;
 
         if (i - offset)
-            substitutedReplacement.append(replacement.data() + offset, i - offset);
+            substitutedReplacement.append(replacement.characters() + offset, i - offset);
         i += 1 + advance;
         offset = i + 1;
-        substitutedReplacement.append(source.data() + backrefStart, backrefLength);
-    } while ((i = replacement.find('$', i + 1)) != UString::NotFound);
+        if (backrefStart >= 0)
+            substitutedReplacement.append(source.characters() + backrefStart, backrefLength);
+    } while ((i = replacement.find('$', i + 1)) != notFound);
 
-    if (replacement.size() - offset)
-        substitutedReplacement.append(replacement.data() + offset, replacement.size() - offset);
+    if (replacement.length() - offset)
+        substitutedReplacement.append(replacement.characters() + offset, replacement.length() - offset);
 
     substitutedReplacement.shrinkToFit();
     return UString::adopt(substitutedReplacement);
@@ -226,15 +228,15 @@ static NEVER_INLINE UString substituteBackreferencesSlow(const UString& replacem
 
 static inline UString substituteBackreferences(const UString& replacement, const UString& source, const int* ovector, RegExp* reg)
 {
-    unsigned i = replacement.find('$', 0);
-    if (UNLIKELY(i != UString::NotFound))
+    size_t i = replacement.find('$', 0);
+    if (UNLIKELY(i != notFound))
         return substituteBackreferencesSlow(replacement, source, ovector, reg, i);
     return replacement;
 }
 
 static inline int localeCompare(const UString& a, const UString& b)
 {
-    return Collator::userDefault()->collate(reinterpret_cast<const ::UChar*>(a.data()), a.size(), reinterpret_cast<const ::UChar*>(b.data()), b.size());
+    return Collator::userDefault()->collate(reinterpret_cast<const ::UChar*>(a.characters()), a.length(), reinterpret_cast<const ::UChar*>(b.characters()), b.length());
 }
 
 struct StringRange {
@@ -253,30 +255,29 @@ public:
     int length;
 };
 
-TiValue jsSpliceSubstringsWithSeparators(TiExcState* exec, TiString* sourceVal, const UString& source, const StringRange* substringRanges, int rangeCount, const UString* separators, int separatorCount);
-TiValue jsSpliceSubstringsWithSeparators(TiExcState* exec, TiString* sourceVal, const UString& source, const StringRange* substringRanges, int rangeCount, const UString* separators, int separatorCount)
+static ALWAYS_INLINE TiValue jsSpliceSubstringsWithSeparators(TiExcState* exec, TiString* sourceVal, const UString& source, const StringRange* substringRanges, int rangeCount, const UString* separators, int separatorCount)
 {
     if (rangeCount == 1 && separatorCount == 0) {
-        int sourceSize = source.size();
+        int sourceSize = source.length();
         int position = substringRanges[0].position;
         int length = substringRanges[0].length;
         if (position <= 0 && length >= sourceSize)
             return sourceVal;
         // We could call UString::substr, but this would result in redundant checks
-        return jsString(exec, UStringImpl::create(source.rep(), max(0, position), min(sourceSize, length)));
+        return jsString(exec, StringImpl::create(source.impl(), max(0, position), min(sourceSize, length)));
     }
 
     int totalLength = 0;
     for (int i = 0; i < rangeCount; i++)
         totalLength += substringRanges[i].length;
     for (int i = 0; i < separatorCount; i++)
-        totalLength += separators[i].size();
+        totalLength += separators[i].length();
 
     if (totalLength == 0)
         return jsString(exec, "");
 
     UChar* buffer;
-    PassRefPtr<UStringImpl> impl = UStringImpl::tryCreateUninitialized(totalLength, buffer);
+    PassRefPtr<StringImpl> impl = StringImpl::tryCreateUninitialized(totalLength, buffer);
     if (!impl)
         return throwOutOfMemoryError(exec);
 
@@ -284,34 +285,41 @@ TiValue jsSpliceSubstringsWithSeparators(TiExcState* exec, TiString* sourceVal, 
     int bufferPos = 0;
     for (int i = 0; i < maxCount; i++) {
         if (i < rangeCount) {
-            UStringImpl::copyChars(buffer + bufferPos, source.data() + substringRanges[i].position, substringRanges[i].length);
-            bufferPos += substringRanges[i].length;
+            if (int srcLen = substringRanges[i].length) {
+                StringImpl::copyChars(buffer + bufferPos, source.characters() + substringRanges[i].position, srcLen);
+                bufferPos += srcLen;
+            }
         }
         if (i < separatorCount) {
-            UStringImpl::copyChars(buffer + bufferPos, separators[i].data(), separators[i].size());
-            bufferPos += separators[i].size();
+            if (int sepLen = separators[i].length()) {
+                StringImpl::copyChars(buffer + bufferPos, separators[i].characters(), sepLen);
+                bufferPos += sepLen;
+            }
         }
     }
 
     return jsString(exec, impl);
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     TiString* sourceVal = thisValue.toThisTiString(exec);
-    TiValue pattern = args.at(0);
-    TiValue replacement = args.at(1);
+    TiValue pattern = exec->argument(0);
+    TiValue replacement = exec->argument(1);
+    TiGlobalData* globalData = &exec->globalData();
 
     UString replacementString;
     CallData callData;
-    CallType callType = replacement.getCallData(callData);
+    CallType callType = getCallData(replacement, callData);
     if (callType == CallTypeNone)
         replacementString = replacement.toString(exec);
 
-    if (pattern.inherits(&RegExpObject::info)) {
+    if (pattern.inherits(&RegExpObject::s_info)) {
         const UString& source = sourceVal->value(exec);
+        unsigned sourceLen = source.length();
         if (exec->hadException())
-            return TiValue();
+            return TiValue::encode(TiValue());
         RegExp* reg = asRegExpObject(pattern)->regExp();
         bool global = reg->global();
 
@@ -328,17 +336,17 @@ TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValu
             // reg->numSubpatterns() + 1 for pattern args, + 2 for match start and sourceValue
             int argCount = reg->numSubpatterns() + 1 + 2;
             TiFunction* func = asFunction(replacement);
-            CachedCall cachedCall(exec, func, argCount, exec->exceptionSlot());
+            CachedCall cachedCall(exec, func, argCount);
             if (exec->hadException())
-                return jsNull();
+                return TiValue::encode(jsNull());
             while (true) {
                 int matchIndex;
                 int matchLen = 0;
                 int* ovector;
-                regExpConstructor->performMatch(reg, source, startPosition, matchIndex, matchLen, &ovector);
+                regExpConstructor->performMatch(*globalData, reg, source, startPosition, matchIndex, matchLen, &ovector);
                 if (matchIndex < 0)
                     break;
-                
+
                 sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
 
                 int completeMatchStart = ovector[0];
@@ -353,12 +361,15 @@ TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValu
                         cachedCall.setArgument(i, jsSubstring(exec, source, matchStart, matchLen));
                 }
 
-                cachedCall.setArgument(i++, jsNumber(exec, completeMatchStart));
+                cachedCall.setArgument(i++, jsNumber(completeMatchStart));
                 cachedCall.setArgument(i++, sourceVal);
-                
+
                 cachedCall.setThis(exec->globalThisValue());
                 TiValue result = cachedCall.call();
-                replacements.append(result.toString(cachedCall.newCallFrame(exec)));
+                if (LIKELY(result.isString()))
+                    replacements.append(asString(result)->value(exec));
+                else
+                    replacements.append(result.toString(cachedCall.newCallFrame(exec)));
                 if (exec->hadException())
                     break;
 
@@ -368,43 +379,52 @@ TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValu
                 // special case of empty match
                 if (matchLen == 0) {
                     startPosition++;
-                    if (startPosition > source.size())
+                    if (startPosition > sourceLen)
                         break;
                 }
-            }            
+            }
         } else {
             do {
                 int matchIndex;
                 int matchLen = 0;
                 int* ovector;
-                regExpConstructor->performMatch(reg, source, startPosition, matchIndex, matchLen, &ovector);
+                regExpConstructor->performMatch(*globalData, reg, source, startPosition, matchIndex, matchLen, &ovector);
                 if (matchIndex < 0)
                     break;
 
-                sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
-
                 if (callType != CallTypeNone) {
+                    sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
+
                     int completeMatchStart = ovector[0];
                     MarkedArgumentBuffer args;
 
                     for (unsigned i = 0; i < reg->numSubpatterns() + 1; ++i) {
                         int matchStart = ovector[i * 2];
                         int matchLen = ovector[i * 2 + 1] - matchStart;
-
+ 
                         if (matchStart < 0)
                             args.append(jsUndefined());
                         else
                             args.append(jsSubstring(exec, source, matchStart, matchLen));
                     }
 
-                    args.append(jsNumber(exec, completeMatchStart));
+                    args.append(jsNumber(completeMatchStart));
                     args.append(sourceVal);
 
                     replacements.append(call(exec, replacement, callType, callData, exec->globalThisValue(), args).toString(exec));
                     if (exec->hadException())
                         break;
-                } else
-                    replacements.append(substituteBackreferences(replacementString, source, ovector, reg));
+                } else {
+                    int replLen = replacementString.length();
+                    if (lastIndex < matchIndex || replLen) {
+                        sourceRanges.append(StringRange(lastIndex, matchIndex - lastIndex));
+ 
+                        if (replLen)
+                            replacements.append(substituteBackreferences(replacementString, source, ovector, reg));
+                        else
+                            replacements.append(UString());
+                    }
+                }
 
                 lastIndex = matchIndex + matchLen;
                 startPosition = lastIndex;
@@ -412,38 +432,39 @@ TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValu
                 // special case of empty match
                 if (matchLen == 0) {
                     startPosition++;
-                    if (startPosition > source.size())
+                    if (startPosition > sourceLen)
                         break;
                 }
             } while (global);
         }
 
         if (!lastIndex && replacements.isEmpty())
-            return sourceVal;
+            return TiValue::encode(sourceVal);
 
-        if (static_cast<unsigned>(lastIndex) < source.size())
-            sourceRanges.append(StringRange(lastIndex, source.size() - lastIndex));
+        if (static_cast<unsigned>(lastIndex) < sourceLen)
+            sourceRanges.append(StringRange(lastIndex, sourceLen - lastIndex));
 
-        return jsSpliceSubstringsWithSeparators(exec, sourceVal, source, sourceRanges.data(), sourceRanges.size(), replacements.data(), replacements.size());
+        return TiValue::encode(jsSpliceSubstringsWithSeparators(exec, sourceVal, source, sourceRanges.data(), sourceRanges.size(), replacements.data(), replacements.size()));
     }
 
     // Not a regular expression, so treat the pattern as a string.
 
     UString patternString = pattern.toString(exec);
-    if (patternString.size() == 1 && callType == CallTypeNone)
-        return sourceVal->replaceCharacter(exec, patternString[0], replacementString);
-    
+    // Special case for single character patterns without back reference replacement
+    if (patternString.length() == 1 && callType == CallTypeNone && replacementString.find('$', 0) == notFound)
+        return TiValue::encode(sourceVal->replaceCharacter(exec, patternString[0], replacementString));
+
     const UString& source = sourceVal->value(exec);
-    unsigned matchPos = source.find(patternString);
+    size_t matchPos = source.find(patternString);
 
-    if (matchPos == UString::NotFound)
-        return sourceVal;
+    if (matchPos == notFound)
+        return TiValue::encode(sourceVal);
 
-    int matchLen = patternString.size();
+    int matchLen = patternString.length();
     if (callType != CallTypeNone) {
         MarkedArgumentBuffer args;
         args.append(jsSubstring(exec, source, matchPos, matchLen));
-        args.append(jsNumber(exec, matchPos));
+        args.append(jsNumber(matchPos));
         args.append(sourceVal);
 
         replacementString = call(exec, replacement, callType, callData, exec->globalThisValue(), args).toString(exec);
@@ -451,75 +472,87 @@ TiValue JSC_HOST_CALL stringProtoFuncReplace(TiExcState* exec, TiObject*, TiValu
     
     size_t matchEnd = matchPos + matchLen;
     int ovector[2] = { matchPos, matchEnd };
-    return jsString(exec, source.substr(0, matchPos), substituteBackreferences(replacementString, source, ovector, 0), source.substr(matchEnd));
+    return TiValue::encode(jsString(exec, source.substringSharingImpl(0, matchPos), substituteBackreferences(replacementString, source, ovector, 0), source.substringSharingImpl(matchEnd)));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncToString(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     // Also used for valueOf.
 
     if (thisValue.isString())
-        return thisValue;
+        return TiValue::encode(thisValue);
 
-    if (thisValue.inherits(&StringObject::info))
-        return asStringObject(thisValue)->internalValue();
+    if (thisValue.inherits(&StringObject::s_info))
+        return TiValue::encode(asStringObject(thisValue)->internalValue());
 
-    return throwError(exec, TypeError);
+    return throwVMTypeError(exec);
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncCharAt(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncCharAt(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
-    unsigned len = s.size();
-    TiValue a0 = args.at(0);
+    unsigned len = s.length();
+    TiValue a0 = exec->argument(0);
     if (a0.isUInt32()) {
         uint32_t i = a0.asUInt32();
         if (i < len)
-            return jsSingleCharacterSubstring(exec, s, i);
-        return jsEmptyString(exec);
+            return TiValue::encode(jsSingleCharacterSubstring(exec, s, i));
+        return TiValue::encode(jsEmptyString(exec));
     }
     double dpos = a0.toInteger(exec);
     if (dpos >= 0 && dpos < len)
-        return jsSingleCharacterSubstring(exec, s, static_cast<unsigned>(dpos));
-    return jsEmptyString(exec);
+        return TiValue::encode(jsSingleCharacterSubstring(exec, s, static_cast<unsigned>(dpos)));
+    return TiValue::encode(jsEmptyString(exec));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncCharCodeAt(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncCharCodeAt(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
-    unsigned len = s.size();
-    TiValue a0 = args.at(0);
+    unsigned len = s.length();
+    TiValue a0 = exec->argument(0);
     if (a0.isUInt32()) {
         uint32_t i = a0.asUInt32();
         if (i < len)
-            return jsNumber(exec, s.data()[i]);
-        return jsNaN(exec);
+            return TiValue::encode(jsNumber(s.characters()[i]));
+        return TiValue::encode(jsNaN());
     }
     double dpos = a0.toInteger(exec);
     if (dpos >= 0 && dpos < len)
-        return jsNumber(exec, s[static_cast<int>(dpos)]);
-    return jsNaN(exec);
+        return TiValue::encode(jsNumber(s[static_cast<int>(dpos)]));
+    return TiValue::encode(jsNaN());
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncConcat(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncConcat(TiExcState* exec)
 {
-    if (thisValue.isString() && (args.size() == 1)) {
-        TiValue v = args.at(0);
-        return v.isString()
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isString() && (exec->argumentCount() == 1)) {
+        TiValue v = exec->argument(0);
+        return TiValue::encode(v.isString()
             ? jsString(exec, asString(thisValue), asString(v))
-            : jsString(exec, asString(thisValue), v.toString(exec));
+            : jsString(exec, asString(thisValue), v.toString(exec)));
     }
-
-    return jsString(exec, thisValue, args);
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
+    return TiValue::encode(jsString(exec, thisValue));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncIndexOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncIndexOf(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
-    int len = s.size();
+    int len = s.length();
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
     UString u2 = a0.toString(exec);
     int pos;
     if (a1.isUndefined())
@@ -535,19 +568,22 @@ TiValue JSC_HOST_CALL stringProtoFuncIndexOf(TiExcState* exec, TiObject*, TiValu
         pos = static_cast<int>(dpos);
     }
 
-    unsigned result = s.find(u2, pos);
-    if (result == UString::NotFound)
-        return jsNumber(exec, -1);
-    return jsNumber(exec, result);
+    size_t result = s.find(u2, pos);
+    if (result == notFound)
+        return TiValue::encode(jsNumber(-1));
+    return TiValue::encode(jsNumber(result));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncLastIndexOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncLastIndexOf(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
-    int len = s.size();
+    int len = s.length();
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
 
     UString u2 = a0.toString(exec);
     double dpos = a1.toIntegerPreserveNaN(exec);
@@ -561,22 +597,24 @@ TiValue JSC_HOST_CALL stringProtoFuncLastIndexOf(TiExcState* exec, TiObject*, Ti
         dpos = len;
 #endif
 
-    unsigned result = s.rfind(u2, static_cast<unsigned>(dpos));
-    if (result == UString::NotFound)
-        return jsNumber(exec, -1);
-    return jsNumber(exec, result);
+    size_t result = s.reverseFind(u2, static_cast<unsigned>(dpos));
+    if (result == notFound)
+        return TiValue::encode(jsNumber(-1));
+    return TiValue::encode(jsNumber(result));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncMatch(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncMatch(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
+    TiGlobalData* globalData = &exec->globalData();
 
-    TiValue a0 = args.at(0);
+    TiValue a0 = exec->argument(0);
 
-    UString u = s;
-    RefPtr<RegExp> reg;
-    RegExpObject* imp = 0;
-    if (a0.inherits(&RegExpObject::info))
+    RegExp* reg;
+    if (a0.inherits(&RegExpObject::s_info))
         reg = asRegExpObject(a0)->regExp();
     else {
         /*
@@ -584,49 +622,48 @@ TiValue JSC_HOST_CALL stringProtoFuncMatch(TiExcState* exec, TiObject*, TiValue 
          *  If regexp is not an object whose [[Class]] property is "RegExp", it is
          *  replaced with the result of the expression new RegExp(regexp).
          */
-        reg = exec->globalData().regExpCache()->lookupOrCreate(a0.toString(exec), UString::null());
+        reg = RegExp::create(&exec->globalData(), a0.toString(exec), NoFlags);
     }
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
     int pos;
     int matchLength = 0;
-    regExpConstructor->performMatch(reg.get(), u, 0, pos, matchLength);
+    regExpConstructor->performMatch(*globalData, reg, s, 0, pos, matchLength);
     if (!(reg->global())) {
         // case without 'g' flag is handled like RegExp.prototype.exec
         if (pos < 0)
-            return jsNull();
-        return regExpConstructor->arrayOfMatches(exec);
+            return TiValue::encode(jsNull());
+        return TiValue::encode(regExpConstructor->arrayOfMatches(exec));
     }
 
     // return array of matches
     MarkedArgumentBuffer list;
-    int lastIndex = 0;
     while (pos >= 0) {
-        list.append(jsSubstring(exec, u, pos, matchLength));
-        lastIndex = pos;
+        list.append(jsSubstring(exec, s, pos, matchLength));
         pos += matchLength == 0 ? 1 : matchLength;
-        regExpConstructor->performMatch(reg.get(), u, pos, pos, matchLength);
+        regExpConstructor->performMatch(*globalData, reg, s, pos, pos, matchLength);
     }
-    if (imp)
-        imp->setLastIndex(lastIndex);
     if (list.isEmpty()) {
         // if there are no matches at all, it's important to return
         // Null instead of an empty array, because this matches
         // other browsers and because Null is a false value.
-        return jsNull();
+        return TiValue::encode(jsNull());
     }
 
-    return constructArray(exec, list);
+    return TiValue::encode(constructArray(exec, list));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSearch(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSearch(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
+    TiGlobalData* globalData = &exec->globalData();
 
-    TiValue a0 = args.at(0);
+    TiValue a0 = exec->argument(0);
 
-    UString u = s;
-    RefPtr<RegExp> reg;
-    if (a0.inherits(&RegExpObject::info))
+    RegExp* reg;
+    if (a0.inherits(&RegExpObject::s_info))
         reg = asRegExpObject(a0)->regExp();
     else { 
         /*
@@ -634,22 +671,25 @@ TiValue JSC_HOST_CALL stringProtoFuncSearch(TiExcState* exec, TiObject*, TiValue
          *  If regexp is not an object whose [[Class]] property is "RegExp", it is
          *  replaced with the result of the expression new RegExp(regexp).
          */
-        reg = exec->globalData().regExpCache()->lookupOrCreate(a0.toString(exec), UString::null());
+        reg = RegExp::create(&exec->globalData(), a0.toString(exec), NoFlags);
     }
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
     int pos;
     int matchLength = 0;
-    regExpConstructor->performMatch(reg.get(), u, 0, pos, matchLength);
-    return jsNumber(exec, pos);
+    regExpConstructor->performMatch(*globalData, reg, s, 0, pos, matchLength);
+    return TiValue::encode(jsNumber(pos));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSlice(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSlice(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
-    int len = s.size();
+    int len = s.length();
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
 
     // The arg processing is very much like ArrayProtoFunc::Slice
     double start = a0.toInteger(exec);
@@ -661,33 +701,37 @@ TiValue JSC_HOST_CALL stringProtoFuncSlice(TiExcState* exec, TiObject*, TiValue 
             from = 0;
         if (to > len)
             to = len;
-        return jsSubstring(exec, s, static_cast<unsigned>(from), static_cast<unsigned>(to) - static_cast<unsigned>(from));
+        return TiValue::encode(jsSubstring(exec, s, static_cast<unsigned>(from), static_cast<unsigned>(to) - static_cast<unsigned>(from)));
     }
 
-    return jsEmptyString(exec);
+    return TiValue::encode(jsEmptyString(exec));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSplit(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSplit(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     UString s = thisValue.toThisString(exec);
+    TiGlobalData* globalData = &exec->globalData();
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
 
     TiArray* result = constructEmptyArray(exec);
     unsigned i = 0;
     unsigned p0 = 0;
     unsigned limit = a1.isUndefined() ? 0xFFFFFFFFU : a1.toUInt32(exec);
-    if (a0.inherits(&RegExpObject::info)) {
+    if (a0.inherits(&RegExpObject::s_info)) {
         RegExp* reg = asRegExpObject(a0)->regExp();
-        if (s.isEmpty() && reg->match(s, 0) >= 0) {
+        if (s.isEmpty() && reg->match(*globalData, s, 0) >= 0) {
             // empty string matched by regexp -> empty array
-            return result;
+            return TiValue::encode(result);
         }
         unsigned pos = 0;
-        while (i != limit && pos < s.size()) {
+        while (i != limit && pos < s.length()) {
             Vector<int, 32> ovector;
-            int mpos = reg->match(s, pos, &ovector);
+            int mpos = reg->match(*globalData, s, pos, &ovector);
             if (mpos < 0)
                 break;
             int mlen = ovector[1] - ovector[0];
@@ -709,30 +753,32 @@ TiValue JSC_HOST_CALL stringProtoFuncSplit(TiExcState* exec, TiObject*, TiValue 
         if (u2.isEmpty()) {
             if (s.isEmpty()) {
                 // empty separator matches empty string -> empty array
-                return result;
+                return TiValue::encode(result);
             }
-            while (i != limit && p0 < s.size() - 1)
+            while (i != limit && p0 < s.length() - 1)
                 result->put(exec, i++, jsSingleCharacterSubstring(exec, s, p0++));
         } else {
-            unsigned pos;
-            
-            while (i != limit && (pos = s.find(u2, p0)) != UString::NotFound) {
+            size_t pos;
+            while (i != limit && (pos = s.find(u2, p0)) != notFound) {
                 result->put(exec, i++, jsSubstring(exec, s, p0, pos - p0));
-                p0 = pos + u2.size();
+                p0 = pos + u2.length();
             }
         }
     }
 
     // add remaining string
     if (i != limit)
-        result->put(exec, i++, jsSubstring(exec, s, p0, s.size() - p0));
+        result->put(exec, i++, jsSubstring(exec, s, p0, s.length() - p0));
 
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
-{    
-    int len;
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState* exec)
+{
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
+    unsigned len;
     TiString* jsString = 0;
     UString uString;
     if (thisValue.isString()) {
@@ -740,16 +786,16 @@ TiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState* exec, TiObject*, TiValue
         len = jsString->length();
     } else {
         uString = thisValue.toThisObject(exec)->toString(exec);
-        len = uString.size();
+        len = uString.length();
     }
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
 
     double start = a0.toInteger(exec);
     double length = a1.isUndefined() ? len : a1.toInteger(exec);
     if (start >= len || length <= 0)
-        return jsEmptyString(exec);
+        return TiValue::encode(jsEmptyString(exec));
     if (start < 0) {
         start += len;
         if (start < 0)
@@ -757,16 +803,18 @@ TiValue JSC_HOST_CALL stringProtoFuncSubstr(TiExcState* exec, TiObject*, TiValue
     }
     if (start + length > len)
         length = len - start;
-    
     unsigned substringStart = static_cast<unsigned>(start);
     unsigned substringLength = static_cast<unsigned>(length);
     if (jsString)
-        return jsSubstring(exec, jsString, substringStart, substringLength);
-    return jsSubstring(exec, uString, substringStart, substringLength);
+        return TiValue::encode(jsSubstring(exec, jsString, substringStart, substringLength));
+    return TiValue::encode(jsSubstring(exec, uString, substringStart, substringLength));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     int len;
     TiString* jsString = 0;
     UString uString;
@@ -775,28 +823,27 @@ TiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState* exec, TiObject*, TiVa
         len = jsString->length();
     } else {
         uString = thisValue.toThisObject(exec)->toString(exec);
-        len = uString.size();
+        len = uString.length();
     }
 
-    TiValue a0 = args.at(0);
-    TiValue a1 = args.at(1);
+    TiValue a0 = exec->argument(0);
+    TiValue a1 = exec->argument(1);
 
     double start = a0.toNumber(exec);
-    double end = a1.toNumber(exec);
-    if (isnan(start))
+    double end;
+    if (!(start >= 0)) // check for negative values or NaN
         start = 0;
-    if (isnan(end))
-        end = 0;
-    if (start < 0)
-        start = 0;
-    if (end < 0)
-        end = 0;
-    if (start > len)
+    else if (start > len)
         start = len;
-    if (end > len)
-        end = len;
     if (a1.isUndefined())
         end = len;
+    else { 
+        end = a1.toNumber(exec);
+        if (!(end >= 0)) // check for negative values or NaN
+            end = 0;
+        else if (end > len)
+            end = len;
+    }
     if (start > end) {
         double temp = end;
         end = start;
@@ -805,20 +852,23 @@ TiValue JSC_HOST_CALL stringProtoFuncSubstring(TiExcState* exec, TiObject*, TiVa
     unsigned substringStart = static_cast<unsigned>(start);
     unsigned substringLength = static_cast<unsigned>(end) - substringStart;
     if (jsString)
-        return jsSubstring(exec, jsString, substringStart, substringLength);
-    return jsSubstring(exec, uString, substringStart, substringLength);
+        return TiValue::encode(jsSubstring(exec, jsString, substringStart, substringLength));
+    return TiValue::encode(jsSubstring(exec, uString, substringStart, substringLength));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     TiString* sVal = thisValue.toThisTiString(exec);
     const UString& s = sVal->value(exec);
 
-    int sSize = s.size();
+    int sSize = s.length();
     if (!sSize)
-        return sVal;
+        return TiValue::encode(sVal);
 
-    const UChar* sData = s.data();
+    const UChar* sData = s.characters();
     Vector<UChar> buffer(sSize);
 
     UChar ored = 0;
@@ -828,7 +878,7 @@ TiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec, TiObject*, Ti
         buffer[i] = toASCIILower(c);
     }
     if (!(ored & ~0x7f))
-        return jsString(exec, UString::adopt(buffer));
+        return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 
     bool error = 0;
     int length = Unicode::toLower(buffer.data(), sSize, sData, sSize, &error);
@@ -836,26 +886,29 @@ TiValue JSC_HOST_CALL stringProtoFuncToLowerCase(TiExcState* exec, TiObject*, Ti
         buffer.resize(length);
         length = Unicode::toLower(buffer.data(), length, sData, sSize, &error);
         if (error)
-            return sVal;
+            return TiValue::encode(sVal);
     }
     if (length == sSize) {
         if (memcmp(buffer.data(), sData, length * sizeof(UChar)) == 0)
-            return sVal;
+            return TiValue::encode(sVal);
     } else
         buffer.resize(length);
-    return jsString(exec, UString::adopt(buffer));
+    return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
     TiString* sVal = thisValue.toThisTiString(exec);
     const UString& s = sVal->value(exec);
 
-    int sSize = s.size();
+    int sSize = s.length();
     if (!sSize)
-        return sVal;
+        return TiValue::encode(sVal);
 
-    const UChar* sData = s.data();
+    const UChar* sData = s.characters();
     Vector<UChar> buffer(sSize);
 
     UChar ored = 0;
@@ -865,7 +918,7 @@ TiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec, TiObject*, Ti
         buffer[i] = toASCIIUpper(c);
     }
     if (!(ored & ~0x7f))
-        return jsString(exec, UString::adopt(buffer));
+        return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 
     bool error = 0;
     int length = Unicode::toUpper(buffer.data(), sSize, sData, sSize, &error);
@@ -873,100 +926,115 @@ TiValue JSC_HOST_CALL stringProtoFuncToUpperCase(TiExcState* exec, TiObject*, Ti
         buffer.resize(length);
         length = Unicode::toUpper(buffer.data(), length, sData, sSize, &error);
         if (error)
-            return sVal;
+            return TiValue::encode(sVal);
     }
     if (length == sSize) {
         if (memcmp(buffer.data(), sData, length * sizeof(UChar)) == 0)
-            return sVal;
+            return TiValue::encode(sVal);
     } else
         buffer.resize(length);
-    return jsString(exec, UString::adopt(buffer));
+    return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncLocaleCompare(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncLocaleCompare(TiExcState* exec)
 {
-    if (args.size() < 1)
-      return jsNumber(exec, 0);
+    if (exec->argumentCount() < 1)
+      return TiValue::encode(jsNumber(0));
+
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwVMTypeError(exec);
 
     UString s = thisValue.toThisString(exec);
-    TiValue a0 = args.at(0);
-    return jsNumber(exec, localeCompare(s, a0.toString(exec)));
+    TiValue a0 = exec->argument(0);
+    return TiValue::encode(jsNumber(localeCompare(s, a0.toString(exec))));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncBig(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncBig(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<big>", s, "</big>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<big>", s, "</big>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSmall(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSmall(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<small>", s, "</small>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<small>", s, "</small>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncBlink(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncBlink(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<blink>", s, "</blink>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<blink>", s, "</blink>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncBold(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncBold(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<b>", s, "</b>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<b>", s, "</b>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncFixed(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncFixed(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<tt>", s, "</tt>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<tt>", s, "</tt>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncItalics(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncItalics(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<i>", s, "</i>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<i>", s, "</i>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncStrike(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncStrike(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<strike>", s, "</strike>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<strike>", s, "</strike>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSub(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSub(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<sub>", s, "</sub>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<sub>", s, "</sub>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncSup(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncSup(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    return jsMakeNontrivialString(exec, "<sup>", s, "</sup>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<sup>", s, "</sup>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncFontcolor(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncFontcolor(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    TiValue a0 = args.at(0);
-    return jsMakeNontrivialString(exec, "<font color=\"", a0.toString(exec), "\">", s, "</font>");
+    TiValue a0 = exec->argument(0);
+    return TiValue::encode(jsMakeNontrivialString(exec, "<font color=\"", a0.toString(exec), "\">", s, "</font>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    TiValue a0 = args.at(0);
+    TiValue a0 = exec->argument(0);
 
     uint32_t smallInteger;
     if (a0.getUInt32(smallInteger) && smallInteger <= 9) {
-        unsigned stringSize = s.size();
+        unsigned stringSize = s.length();
         unsigned bufferSize = 22 + stringSize;
         UChar* buffer;
-        PassRefPtr<UStringImpl> impl = UStringImpl::tryCreateUninitialized(bufferSize, buffer);
+        PassRefPtr<StringImpl> impl = StringImpl::tryCreateUninitialized(bufferSize, buffer);
         if (!impl)
-            return jsUndefined();
+            return TiValue::encode(jsUndefined());
         buffer[0] = '<';
         buffer[1] = 'f';
         buffer[2] = 'o';
@@ -982,7 +1050,7 @@ TiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState* exec, TiObject*, TiVal
         buffer[12] = '0' + smallInteger;
         buffer[13] = '"';
         buffer[14] = '>';
-        memcpy(&buffer[15], s.data(), stringSize * sizeof(UChar));
+        memcpy(&buffer[15], s.characters(), stringSize * sizeof(UChar));
         buffer[15 + stringSize] = '<';
         buffer[16 + stringSize] = '/';
         buffer[17 + stringSize] = 'f';
@@ -990,32 +1058,34 @@ TiValue JSC_HOST_CALL stringProtoFuncFontsize(TiExcState* exec, TiObject*, TiVal
         buffer[19 + stringSize] = 'n';
         buffer[20 + stringSize] = 't';
         buffer[21 + stringSize] = '>';
-        return jsNontrivialString(exec, impl);
+        return TiValue::encode(jsNontrivialString(exec, impl));
     }
 
-    return jsMakeNontrivialString(exec, "<font size=\"", a0.toString(exec), "\">", s, "</font>");
+    return TiValue::encode(jsMakeNontrivialString(exec, "<font size=\"", a0.toString(exec), "\">", s, "</font>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncAnchor(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncAnchor(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    TiValue a0 = args.at(0);
-    return jsMakeNontrivialString(exec, "<a name=\"", a0.toString(exec), "\">", s, "</a>");
+    TiValue a0 = exec->argument(0);
+    return TiValue::encode(jsMakeNontrivialString(exec, "<a name=\"", a0.toString(exec), "\">", s, "</a>"));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncLink(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncLink(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     UString s = thisValue.toThisString(exec);
-    TiValue a0 = args.at(0);
+    TiValue a0 = exec->argument(0);
     UString linkText = a0.toString(exec);
 
-    unsigned linkTextSize = linkText.size();
-    unsigned stringSize = s.size();
+    unsigned linkTextSize = linkText.length();
+    unsigned stringSize = s.length();
     unsigned bufferSize = 15 + linkTextSize + stringSize;
     UChar* buffer;
-    PassRefPtr<UStringImpl> impl = UStringImpl::tryCreateUninitialized(bufferSize, buffer);
+    PassRefPtr<StringImpl> impl = StringImpl::tryCreateUninitialized(bufferSize, buffer);
     if (!impl)
-        return jsUndefined();
+        return TiValue::encode(jsUndefined());
     buffer[0] = '<';
     buffer[1] = 'a';
     buffer[2] = ' ';
@@ -1025,15 +1095,15 @@ TiValue JSC_HOST_CALL stringProtoFuncLink(TiExcState* exec, TiObject*, TiValue t
     buffer[6] = 'f';
     buffer[7] = '=';
     buffer[8] = '"';
-    memcpy(&buffer[9], linkText.data(), linkTextSize * sizeof(UChar));
+    memcpy(&buffer[9], linkText.characters(), linkTextSize * sizeof(UChar));
     buffer[9 + linkTextSize] = '"';
     buffer[10 + linkTextSize] = '>';
-    memcpy(&buffer[11 + linkTextSize], s.data(), stringSize * sizeof(UChar));
+    memcpy(&buffer[11 + linkTextSize], s.characters(), stringSize * sizeof(UChar));
     buffer[11 + linkTextSize + stringSize] = '<';
     buffer[12 + linkTextSize + stringSize] = '/';
     buffer[13 + linkTextSize + stringSize] = 'a';
     buffer[14 + linkTextSize + stringSize] = '>';
-    return jsNontrivialString(exec, impl);
+    return TiValue::encode(jsNontrivialString(exec, impl));
 }
 
 enum {
@@ -1048,38 +1118,43 @@ static inline bool isTrimWhitespace(UChar c)
 
 static inline TiValue trimString(TiExcState* exec, TiValue thisValue, int trimKind)
 {
+    if (thisValue.isUndefinedOrNull()) // CheckObjectCoercible
+        return throwTypeError(exec);
     UString str = thisValue.toThisString(exec);
     unsigned left = 0;
     if (trimKind & TrimLeft) {
-        while (left < str.size() && isTrimWhitespace(str[left]))
+        while (left < str.length() && isTrimWhitespace(str[left]))
             left++;
     }
-    unsigned right = str.size();
+    unsigned right = str.length();
     if (trimKind & TrimRight) {
         while (right > left && isTrimWhitespace(str[right - 1]))
             right--;
     }
 
     // Don't gc allocate a new string if we don't have to.
-    if (left == 0 && right == str.size() && thisValue.isString())
+    if (left == 0 && right == str.length() && thisValue.isString())
         return thisValue;
 
-    return jsString(exec, str.substr(left, right - left));
+    return jsString(exec, str.substringSharingImpl(left, right - left));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncTrim(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncTrim(TiExcState* exec)
 {
-    return trimString(exec, thisValue, TrimLeft | TrimRight);
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(trimString(exec, thisValue, TrimLeft | TrimRight));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncTrimLeft(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncTrimLeft(TiExcState* exec)
 {
-    return trimString(exec, thisValue, TrimLeft);
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(trimString(exec, thisValue, TrimLeft));
 }
 
-TiValue JSC_HOST_CALL stringProtoFuncTrimRight(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL stringProtoFuncTrimRight(TiExcState* exec)
 {
-    return trimString(exec, thisValue, TrimRight);
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(trimString(exec, thisValue, TrimRight));
 }
     
     

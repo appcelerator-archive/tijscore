@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -47,11 +47,11 @@ namespace TI {
 
     class Register;
 
-    class JSVariableObject : public TiObject {
+    class JSVariableObject : public JSNonFinalObject {
         friend class JIT;
 
     public:
-        SymbolTable& symbolTable() const { return *d->symbolTable; }
+        SymbolTable& symbolTable() const { return *m_symbolTable; }
 
         virtual void putWithAttributes(TiExcState*, const Identifier&, TiValue, unsigned attributes) = 0;
 
@@ -61,58 +61,46 @@ namespace TI {
         virtual bool isVariableObject() const;
         virtual bool isDynamicScope(bool& requiresDynamicChecks) const = 0;
 
-        Register& registerAt(int index) const { return d->registers[index]; }
+        WriteBarrier<Unknown>& registerAt(int index) const { return m_registers[index]; }
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        WriteBarrier<Unknown>* const * addressOfRegisters() const { return &m_registers; }
+
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
         
     protected:
         static const unsigned StructureFlags = OverridesGetPropertyNames | TiObject::StructureFlags;
-        // Subclasses of JSVariableObject can subclass this struct to add data
-        // without increasing their own size (since there's a hard limit on the
-        // size of a TiCell).
-        struct JSVariableObjectData {
-            JSVariableObjectData(SymbolTable* symbolTable, Register* registers)
-                : symbolTable(symbolTable)
-                , registers(registers)
-            {
-                ASSERT(symbolTable);
-            }
 
-            SymbolTable* symbolTable; // Maps name -> offset from "r" in register file.
-            Register* registers; // "r" in the register file.
-            OwnArrayPtr<Register> registerArray; // Independent copy of registers, used when a variable object copies its registers out of the register file.
-
-        private:
-            JSVariableObjectData(const JSVariableObjectData&);
-            JSVariableObjectData& operator=(const JSVariableObjectData&);
-        };
-
-        JSVariableObject(NonNullPassRefPtr<Structure> structure, JSVariableObjectData* data)
-            : TiObject(structure)
-            , d(data) // Subclass owns this pointer.
+        JSVariableObject(TiGlobalData& globalData, Structure* structure, SymbolTable* symbolTable, Register* registers)
+            : JSNonFinalObject(globalData, structure)
+            , m_symbolTable(symbolTable)
+            , m_registers(reinterpret_cast<WriteBarrier<Unknown>*>(registers))
         {
+            ASSERT(m_symbolTable);
+            COMPILE_ASSERT(sizeof(WriteBarrier<Unknown>) == sizeof(Register), Register_should_be_same_size_as_WriteBarrier);
         }
 
-        Register* copyRegisterArray(Register* src, size_t count);
-        void setRegisters(Register* r, Register* registerArray);
+        PassOwnArrayPtr<WriteBarrier<Unknown> > copyRegisterArray(TiGlobalData&, WriteBarrier<Unknown>* src, size_t count, size_t callframeStarts);
+        void setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray);
 
         bool symbolTableGet(const Identifier&, PropertySlot&);
         bool symbolTableGet(const Identifier&, PropertyDescriptor&);
         bool symbolTableGet(const Identifier&, PropertySlot&, bool& slotIsWriteable);
-        bool symbolTablePut(const Identifier&, TiValue);
-        bool symbolTablePutWithAttributes(const Identifier&, TiValue, unsigned attributes);
+        bool symbolTablePut(TiGlobalData&, const Identifier&, TiValue);
+        bool symbolTablePutWithAttributes(TiGlobalData&, const Identifier&, TiValue, unsigned attributes);
 
-        JSVariableObjectData* d;
+        SymbolTable* m_symbolTable; // Maps name -> offset from "r" in register file.
+        WriteBarrier<Unknown>* m_registers; // "r" in the register file.
+        OwnArrayPtr<WriteBarrier<Unknown> > m_registerArray; // Independent copy of registers, used when a variable object copies its registers out of the register file.
     };
 
     inline bool JSVariableObject::symbolTableGet(const Identifier& propertyName, PropertySlot& slot)
     {
-        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.ustring().rep());
+        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
         if (!entry.isNull()) {
-            slot.setRegisterSlot(&registerAt(entry.getIndex()));
+            slot.setValue(registerAt(entry.getIndex()).get());
             return true;
         }
         return false;
@@ -120,55 +108,58 @@ namespace TI {
 
     inline bool JSVariableObject::symbolTableGet(const Identifier& propertyName, PropertySlot& slot, bool& slotIsWriteable)
     {
-        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.ustring().rep());
+        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
         if (!entry.isNull()) {
-            slot.setRegisterSlot(&registerAt(entry.getIndex()));
+            slot.setValue(registerAt(entry.getIndex()).get());
             slotIsWriteable = !entry.isReadOnly();
             return true;
         }
         return false;
     }
 
-    inline bool JSVariableObject::symbolTablePut(const Identifier& propertyName, TiValue value)
+    inline bool JSVariableObject::symbolTablePut(TiGlobalData& globalData, const Identifier& propertyName, TiValue value)
     {
         ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
 
-        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.ustring().rep());
+        SymbolTableEntry entry = symbolTable().inlineGet(propertyName.impl());
         if (entry.isNull())
             return false;
         if (entry.isReadOnly())
             return true;
-        registerAt(entry.getIndex()) = value;
+        registerAt(entry.getIndex()).set(globalData, this, value);
         return true;
     }
 
-    inline bool JSVariableObject::symbolTablePutWithAttributes(const Identifier& propertyName, TiValue value, unsigned attributes)
+    inline bool JSVariableObject::symbolTablePutWithAttributes(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes)
     {
         ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
 
-        SymbolTable::iterator iter = symbolTable().find(propertyName.ustring().rep());
+        SymbolTable::iterator iter = symbolTable().find(propertyName.impl());
         if (iter == symbolTable().end())
             return false;
         SymbolTableEntry& entry = iter->second;
         ASSERT(!entry.isNull());
         entry.setAttributes(attributes);
-        registerAt(entry.getIndex()) = value;
+        registerAt(entry.getIndex()).set(globalData, this, value);
         return true;
     }
 
-    inline Register* JSVariableObject::copyRegisterArray(Register* src, size_t count)
+    inline PassOwnArrayPtr<WriteBarrier<Unknown> > JSVariableObject::copyRegisterArray(TiGlobalData& globalData, WriteBarrier<Unknown>* src, size_t count, size_t callframeStarts)
     {
-        Register* registerArray = new Register[count];
-        memcpy(registerArray, src, count * sizeof(Register));
+        OwnArrayPtr<WriteBarrier<Unknown> > registerArray = adoptArrayPtr(new WriteBarrier<Unknown>[count]);
+        for (size_t i = 0; i < callframeStarts; i++)
+            registerArray[i].set(globalData, this, src[i].get());
+        for (size_t i = callframeStarts + RegisterFile::CallFrameHeaderSize; i < count; i++)
+            registerArray[i].set(globalData, this, src[i].get());
 
-        return registerArray;
+        return registerArray.release();
     }
 
-    inline void JSVariableObject::setRegisters(Register* registers, Register* registerArray)
+    inline void JSVariableObject::setRegisters(WriteBarrier<Unknown>* registers, PassOwnArrayPtr<WriteBarrier<Unknown> > registerArray)
     {
-        ASSERT(registerArray != d->registerArray.get());
-        d->registerArray.set(registerArray);
-        d->registers = registers;
+        ASSERT(registerArray != m_registerArray);
+        m_registerArray = registerArray;
+        m_registers = registers;
     }
 
 } // namespace TI

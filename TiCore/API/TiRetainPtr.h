@@ -2,11 +2,11 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
- * Copyright (C) 2005, 2006, 2007 Apple Inc. All rights reserved.
+ * Copyright (C) 2005, 2006, 2007, 2010 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,31 +36,31 @@
 #ifndef TiRetainPtr_h
 #define TiRetainPtr_h
 
+#include <TiCore/TiContextRef.h>
 #include <TiCore/TiStringRef.h>
 #include <algorithm>
 
 inline void TiRetain(TiStringRef string) { TiStringRetain(string); }
 inline void TiRelease(TiStringRef string) { TiStringRelease(string); }
+inline void TiRetain(TiGlobalContextRef context) { TiGlobalContextRetain(context); }
+inline void TiRelease(TiGlobalContextRef context) { TiGlobalContextRelease(context); }
 
 enum AdoptTag { Adopt };
 
-template <typename T> class TiRetainPtr {
+template<typename T> class TiRetainPtr {
 public:
-    TiRetainPtr() : m_ptr(0) {}
+    TiRetainPtr() : m_ptr(0) { }
     TiRetainPtr(T ptr) : m_ptr(ptr) { if (ptr) TiRetain(ptr); }
-
     TiRetainPtr(AdoptTag, T ptr) : m_ptr(ptr) { }
-    
-    TiRetainPtr(const TiRetainPtr& o) : m_ptr(o.m_ptr) { if (T ptr = m_ptr) TiRetain(ptr); }
-
-    ~TiRetainPtr() { if (T ptr = m_ptr) TiRelease(ptr); }
-    
-    template <typename U> TiRetainPtr(const TiRetainPtr<U>& o) : m_ptr(o.get()) { if (T ptr = m_ptr) TiRetain(ptr); }
+    TiRetainPtr(const TiRetainPtr&);
+    template<typename U> TiRetainPtr(const TiRetainPtr<U>&);
+    ~TiRetainPtr();
     
     T get() const { return m_ptr; }
     
-    T releaseRef() { T tmp = m_ptr; m_ptr = 0; return tmp; }
-    
+    void clear();
+    T leakRef();
+
     T operator->() const { return m_ptr; }
     
     bool operator!() const { return !m_ptr; }
@@ -70,19 +70,57 @@ public:
     operator UnspecifiedBoolType() const { return m_ptr ? &TiRetainPtr::m_ptr : 0; }
     
     TiRetainPtr& operator=(const TiRetainPtr&);
-    template <typename U> TiRetainPtr& operator=(const TiRetainPtr<U>&);
+    template<typename U> TiRetainPtr& operator=(const TiRetainPtr<U>&);
     TiRetainPtr& operator=(T);
-    template <typename U> TiRetainPtr& operator=(U*);
+    template<typename U> TiRetainPtr& operator=(U*);
 
     void adopt(T);
     
     void swap(TiRetainPtr&);
 
+    // FIXME: Remove releaseRef once we change all callers to call leakRef instead.
+    T releaseRef() { return leakRef(); }
+
 private:
     T m_ptr;
 };
 
-template <typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(const TiRetainPtr<T>& o)
+template<typename T> inline TiRetainPtr<T>::TiRetainPtr(const TiRetainPtr& o)
+    : m_ptr(o.m_ptr)
+{
+    if (m_ptr)
+        TiRetain(m_ptr);
+}
+
+template<typename T> template<typename U> inline TiRetainPtr<T>::TiRetainPtr(const TiRetainPtr<U>& o)
+    : m_ptr(o.get())
+{
+    if (m_ptr)
+        TiRetain(m_ptr);
+}
+
+template<typename T> inline TiRetainPtr<T>::~TiRetainPtr()
+{
+    if (m_ptr)
+        TiRelease(m_ptr);
+}
+
+template<typename T> inline void TiRetainPtr<T>::clear()
+{
+    if (T ptr = m_ptr) {
+        m_ptr = 0;
+        TiRelease(ptr);
+    }
+}
+
+template<typename T> inline T TiRetainPtr<T>::leakRef()
+{
+    T ptr = m_ptr;
+    m_ptr = 0;
+    return ptr;
+}
+
+template<typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(const TiRetainPtr<T>& o)
 {
     T optr = o.get();
     if (optr)
@@ -94,7 +132,7 @@ template <typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(const TiR
     return *this;
 }
 
-template <typename T> template <typename U> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(const TiRetainPtr<U>& o)
+template<typename T> template<typename U> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(const TiRetainPtr<U>& o)
 {
     T optr = o.get();
     if (optr)
@@ -106,7 +144,7 @@ template <typename T> template <typename U> inline TiRetainPtr<T>& TiRetainPtr<T
     return *this;
 }
 
-template <typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(T optr)
+template<typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(T optr)
 {
     if (optr)
         TiRetain(optr);
@@ -117,7 +155,7 @@ template <typename T> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(T optr)
     return *this;
 }
 
-template <typename T> inline void TiRetainPtr<T>::adopt(T optr)
+template<typename T> inline void TiRetainPtr<T>::adopt(T optr)
 {
     T ptr = m_ptr;
     m_ptr = optr;
@@ -125,7 +163,7 @@ template <typename T> inline void TiRetainPtr<T>::adopt(T optr)
         TiRelease(ptr);
 }
 
-template <typename T> template <typename U> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(U* optr)
+template<typename T> template<typename U> inline TiRetainPtr<T>& TiRetainPtr<T>::operator=(U* optr)
 {
     if (optr)
         TiRetain(optr);
@@ -136,42 +174,42 @@ template <typename T> template <typename U> inline TiRetainPtr<T>& TiRetainPtr<T
     return *this;
 }
 
-template <class T> inline void TiRetainPtr<T>::swap(TiRetainPtr<T>& o)
+template<typename T> inline void TiRetainPtr<T>::swap(TiRetainPtr<T>& o)
 {
     std::swap(m_ptr, o.m_ptr);
 }
 
-template <class T> inline void swap(TiRetainPtr<T>& a, TiRetainPtr<T>& b)
+template<typename T> inline void swap(TiRetainPtr<T>& a, TiRetainPtr<T>& b)
 {
     a.swap(b);
 }
 
-template <typename T, typename U> inline bool operator==(const TiRetainPtr<T>& a, const TiRetainPtr<U>& b)
+template<typename T, typename U> inline bool operator==(const TiRetainPtr<T>& a, const TiRetainPtr<U>& b)
 { 
     return a.get() == b.get(); 
 }
 
-template <typename T, typename U> inline bool operator==(const TiRetainPtr<T>& a, U* b)
+template<typename T, typename U> inline bool operator==(const TiRetainPtr<T>& a, U* b)
 { 
     return a.get() == b; 
 }
 
-template <typename T, typename U> inline bool operator==(T* a, const TiRetainPtr<U>& b) 
+template<typename T, typename U> inline bool operator==(T* a, const TiRetainPtr<U>& b) 
 {
     return a == b.get(); 
 }
 
-template <typename T, typename U> inline bool operator!=(const TiRetainPtr<T>& a, const TiRetainPtr<U>& b)
+template<typename T, typename U> inline bool operator!=(const TiRetainPtr<T>& a, const TiRetainPtr<U>& b)
 { 
     return a.get() != b.get(); 
 }
 
-template <typename T, typename U> inline bool operator!=(const TiRetainPtr<T>& a, U* b)
+template<typename T, typename U> inline bool operator!=(const TiRetainPtr<T>& a, U* b)
 {
     return a.get() != b; 
 }
 
-template <typename T, typename U> inline bool operator!=(T* a, const TiRetainPtr<U>& b)
+template<typename T, typename U> inline bool operator!=(T* a, const TiRetainPtr<U>& b)
 { 
     return a != b.get(); 
 }

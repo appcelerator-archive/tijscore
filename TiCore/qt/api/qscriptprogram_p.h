@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -59,7 +59,7 @@ public:
     inline bool operator==(const QScriptProgramPrivate& other) const;
     inline bool operator!=(const QScriptProgramPrivate& other) const;
 
-    inline TiStringRef program() const;
+    inline operator TiStringRef() const;
     inline TiStringRef file() const;
     inline int line() const;
 private:
@@ -129,7 +129,11 @@ bool QScriptProgramPrivate::operator!=(const QScriptProgramPrivate& other) const
             || !TiStringIsEqual(m_program, other.m_program);
 }
 
-TiStringRef QScriptProgramPrivate::program() const { return m_program; }
+QScriptProgramPrivate::operator TiStringRef() const
+{
+    return m_program;
+}
+
 TiStringRef QScriptProgramPrivate::file() const {return m_fileName; }
 int QScriptProgramPrivate::line() const { return m_line; }
 

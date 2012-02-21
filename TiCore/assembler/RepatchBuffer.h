@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -94,14 +94,14 @@ public:
         MacroAssembler::repatchInt32(dataLabel32, value);
     }
 
+    void repatch(CodeLocationDataLabelCompact dataLabelCompact, int32_t value)
+    {
+        MacroAssembler::repatchCompact(dataLabelCompact, value);
+    }
+
     void repatch(CodeLocationDataLabelPtr dataLabelPtr, void* value)
     {
         MacroAssembler::repatchPointer(dataLabelPtr, value);
-    }
-
-    void repatchLoadPtrToLEA(CodeLocationInstruction instruction)
-    {
-        MacroAssembler::repatchLoadPtrToLEA(instruction);
     }
 
     void relinkCallerToTrampoline(ReturnAddressPtr returnAddress, CodeLocationLabel label)

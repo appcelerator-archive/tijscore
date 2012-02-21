@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -47,8 +47,8 @@ public:
 private:
     friend class CString;
 
-    static PassRefPtr<CStringBuffer> create(unsigned length) { return adoptRef(new CStringBuffer(length)); }
-    CStringBuffer(unsigned length) : m_vector(length) { }
+    static PassRefPtr<CStringBuffer> create(size_t length) { return adoptRef(new CStringBuffer(length)); }
+    CStringBuffer(size_t length) : m_vector(length) { }
     char* mutableData() { return m_vector.data(); }
 
     Vector<char> m_vector;
@@ -60,7 +60,7 @@ class CString {
 public:
     CString() { }
     CString(const char*);
-    CString(const char*, unsigned length);
+    CString(const char*, size_t length);
     CString(CStringBuffer* buffer) : m_buffer(buffer) { }
     static CString newUninitialized(size_t length, char*& characterBuffer);
 
@@ -69,7 +69,7 @@ public:
         return m_buffer ? m_buffer->data() : 0;
     }
     char* mutableData();
-    unsigned length() const
+    size_t length() const
     {
         return m_buffer ? m_buffer->length() - 1 : 0;
     }
@@ -80,7 +80,7 @@ public:
 
 private:
     void copyBufferIfNeeded();
-    void init(const char*, unsigned length);
+    void init(const char*, size_t length);
     RefPtr<CStringBuffer> m_buffer;
 };
 

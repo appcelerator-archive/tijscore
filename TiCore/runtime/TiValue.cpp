@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,6 +32,7 @@
 
 #include "BooleanConstructor.h"
 #include "BooleanPrototype.h"
+#include "Error.h"
 #include "ExceptionHelpers.h"
 #include "TiGlobalObject.h"
 #include "TiFunction.h"
@@ -60,18 +61,18 @@ double TiValue::toIntegerPreserveNaN(TiExcState* exec) const
     return trunc(toNumber(exec));
 }
 
-TiObject* TiValue::toObjectSlowCase(TiExcState* exec) const
+TiObject* TiValue::toObjectSlowCase(TiExcState* exec, TiGlobalObject* globalObject) const
 {
     ASSERT(!isCell());
 
     if (isInt32() || isDouble())
-        return constructNumber(exec, asValue());
+        return constructNumber(exec, globalObject, asValue());
     if (isTrue() || isFalse())
-        return constructBooleanFromImmediateBoolean(exec, asValue());
+        return constructBooleanFromImmediateBoolean(exec, globalObject, asValue());
+
     ASSERT(isUndefinedOrNull());
-    JSNotAnObjectErrorStub* exception = createNotAnObjectErrorStub(exec, isNull());
-    exec->setException(exception);
-    return new (exec) JSNotAnObject(exec, exception);
+    throwError(exec, createNotAnObjectError(exec, *this));
+    return new (exec) JSNotAnObject(exec);
 }
 
 TiObject* TiValue::toThisObjectSlowCase(TiExcState* exec) const
@@ -79,9 +80,9 @@ TiObject* TiValue::toThisObjectSlowCase(TiExcState* exec) const
     ASSERT(!isCell());
 
     if (isInt32() || isDouble())
-        return constructNumber(exec, asValue());
+        return constructNumber(exec, exec->lexicalGlobalObject(), asValue());
     if (isTrue() || isFalse())
-        return constructBooleanFromImmediateBoolean(exec, asValue());
+        return constructBooleanFromImmediateBoolean(exec, exec->lexicalGlobalObject(), asValue());
     ASSERT(isUndefinedOrNull());
     return exec->globalThisValue();
 }
@@ -90,13 +91,13 @@ TiObject* TiValue::synthesizeObject(TiExcState* exec) const
 {
     ASSERT(!isCell());
     if (isNumber())
-        return constructNumber(exec, asValue());
+        return constructNumber(exec, exec->lexicalGlobalObject(), asValue());
     if (isBoolean())
-        return constructBooleanFromImmediateBoolean(exec, asValue());
-    
-    JSNotAnObjectErrorStub* exception = createNotAnObjectErrorStub(exec, isNull());
-    exec->setException(exception);
-    return new (exec) JSNotAnObject(exec, exception);
+        return constructBooleanFromImmediateBoolean(exec, exec->lexicalGlobalObject(), asValue());
+
+    ASSERT(isUndefinedOrNull());
+    throwError(exec, createNotAnObjectError(exec, *this));
+    return new (exec) JSNotAnObject(exec);
 }
 
 TiObject* TiValue::synthesizePrototype(TiExcState* exec) const
@@ -107,9 +108,9 @@ TiObject* TiValue::synthesizePrototype(TiExcState* exec) const
     if (isBoolean())
         return exec->lexicalGlobalObject()->booleanPrototype();
 
-    JSNotAnObjectErrorStub* exception = createNotAnObjectErrorStub(exec, isNull());
-    exec->setException(exception);
-    return new (exec) JSNotAnObject(exec, exception);
+    ASSERT(isUndefinedOrNull());
+    throwError(exec, createNotAnObjectError(exec, *this));
+    return new (exec) JSNotAnObject(exec);
 }
 
 #ifndef NDEBUG
@@ -132,51 +133,58 @@ char* TiValue::description()
         snprintf(description, size, "False");
     else if (isNull())
         snprintf(description, size, "Null");
-    else {
-        ASSERT(isUndefined());
+    else if (isUndefined())
         snprintf(description, size, "Undefined");
-    }
+    else
+        snprintf(description, size, "INVALID");
 
     return description;
 }
 #endif
 
-int32_t toInt32SlowCase(double d, bool& ok)
+// This in the ToInt32 operation is defined in section 9.5 of the ECMA-262 spec.
+// Note that this operation is identical to ToUInt32 other than to interpretation
+// of the resulting bit-pattern (as such this metod is also called to implement
+// ToUInt32).
+//
+// The operation can be descibed as round towards zero, then select the 32 least
+// bits of the resulting value in 2s-complement representation.
+int32_t toInt32(double number)
 {
-    ok = true;
+    int64_t bits = WTI::bitwise_cast<int64_t>(number);
+    int32_t exp = (static_cast<int32_t>(bits >> 52) & 0x7ff) - 0x3ff;
 
-    if (d >= -D32 / 2 && d < D32 / 2)
-        return static_cast<int32_t>(d);
-
-    if (isnan(d) || isinf(d)) {
-        ok = false;
+    // If exponent < 0 there will be no bits to the left of the decimal point
+    // after rounding; if the exponent is > 83 then no bits of precision can be
+    // left in the low 32-bit range of the result (IEEE-754 doubles have 52 bits
+    // of fractional precision).
+    // Note this case handles 0, -0, and all infinte, NaN, & denormal value. 
+    if (exp < 0 || exp > 83)
         return 0;
+
+    // Select the appropriate 32-bits from the floating point mantissa.  If the
+    // exponent is 52 then the bits we need to select are already aligned to the
+    // lowest bits of the 64-bit integer representation of tghe number, no need
+    // to shift.  If the exponent is greater than 52 we need to shift the value
+    // left by (exp - 52), if the value is less than 52 we need to shift right
+    // accordingly.
+    int32_t result = (exp > 52)
+        ? static_cast<int32_t>(bits << (exp - 52))
+        : static_cast<int32_t>(bits >> (52 - exp));
+
+    // IEEE-754 double precision values are stored omitting an implicit 1 before
+    // the decimal point; we need to reinsert this now.  We may also the shifted
+    // invalid bits into the result that are not a part of the mantissa (the sign
+    // and exponent bits from the floatingpoint representation); mask these out.
+    if (exp < 32) {
+        int32_t missingOne = 1 << exp;
+        result &= missingOne - 1;
+        result += missingOne;
     }
 
-    double d32 = fmod(trunc(d), D32);
-    if (d32 >= D32 / 2)
-        d32 -= D32;
-    else if (d32 < -D32 / 2)
-        d32 += D32;
-    return static_cast<int32_t>(d32);
-}
-
-uint32_t toUInt32SlowCase(double d, bool& ok)
-{
-    ok = true;
-
-    if (d >= 0.0 && d < D32)
-        return static_cast<uint32_t>(d);
-
-    if (isnan(d) || isinf(d)) {
-        ok = false;
-        return 0;
-    }
-
-    double d32 = fmod(trunc(d), D32);
-    if (d32 < 0)
-        d32 += D32;
-    return static_cast<uint32_t>(d32);
+    // If the input value was negative (we could test either 'number' or 'bits',
+    // but testing 'bits' is likely faster) invert the result appropriately.
+    return bits < 0 ? -result : result;
 }
 
 NEVER_INLINE double nonInlineNaN()
@@ -186,6 +194,11 @@ NEVER_INLINE double nonInlineNaN()
 #else
     return std::numeric_limits<double>::quiet_NaN();
 #endif
+}
+
+bool TiValue::isValidCallee()
+{
+    return asObject(asObject(asCell())->getAnonymousValue(0))->isGlobalObject();
 }
 
 } // namespace TI

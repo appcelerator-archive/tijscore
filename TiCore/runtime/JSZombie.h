@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,20 +34,21 @@
 #define JSZombie_h
 
 #include "TiCell.h"
+#include "Structure.h"
 
 #if ENABLE(JSC_ZOMBIES)
 namespace TI {
 
 class JSZombie : public TiCell {
 public:
-    JSZombie(const ClassInfo* oldInfo, Structure* structure)
-        : TiCell(structure)
+    JSZombie(TiGlobalData& globalData, const ClassInfo* oldInfo, Structure* structure)
+        : TiCell(globalData, structure)
         , m_oldInfo(oldInfo)
     {
+        ASSERT(inherits(&s_info));
     }
+
     virtual bool isZombie() const { return true; }
-    virtual const ClassInfo* classInfo() const { return &s_info; }
-    static Structure* leakedZombieStructure();
 
     virtual bool isGetterSetter() const { ASSERT_NOT_REACHED(); return false; }
     virtual bool isAPIValueWrapper() const { ASSERT_NOT_REACHED(); return false; }
@@ -61,17 +62,24 @@ public:
     virtual double toNumber(TiExcState*) const { ASSERT_NOT_REACHED(); return 0.0; }
     virtual UString toString(TiExcState*) const { ASSERT_NOT_REACHED(); return ""; }
     virtual TiObject* toObject(TiExcState*) const { ASSERT_NOT_REACHED(); return 0; }
-    virtual void markChildren(MarkStack&) { ASSERT_NOT_REACHED(); }
+    virtual void visitChildren(SlotVisitor&) { ASSERT_NOT_REACHED(); }
     virtual void put(TiExcState*, const Identifier&, TiValue, PutPropertySlot&) { ASSERT_NOT_REACHED(); }
     virtual void put(TiExcState*, unsigned, TiValue) { ASSERT_NOT_REACHED(); }
     virtual bool deleteProperty(TiExcState*, const Identifier&) { ASSERT_NOT_REACHED(); return false; }
     virtual bool deleteProperty(TiExcState*, unsigned) { ASSERT_NOT_REACHED(); return false; }
     virtual TiObject* toThisObject(TiExcState*) const { ASSERT_NOT_REACHED(); return 0; }
+    virtual TiValue toStrictThisObject(TiExcState*) const { ASSERT_NOT_REACHED(); return TiValue(); }
     virtual TiValue getJSNumber() { ASSERT_NOT_REACHED(); return jsNull(); }
     virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&) { ASSERT_NOT_REACHED(); return false; }
     virtual bool getOwnPropertySlot(TiExcState*, unsigned, PropertySlot&) { ASSERT_NOT_REACHED(); return false; }
     
+    static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+    {
+        return Structure::create(globalData, prototype, TypeInfo(LeafType, 0), AnonymousSlotCount, &s_info);
+    }
+
     static const ClassInfo s_info;
+
 private:
     const ClassInfo* m_oldInfo;
 };

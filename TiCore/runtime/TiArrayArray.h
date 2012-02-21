@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,14 +39,16 @@
 
 namespace TI {
 
-    class TiArrayArray : public TiObject {
+    class TiArrayArray : public JSNonFinalObject {
         friend class TiGlobalData;
     public:
+        typedef JSNonFinalObject Base;
+
         bool canAccessIndex(unsigned i) { return i < m_storage->length(); }
-        TiValue getIndex(TiExcState* exec, unsigned i)
+        TiValue getIndex(TiExcState*, unsigned i)
         {
             ASSERT(canAccessIndex(i));
-            return jsNumber(exec, m_storage->data()[i]);
+            return jsNumber(m_storage->data()[i]);
         }
 
         void setIndex(unsigned i, int value)
@@ -80,9 +82,9 @@ namespace TI {
                 setIndex(i, byteValue);
         }
 
-        TiArrayArray(TiExcState* exec, NonNullPassRefPtr<Structure>, WTI::ByteArray* storage, const TI::ClassInfo* = &s_defaultInfo);
-        static PassRefPtr<Structure> createStructure(TiValue prototype);
-        
+        TiArrayArray(TiExcState*, Structure*, WTI::ByteArray* storage);
+        static Structure* createStructure(TiGlobalData&, TiValue prototype, const TI::ClassInfo* = &s_defaultInfo);
+
         virtual bool getOwnPropertySlot(TI::TiExcState*, const TI::Identifier& propertyName, TI::PropertySlot&);
         virtual bool getOwnPropertySlot(TI::TiExcState*, unsigned propertyName, TI::PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
@@ -91,7 +93,6 @@ namespace TI {
 
         virtual void getOwnPropertyNames(TI::TiExcState*, TI::PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
-        virtual const ClassInfo* classInfo() const { return m_classInfo; }
         static const ClassInfo s_defaultInfo;
         
         size_t length() const { return m_storage->length(); }
@@ -106,21 +107,18 @@ namespace TI {
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | TiObject::StructureFlags;
 
     private:
-        enum VPtrStealingHackType { VPtrStealingHack };
-        TiArrayArray(VPtrStealingHackType) 
-            : TiObject(createStructure(jsNull()))
-            , m_classInfo(0)
+        TiArrayArray(VPtrStealingHackType)
+            : JSNonFinalObject(VPtrStealingHack)
         {
         }
 
         RefPtr<WTI::ByteArray> m_storage;
-        const ClassInfo* m_classInfo;
     };
     
     TiArrayArray* asByteArray(TiValue value);
     inline TiArrayArray* asByteArray(TiValue value)
     {
-        return static_cast<TiArrayArray*>(asCell(value));
+        return static_cast<TiArrayArray*>(value.asCell());
     }
 
     inline bool isTiArrayArray(TiGlobalData* globalData, TiValue v) { return v.isCell() && v.asCell()->vptr() == globalData->jsByteArrayVPtr; }

@@ -2,12 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2004, 2005, 2006, 2007, 2008, 2011 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -37,7 +37,6 @@
 #include "TiString.h"
 #include "TiStringBuilder.h"
 #include "ObjectPrototype.h"
-#include "PrototypeFunction.h"
 #include <math.h>
 #include <time.h>
 #include <wtf/DateMath.h>
@@ -59,26 +58,47 @@ using namespace WTI;
 
 namespace TI {
 
+static EncodedTiValue JSC_HOST_CALL dateParse(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateNow(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateUTC(TiExcState*);
+
+}
+
+#include "DateConstructor.lut.h"
+
+namespace TI {
+
+const ClassInfo DateConstructor::s_info = { "Function", &InternalFunction::s_info, 0, TiExcState::dateConstructorTable };
+
+/* Source for DateConstructor.lut.h
+@begin dateConstructorTable
+  parse     dateParse   DontEnum|Function 1
+  UTC       dateUTC     DontEnum|Function 7
+  now       dateNow     DontEnum|Function 0
+@end
+*/
+
 ASSERT_CLASS_FITS_IN_CELL(DateConstructor);
 
-static TiValue JSC_HOST_CALL dateParse(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateNow(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateUTC(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-DateConstructor::DateConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, Structure* prototypeFunctionStructure, DatePrototype* datePrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, datePrototype->classInfo()->className))
+DateConstructor::DateConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, DatePrototype* datePrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, datePrototype->classInfo()->className))
 {
-      putDirectWithoutTransition(exec->propertyNames().prototype, datePrototype, DontEnum|DontDelete|ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, datePrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(7), ReadOnly | DontEnum | DontDelete);
+}
 
-      putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().parse, dateParse), DontEnum);
-      putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 7, exec->propertyNames().UTC, dateUTC), DontEnum);
-      putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().now, dateNow), DontEnum);
+bool DateConstructor::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<InternalFunction>(exec, TiExcState::dateConstructorTable(exec), this, propertyName, slot);
+}
 
-      putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 7), ReadOnly | DontEnum | DontDelete);
+bool DateConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<InternalFunction>(exec, TiExcState::dateConstructorTable(exec), this, propertyName, descriptor);
 }
 
 // ECMA 15.9.3
-TiObject* constructDate(TiExcState* exec, const ArgList& args)
+TiObject* constructDate(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args)
 {
     int numArgs = args.size();
 
@@ -87,7 +107,7 @@ TiObject* constructDate(TiExcState* exec, const ArgList& args)
     if (numArgs == 0) // new Date() ECMA 15.9.3.3
         value = jsCurrentTime();
     else if (numArgs == 1) {
-        if (args.at(0).inherits(&DateInstance::info))
+        if (args.at(0).inherits(&DateInstance::s_info))
             value = asDateInstance(args.at(0))->internalNumber();
         else {
             TiValue primitive = args.at(0).toPrimitive(exec);
@@ -97,35 +117,45 @@ TiObject* constructDate(TiExcState* exec, const ArgList& args)
                 value = primitive.toNumber(exec);
         }
     } else {
-        if (isnan(args.at(0).toNumber(exec))
-                || isnan(args.at(1).toNumber(exec))
-                || (numArgs >= 3 && isnan(args.at(2).toNumber(exec)))
-                || (numArgs >= 4 && isnan(args.at(3).toNumber(exec)))
-                || (numArgs >= 5 && isnan(args.at(4).toNumber(exec)))
-                || (numArgs >= 6 && isnan(args.at(5).toNumber(exec)))
-                || (numArgs >= 7 && isnan(args.at(6).toNumber(exec))))
+        double doubleArguments[7] = {
+            args.at(0).toNumber(exec), 
+            args.at(1).toNumber(exec), 
+            args.at(2).toNumber(exec), 
+            args.at(3).toNumber(exec), 
+            args.at(4).toNumber(exec), 
+            args.at(5).toNumber(exec), 
+            args.at(6).toNumber(exec)
+        };
+        if (isnan(doubleArguments[0])
+                || isnan(doubleArguments[1])
+                || (numArgs >= 3 && isnan(doubleArguments[2]))
+                || (numArgs >= 4 && isnan(doubleArguments[3]))
+                || (numArgs >= 5 && isnan(doubleArguments[4]))
+                || (numArgs >= 6 && isnan(doubleArguments[5]))
+                || (numArgs >= 7 && isnan(doubleArguments[6])))
             value = NaN;
         else {
             GregorianDateTime t;
-            int year = args.at(0).toInt32(exec);
+            int year = TI::toInt32(doubleArguments[0]);
             t.year = (year >= 0 && year <= 99) ? year : year - 1900;
-            t.month = args.at(1).toInt32(exec);
-            t.monthDay = (numArgs >= 3) ? args.at(2).toInt32(exec) : 1;
-            t.hour = args.at(3).toInt32(exec);
-            t.minute = args.at(4).toInt32(exec);
-            t.second = args.at(5).toInt32(exec);
+            t.month = TI::toInt32(doubleArguments[1]);
+            t.monthDay = (numArgs >= 3) ? TI::toInt32(doubleArguments[2]) : 1;
+            t.hour = TI::toInt32(doubleArguments[3]);
+            t.minute = TI::toInt32(doubleArguments[4]);
+            t.second = TI::toInt32(doubleArguments[5]);
             t.isDST = -1;
-            double ms = (numArgs >= 7) ? args.at(6).toNumber(exec) : 0;
+            double ms = (numArgs >= 7) ? doubleArguments[6] : 0;
             value = gregorianDateTimeToMS(exec, t, ms, false);
         }
     }
 
-    return new (exec) DateInstance(exec, value);
+    return new (exec) DateInstance(exec, globalObject->dateStructure(), value);
 }
     
-static TiObject* constructWithDateConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithDateConstructor(TiExcState* exec)
 {
-    return constructDate(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructDate(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 ConstructType DateConstructor::getConstructData(ConstructData& constructData)
@@ -135,7 +165,7 @@ ConstructType DateConstructor::getConstructData(ConstructData& constructData)
 }
 
 // ECMA 15.9.2
-static TiValue JSC_HOST_CALL callDate(TiExcState* exec, TiObject*, TiValue, const ArgList&)
+static EncodedTiValue JSC_HOST_CALL callDate(TiExcState* exec)
 {
     time_t localTime = time(0);
     tm localTM;
@@ -145,7 +175,7 @@ static TiValue JSC_HOST_CALL callDate(TiExcState* exec, TiObject*, TiValue, cons
     DateConversionBuffer time;
     formatDate(ts, date);
     formatTime(ts, time);
-    return jsMakeNontrivialString(exec, date, " ", time);
+    return TiValue::encode(jsMakeNontrivialString(exec, date, " ", time));
 }
 
 CallType DateConstructor::getCallData(CallData& callData)
@@ -154,38 +184,47 @@ CallType DateConstructor::getCallData(CallData& callData)
     return CallTypeHost;
 }
 
-static TiValue JSC_HOST_CALL dateParse(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL dateParse(TiExcState* exec)
 {
-    return jsNumber(exec, parseDate(exec, args.at(0).toString(exec)));
+    return TiValue::encode(jsNumber(parseDate(exec, exec->argument(0).toString(exec))));
 }
 
-static TiValue JSC_HOST_CALL dateNow(TiExcState* exec, TiObject*, TiValue, const ArgList&)
+static EncodedTiValue JSC_HOST_CALL dateNow(TiExcState*)
 {
-    return jsNumber(exec, jsCurrentTime());
+    return TiValue::encode(jsNumber(jsCurrentTime()));
 }
 
-static TiValue JSC_HOST_CALL dateUTC(TiExcState* exec, TiObject*, TiValue, const ArgList& args) 
+static EncodedTiValue JSC_HOST_CALL dateUTC(TiExcState* exec) 
 {
-    int n = args.size();
-    if (isnan(args.at(0).toNumber(exec))
-            || isnan(args.at(1).toNumber(exec))
-            || (n >= 3 && isnan(args.at(2).toNumber(exec)))
-            || (n >= 4 && isnan(args.at(3).toNumber(exec)))
-            || (n >= 5 && isnan(args.at(4).toNumber(exec)))
-            || (n >= 6 && isnan(args.at(5).toNumber(exec)))
-            || (n >= 7 && isnan(args.at(6).toNumber(exec))))
-        return jsNaN(exec);
+    double doubleArguments[7] = {
+        exec->argument(0).toNumber(exec), 
+        exec->argument(1).toNumber(exec), 
+        exec->argument(2).toNumber(exec), 
+        exec->argument(3).toNumber(exec), 
+        exec->argument(4).toNumber(exec), 
+        exec->argument(5).toNumber(exec), 
+        exec->argument(6).toNumber(exec)
+    };
+    int n = exec->argumentCount();
+    if (isnan(doubleArguments[0])
+            || isnan(doubleArguments[1])
+            || (n >= 3 && isnan(doubleArguments[2]))
+            || (n >= 4 && isnan(doubleArguments[3]))
+            || (n >= 5 && isnan(doubleArguments[4]))
+            || (n >= 6 && isnan(doubleArguments[5]))
+            || (n >= 7 && isnan(doubleArguments[6])))
+        return TiValue::encode(jsNaN());
 
     GregorianDateTime t;
-    int year = args.at(0).toInt32(exec);
+    int year = TI::toInt32(doubleArguments[0]);
     t.year = (year >= 0 && year <= 99) ? year : year - 1900;
-    t.month = args.at(1).toInt32(exec);
-    t.monthDay = (n >= 3) ? args.at(2).toInt32(exec) : 1;
-    t.hour = args.at(3).toInt32(exec);
-    t.minute = args.at(4).toInt32(exec);
-    t.second = args.at(5).toInt32(exec);
-    double ms = (n >= 7) ? args.at(6).toNumber(exec) : 0;
-    return jsNumber(exec, timeClip(gregorianDateTimeToMS(exec, t, ms, true)));
+    t.month = TI::toInt32(doubleArguments[1]);
+    t.monthDay = (n >= 3) ? TI::toInt32(doubleArguments[2]) : 1;
+    t.hour = TI::toInt32(doubleArguments[3]);
+    t.minute = TI::toInt32(doubleArguments[4]);
+    t.second = TI::toInt32(doubleArguments[5]);
+    double ms = (n >= 7) ? doubleArguments[6] : 0;
+    return TiValue::encode(jsNumber(timeClip(gregorianDateTimeToMS(exec, t, ms, true))));
 }
 
 } // namespace TI

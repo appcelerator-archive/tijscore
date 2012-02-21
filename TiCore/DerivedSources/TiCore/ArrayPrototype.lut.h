@@ -1,3 +1,10 @@
+/**
+ * Appcelerator Titanium License
+ * This source code and all modifications done by Appcelerator
+ * are licensed under the Apache Public License (version 2) and
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
+ */
+
 // Automatically generated from ../../runtime/ArrayPrototype.cpp using ../../create_hash_table. DO NOT EDIT!
 
 #include "Lookup.h"
@@ -9,7 +16,7 @@ namespace TI {
 #define THUNK_GENERATOR(generator)
 #endif
 
-static const struct HashTableValue arrayTableValues[22] = {
+static const struct HashTableValue arrayPrototypeTableValues[22] = {
    { "toString", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(arrayProtoFuncToString), (intptr_t)0 THUNK_GENERATOR(0) },
    { "toLocaleString", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(arrayProtoFuncToLocaleString), (intptr_t)0 THUNK_GENERATOR(0) },
    { "concat", DontEnum|Function, (intptr_t)static_cast<NativeFunction>(arrayProtoFuncConcat), (intptr_t)1 THUNK_GENERATOR(0) },
@@ -35,6 +42,6 @@ static const struct HashTableValue arrayTableValues[22] = {
 };
 
 #undef THUNK_GENERATOR
-extern JSC_CONST_HASHTABLE HashTable arrayTable =
-    { 65, 63, arrayTableValues, 0 };
+extern JSC_CONST_HASHTABLE HashTable arrayPrototypeTable =
+    { 65, 63, arrayPrototypeTableValues, 0 };
 } // namespace

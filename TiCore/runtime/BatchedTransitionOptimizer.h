@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // -*- mode: c++; c-basic-offset: 4 -*-
@@ -34,26 +34,27 @@
 #ifndef BatchedTransitionOptimizer_h
 #define BatchedTransitionOptimizer_h
 
-#include <wtf/Noncopyable.h>
 #include "TiObject.h"
 
 namespace TI {
 
-    class BatchedTransitionOptimizer : public Noncopyable {
+    class BatchedTransitionOptimizer {
+        WTF_MAKE_NONCOPYABLE(BatchedTransitionOptimizer);
     public:
-        BatchedTransitionOptimizer(TiObject* object)
-            : m_object(object)
+        BatchedTransitionOptimizer(TiGlobalData& globalData, TiObject* object)
+            : m_globalData(&globalData)
+            , m_object(object)
         {
-            if (!m_object->structure()->isDictionary())
-                m_object->setStructure(Structure::toCacheableDictionaryTransition(m_object->structure()));
         }
 
         ~BatchedTransitionOptimizer()
         {
-            m_object->flattenDictionaryObject();
+            if (m_object->structure()->isDictionary())
+                m_object->flattenDictionaryObject(*m_globalData);
         }
 
     private:
+        TiGlobalData* m_globalData;
         TiObject* m_object;
     };
 

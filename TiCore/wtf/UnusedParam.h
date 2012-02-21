@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,6 +31,14 @@
 /* don't use this for C++, it should only be used in plain C files or
    ObjC methods, where leaving off the parameter name is not allowed. */
 
-#define UNUSED_PARAM(x) (void)x
+#include "Platform.h"
+
+#if COMPILER(INTEL) && !OS(WINDOWS) || COMPILER(RVCT)
+template<typename T>
+inline void unusedParam(T& x) { (void)x; }
+#define UNUSED_PARAM(variable) unusedParam(variable)
+#else
+#define UNUSED_PARAM(variable) (void)variable
+#endif
 
 #endif /* WTF_UnusedParam_h */

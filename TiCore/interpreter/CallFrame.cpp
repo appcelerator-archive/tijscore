@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,11 +38,6 @@
 
 namespace TI {
 
-TiValue CallFrame::thisValue()
-{
-    return this[codeBlock()->thisRegister()].jsValue();
-}
-
 #ifndef NDEBUG
 void CallFrame::dumpCaller()
 {
@@ -52,8 +47,14 @@ void CallFrame::dumpCaller()
     TiValue function;
     
     interpreter()->retrieveLastCaller(this, signedLineNumber, sourceID, urlString, function);
-    printf("Callpoint => %s:%d\n", urlString.ascii(), signedLineNumber);
+    printf("Callpoint => %s:%d\n", urlString.utf8().data(), signedLineNumber);
 }
+
+RegisterFile* CallFrame::registerFile()
+{
+    return &interpreter()->registerFile();
+}
+
 #endif
 
 }

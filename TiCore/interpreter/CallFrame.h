@@ -2,13 +2,13 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2007, 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2011 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -31,65 +31,48 @@
 #define CallFrame_h
 
 #include "TiGlobalData.h"
+#include "MacroAssemblerCodeRef.h"
 #include "RegisterFile.h"
-#include "ScopeChain.h"
 
 namespace TI  {
 
     class Arguments;
     class JSActivation;
     class Interpreter;
+    class ScopeChainNode;
 
     // Represents the current state of script execution.
     // Passed as the first argument to most functions.
     class TiExcState : private Register {
     public:
-        TiFunction* callee() const { return this[RegisterFile::Callee].function(); }
+        TiObject* callee() const { return this[RegisterFile::Callee].function(); }
         CodeBlock* codeBlock() const { return this[RegisterFile::CodeBlock].Register::codeBlock(); }
         ScopeChainNode* scopeChain() const
         {
             ASSERT(this[RegisterFile::ScopeChain].Register::scopeChain());
             return this[RegisterFile::ScopeChain].Register::scopeChain();
         }
-        int argumentCount() const { return this[RegisterFile::ArgumentCount].i(); }
-
-        TiValue thisValue();
 
         // Global object in which execution began.
         TiGlobalObject* dynamicGlobalObject();
 
         // Global object in which the currently executing code was defined.
         // Differs from dynamicGlobalObject() during function calls across web browser frames.
-        TiGlobalObject* lexicalGlobalObject() const
-        {
-            return scopeChain()->globalObject;
-        }
+        inline TiGlobalObject* lexicalGlobalObject() const;
 
         // Differs from lexicalGlobalObject because this will have DOM window shell rather than
         // the actual DOM window, which can't be "this" for security reasons.
-        TiObject* globalThisValue() const
-        {
-            return scopeChain()->globalThis;
-        }
+        inline TiObject* globalThisValue() const;
 
-        // FIXME: Elsewhere, we use TiGlobalData* rather than TiGlobalData&.
-        // We should make this more uniform and either use a reference everywhere
-        // or a pointer everywhere.
-        TiGlobalData& globalData() const
-        {
-            ASSERT(scopeChain()->globalData);
-            return *scopeChain()->globalData;
-        }
+        inline TiGlobalData& globalData() const;
 
         // Convenience functions for access to global data.
         // It takes a few memory references to get from a call frame to the global data
         // pointer, so these are inefficient, and should be used sparingly in new code.
         // But they're used in many places in legacy code, so they're not going away any time soon.
 
-        void setException(TiValue exception) { globalData().exception = exception; }
         void clearException() { globalData().exception = TiValue(); }
         TiValue exception() const { return globalData().exception; }
-        TiValue* exceptionSlot() { return &globalData().exception; }
         bool hadException() const { return globalData().exception; }
 
         const CommonIdentifiers& propertyNames() const { return *globalData().propertyNames; }
@@ -99,14 +82,24 @@ namespace TI  {
 #ifndef NDEBUG
         void dumpCaller();
 #endif
-        static const HashTable* arrayTable(CallFrame* callFrame) { return callFrame->globalData().arrayTable; }
+        static const HashTable* arrayConstructorTable(CallFrame* callFrame) { return callFrame->globalData().arrayConstructorTable; }
+        static const HashTable* arrayPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().arrayPrototypeTable; }
+        static const HashTable* booleanPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().booleanPrototypeTable; }
         static const HashTable* dateTable(CallFrame* callFrame) { return callFrame->globalData().dateTable; }
+        static const HashTable* dateConstructorTable(CallFrame* callFrame) { return callFrame->globalData().dateConstructorTable; }
+        static const HashTable* errorPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().errorPrototypeTable; }
+        static const HashTable* globalObjectTable(CallFrame* callFrame) { return callFrame->globalData().globalObjectTable; }
         static const HashTable* jsonTable(CallFrame* callFrame) { return callFrame->globalData().jsonTable; }
         static const HashTable* mathTable(CallFrame* callFrame) { return callFrame->globalData().mathTable; }
-        static const HashTable* numberTable(CallFrame* callFrame) { return callFrame->globalData().numberTable; }
+        static const HashTable* numberConstructorTable(CallFrame* callFrame) { return callFrame->globalData().numberConstructorTable; }
+        static const HashTable* numberPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().numberPrototypeTable; }
+        static const HashTable* objectConstructorTable(CallFrame* callFrame) { return callFrame->globalData().objectConstructorTable; }
+        static const HashTable* objectPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().objectPrototypeTable; }
         static const HashTable* regExpTable(CallFrame* callFrame) { return callFrame->globalData().regExpTable; }
         static const HashTable* regExpConstructorTable(CallFrame* callFrame) { return callFrame->globalData().regExpConstructorTable; }
+        static const HashTable* regExpPrototypeTable(CallFrame* callFrame) { return callFrame->globalData().regExpPrototypeTable; }
         static const HashTable* stringTable(CallFrame* callFrame) { return callFrame->globalData().stringTable; }
+        static const HashTable* stringConstructorTable(CallFrame* callFrame) { return callFrame->globalData().stringConstructorTable; }
 
         static CallFrame* create(Register* callFrameBase) { return static_cast<CallFrame*>(callFrameBase); }
         Register* registers() { return this; }
@@ -114,7 +107,6 @@ namespace TI  {
         CallFrame& operator=(const Register& r) { *static_cast<Register*>(this) = r; return *this; }
 
         CallFrame* callerFrame() const { return this[RegisterFile::CallerFrame].callFrame(); }
-        Arguments* optionalCalleeArguments() const { return this[RegisterFile::OptionalCalleeArguments].arguments(); }
 #if ENABLE(JIT)
         ReturnAddressPtr returnPC() const { return ReturnAddressPtr(this[RegisterFile::ReturnPC].vPC()); }
 #endif
@@ -122,42 +114,57 @@ namespace TI  {
         Instruction* returnVPC() const { return this[RegisterFile::ReturnPC].vPC(); }
 #endif
 
-        void setCalleeArguments(TiValue arguments) { static_cast<Register*>(this)[RegisterFile::OptionalCalleeArguments] = arguments; }
         void setCallerFrame(CallFrame* callerFrame) { static_cast<Register*>(this)[RegisterFile::CallerFrame] = callerFrame; }
         void setScopeChain(ScopeChainNode* scopeChain) { static_cast<Register*>(this)[RegisterFile::ScopeChain] = scopeChain; }
 
         ALWAYS_INLINE void init(CodeBlock* codeBlock, Instruction* vPC, ScopeChainNode* scopeChain,
-            CallFrame* callerFrame, int returnValueRegister, int argc, TiFunction* function)
+            CallFrame* callerFrame, int argc, TiObject* callee)
         {
             ASSERT(callerFrame); // Use noCaller() rather than 0 for the outer host call frame caller.
+            ASSERT(callerFrame == noCaller() || callerFrame->removeHostCallFrameFlag()->registerFile()->end() >= this);
 
             setCodeBlock(codeBlock);
             setScopeChain(scopeChain);
             setCallerFrame(callerFrame);
-            static_cast<Register*>(this)[RegisterFile::ReturnPC] = vPC; // This is either an Instruction* or a pointer into JIT generated code stored as an Instruction*.
-            static_cast<Register*>(this)[RegisterFile::ReturnValueRegister] = Register::withInt(returnValueRegister);
-            setArgumentCount(argc); // original argument count (for the sake of the "arguments" object)
-            setCallee(function);
-            setCalleeArguments(TiValue());
+            setReturnPC(vPC); // This is either an Instruction* or a pointer into JIT generated code stored as an Instruction*.
+            setArgumentCountIncludingThis(argc); // original argument count (for the sake of the "arguments" object)
+            setCallee(callee);
         }
 
         // Read a register from the codeframe (or constant from the CodeBlock).
         inline Register& r(int);
+        // Read a register for a non-constant 
+        inline Register& uncheckedR(int);
+
+        // Access to arguments.
+        int hostThisRegister() { return -RegisterFile::CallFrameHeaderSize - argumentCountIncludingThis(); }
+        TiValue hostThisValue() { return this[hostThisRegister()].jsValue(); }
+        size_t argumentCount() const { return argumentCountIncludingThis() - 1; }
+        size_t argumentCountIncludingThis() const { return this[RegisterFile::ArgumentCount].i(); }
+        TiValue argument(int argumentNumber)
+        {
+            int argumentIndex = -RegisterFile::CallFrameHeaderSize - this[RegisterFile::ArgumentCount].i() + argumentNumber + 1;
+            if (argumentIndex >= -RegisterFile::CallFrameHeaderSize)
+                return jsUndefined();
+            return this[argumentIndex].jsValue();
+        }
 
         static CallFrame* noCaller() { return reinterpret_cast<CallFrame*>(HostCallFrameFlag); }
-        int returnValueRegister() const { return this[RegisterFile::ReturnValueRegister].i(); }
 
         bool hasHostCallFrameFlag() const { return reinterpret_cast<intptr_t>(this) & HostCallFrameFlag; }
         CallFrame* addHostCallFrameFlag() const { return reinterpret_cast<CallFrame*>(reinterpret_cast<intptr_t>(this) | HostCallFrameFlag); }
         CallFrame* removeHostCallFrameFlag() { return reinterpret_cast<CallFrame*>(reinterpret_cast<intptr_t>(this) & ~HostCallFrameFlag); }
 
-    private:
-        void setArgumentCount(int count) { static_cast<Register*>(this)[RegisterFile::ArgumentCount] = Register::withInt(count); }
-        void setCallee(TiFunction* callee) { static_cast<Register*>(this)[RegisterFile::Callee] = callee; }
+        void setArgumentCountIncludingThis(int count) { static_cast<Register*>(this)[RegisterFile::ArgumentCount] = Register::withInt(count); }
+        void setCallee(TiObject* callee) { static_cast<Register*>(this)[RegisterFile::Callee] = Register::withCallee(callee); }
         void setCodeBlock(CodeBlock* codeBlock) { static_cast<Register*>(this)[RegisterFile::CodeBlock] = codeBlock; }
+        void setReturnPC(void* value) { static_cast<Register*>(this)[RegisterFile::ReturnPC] = (Instruction*)value; }
 
+    private:
         static const intptr_t HostCallFrameFlag = 1;
-
+#ifndef NDEBUG
+        RegisterFile* registerFile();
+#endif
         TiExcState();
         ~TiExcState();
     };

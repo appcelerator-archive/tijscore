@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,11 +30,11 @@
 #define OwnFastMallocPtr_h
 
 #include "FastMalloc.h"
-#include "Noncopyable.h"
 
 namespace WTI {
 
-    template<class T> class OwnFastMallocPtr : public Noncopyable {
+    template<class T> class OwnFastMallocPtr {
+        WTF_MAKE_NONCOPYABLE(OwnFastMallocPtr);
     public:
         explicit OwnFastMallocPtr(T* ptr) : m_ptr(ptr)
         {

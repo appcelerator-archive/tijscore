@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,8 +34,10 @@
 #include "APIShims.h"
 #include "APICast.h"
 #include "Error.h"
+#include "ExceptionHelpers.h"
 #include "TiCallbackFunction.h"
 #include "TiClassRef.h"
+#include "TiFunction.h"
 #include "TiGlobalObject.h"
 #include "TiLock.h"
 #include "TiObjectRef.h"
@@ -50,25 +52,27 @@ namespace TI {
 template <class Base>
 inline TiCallbackObject<Base>* TiCallbackObject<Base>::asCallbackObject(TiValue value)
 {
-    ASSERT(asObject(value)->inherits(&info));
+    ASSERT(asObject(value)->inherits(&s_info));
     return static_cast<TiCallbackObject*>(asObject(value));
 }
 
 template <class Base>
-TiCallbackObject<Base>::TiCallbackObject(TiExcState* exec, NonNullPassRefPtr<Structure> structure, TiClassRef jsClass, void* data)
-    : Base(structure)
-    , m_callbackObjectData(new TiCallbackObjectData(data, jsClass))
+TiCallbackObject<Base>::TiCallbackObject(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, TiClassRef jsClass, void* data)
+    : Base(globalObject, structure)
+    , m_callbackObjectData(adoptPtr(new TiCallbackObjectData(data, jsClass)))
 {
+    ASSERT(Base::inherits(&s_info));
     init(exec);
 }
 
 // Global object constructor.
 // FIXME: Move this into a separate TiGlobalCallbackObject class derived from this one.
 template <class Base>
-TiCallbackObject<Base>::TiCallbackObject(TiClassRef jsClass)
-    : Base()
-    , m_callbackObjectData(new TiCallbackObjectData(0, jsClass))
+TiCallbackObject<Base>::TiCallbackObject(TiGlobalData& globalData, TiClassRef jsClass, Structure* structure)
+    : Base(globalData, structure)
+    , m_callbackObjectData(adoptPtr(new TiCallbackObjectData(0, jsClass)))
 {
+    ASSERT(Base::inherits(&s_info));
     ASSERT(Base::isGlobalObject());
     init(static_cast<TiGlobalObject*>(this)->globalExec());
 }
@@ -91,16 +95,16 @@ void TiCallbackObject<Base>::init(TiExcState* exec)
         TiObjectInitializeCallback initialize = initRoutines[i];
         initialize(toRef(exec), toRef(this));
     }
-}
 
-template <class Base>
-TiCallbackObject<Base>::~TiCallbackObject()
-{
-    TiObjectRef thisRef = toRef(this);
-    
-    for (TiClassRef jsClass = classRef(); jsClass; jsClass = jsClass->parentClass)
-        if (TiObjectFinalizeCallback finalize = jsClass->finalize)
-            finalize(thisRef);
+    bool needsFinalizer = false;
+    for (TiClassRef jsClassPtr = classRef(); jsClassPtr && !needsFinalizer; jsClassPtr = jsClassPtr->parentClass)
+        needsFinalizer = jsClassPtr->finalize;
+    if (needsFinalizer) {
+        HandleSlot slot = exec->globalData().allocateGlobalHandle();
+        HandleHeap::heapFor(slot)->makeWeak(slot, m_callbackObjectData.get(), classRef());
+        HandleHeap::heapFor(slot)->writeBarrier(slot, this);
+        *slot = this;
+    }
 }
 
 template <class Base>
@@ -140,7 +144,7 @@ bool TiCallbackObject<Base>::getOwnPropertySlot(TiExcState* exec, const Identifi
                 value = getProperty(ctx, thisRef, propertyNameRef.get(), &exception);
             }
             if (exception) {
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
                 slot.setValue(jsUndefined());
                 return true;
             }
@@ -151,14 +155,17 @@ bool TiCallbackObject<Base>::getOwnPropertySlot(TiExcState* exec, const Identifi
         }
         
         if (OpaqueTiClassStaticValuesTable* staticValues = jsClass->staticValues(exec)) {
-            if (staticValues->contains(propertyName.ustring().rep())) {
-                slot.setCustom(this, staticValueGetter);
-                return true;
+            if (staticValues->contains(propertyName.impl())) {
+                TiValue value = getStaticValue(exec, propertyName);
+                if (value) {
+                    slot.setValue(value);
+                    return true;
+                }
             }
         }
         
         if (OpaqueTiClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
-            if (staticFunctions->contains(propertyName.ustring().rep())) {
+            if (staticFunctions->contains(propertyName.impl())) {
                 slot.setCustom(this, staticFunctionGetter);
                 return true;
             }
@@ -166,12 +173,6 @@ bool TiCallbackObject<Base>::getOwnPropertySlot(TiExcState* exec, const Identifi
     }
     
     return Base::getOwnPropertySlot(exec, propertyName, slot);
-}
-
-template <class Base>
-bool TiCallbackObject<Base>::getOwnPropertySlot(TiExcState* exec, unsigned propertyName, PropertySlot& slot)
-{
-    return getOwnPropertySlot(exec, Identifier::from(exec, propertyName), slot);
 }
 
 template <class Base>
@@ -212,13 +213,13 @@ void TiCallbackObject<Base>::put(TiExcState* exec, const Identifier& propertyNam
                 result = setProperty(ctx, thisRef, propertyNameRef.get(), valueRef, &exception);
             }
             if (exception)
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
             if (result || exception)
                 return;
         }
         
         if (OpaqueTiClassStaticValuesTable* staticValues = jsClass->staticValues(exec)) {
-            if (StaticValueEntry* entry = staticValues->get(propertyName.ustring().rep())) {
+            if (StaticValueEntry* entry = staticValues->get(propertyName.impl())) {
                 if (entry->attributes & kTiPropertyAttributeReadOnly)
                     return;
                 if (TiObjectSetPropertyCallback setProperty = entry->setProperty) {
@@ -231,19 +232,18 @@ void TiCallbackObject<Base>::put(TiExcState* exec, const Identifier& propertyNam
                         result = setProperty(ctx, thisRef, propertyNameRef.get(), valueRef, &exception);
                     }
                     if (exception)
-                        exec->setException(toJS(exec, exception));
+                        throwError(exec, toJS(exec, exception));
                     if (result || exception)
                         return;
-                } else
-                    throwError(exec, ReferenceError, "Attempt to set a property that is not settable.");
+                }
             }
         }
         
         if (OpaqueTiClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
-            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.ustring().rep())) {
+            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.impl())) {
                 if (entry->attributes & kTiPropertyAttributeReadOnly)
                     return;
-                TiCallbackObject<Base>::putDirect(propertyName, value); // put as override property
+                TiCallbackObject<Base>::putDirect(exec->globalData(), propertyName, value); // put as override property
                 return;
             }
         }
@@ -270,13 +270,13 @@ bool TiCallbackObject<Base>::deleteProperty(TiExcState* exec, const Identifier& 
                 result = deleteProperty(ctx, thisRef, propertyNameRef.get(), &exception);
             }
             if (exception)
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
             if (result || exception)
                 return true;
         }
         
         if (OpaqueTiClassStaticValuesTable* staticValues = jsClass->staticValues(exec)) {
-            if (StaticValueEntry* entry = staticValues->get(propertyName.ustring().rep())) {
+            if (StaticValueEntry* entry = staticValues->get(propertyName.impl())) {
                 if (entry->attributes & kTiPropertyAttributeDontDelete)
                     return false;
                 return true;
@@ -284,7 +284,7 @@ bool TiCallbackObject<Base>::deleteProperty(TiExcState* exec, const Identifier& 
         }
         
         if (OpaqueTiClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
-            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.ustring().rep())) {
+            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.impl())) {
                 if (entry->attributes & kTiPropertyAttributeDontDelete)
                     return false;
                 return true;
@@ -314,17 +314,18 @@ ConstructType TiCallbackObject<Base>::getConstructData(ConstructData& constructD
 }
 
 template <class Base>
-TiObject* TiCallbackObject<Base>::construct(TiExcState* exec, TiObject* constructor, const ArgList& args)
+EncodedTiValue TiCallbackObject<Base>::construct(TiExcState* exec)
 {
+    TiObject* constructor = exec->callee();
     TiContextRef execRef = toRef(exec);
     TiObjectRef constructorRef = toRef(constructor);
     
     for (TiClassRef jsClass = static_cast<TiCallbackObject<Base>*>(constructor)->classRef(); jsClass; jsClass = jsClass->parentClass) {
         if (TiObjectCallAsConstructorCallback callAsConstructor = jsClass->callAsConstructor) {
-            int argumentCount = static_cast<int>(args.size());
+            int argumentCount = static_cast<int>(exec->argumentCount());
             Vector<TiValueRef, 16> arguments(argumentCount);
             for (int i = 0; i < argumentCount; i++)
-                arguments[i] = toRef(exec, args.at(i));
+                arguments[i] = toRef(exec, exec->argument(i));
             TiValueRef exception = 0;
             TiObject* result;
             {
@@ -332,13 +333,13 @@ TiObject* TiCallbackObject<Base>::construct(TiExcState* exec, TiObject* construc
                 result = toJS(callAsConstructor(execRef, constructorRef, argumentCount, arguments.data(), &exception));
             }
             if (exception)
-                exec->setException(toJS(exec, exception));
-            return result;
+                throwError(exec, toJS(exec, exception));
+            return TiValue::encode(result);
         }
     }
     
     ASSERT_NOT_REACHED(); // getConstructData should prevent us from reaching here
-    return 0;
+    return TiValue::encode(TiValue());
 }
 
 template <class Base>
@@ -357,7 +358,7 @@ bool TiCallbackObject<Base>::hasInstance(TiExcState* exec, TiValue value, TiValu
                 result = hasInstance(execRef, thisRef, valueRef, &exception);
             }
             if (exception)
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
             return result;
         }
     }
@@ -377,18 +378,18 @@ CallType TiCallbackObject<Base>::getCallData(CallData& callData)
 }
 
 template <class Base>
-TiValue TiCallbackObject<Base>::call(TiExcState* exec, TiObject* functionObject, TiValue thisValue, const ArgList& args)
+EncodedTiValue TiCallbackObject<Base>::call(TiExcState* exec)
 {
     TiContextRef execRef = toRef(exec);
-    TiObjectRef functionRef = toRef(functionObject);
-    TiObjectRef thisObjRef = toRef(thisValue.toThisObject(exec));
+    TiObjectRef functionRef = toRef(exec->callee());
+    TiObjectRef thisObjRef = toRef(exec->hostThisValue().toThisObject(exec));
     
-    for (TiClassRef jsClass = static_cast<TiCallbackObject<Base>*>(functionObject)->classRef(); jsClass; jsClass = jsClass->parentClass) {
+    for (TiClassRef jsClass = static_cast<TiCallbackObject<Base>*>(toJS(functionRef))->classRef(); jsClass; jsClass = jsClass->parentClass) {
         if (TiObjectCallAsFunctionCallback callAsFunction = jsClass->callAsFunction) {
-            int argumentCount = static_cast<int>(args.size());
+            int argumentCount = static_cast<int>(exec->argumentCount());
             Vector<TiValueRef, 16> arguments(argumentCount);
             for (int i = 0; i < argumentCount; i++)
-                arguments[i] = toRef(exec, args.at(i));
+                arguments[i] = toRef(exec, exec->argument(i));
             TiValueRef exception = 0;
             TiValue result;
             {
@@ -396,13 +397,13 @@ TiValue TiCallbackObject<Base>::call(TiExcState* exec, TiObject* functionObject,
                 result = toJS(exec, callAsFunction(execRef, functionRef, thisObjRef, argumentCount, arguments.data(), &exception));
             }
             if (exception)
-                exec->setException(toJS(exec, exception));
-            return result;
+                throwError(exec, toJS(exec, exception));
+            return TiValue::encode(result);
         }
     }
     
     ASSERT_NOT_REACHED(); // getCallData should prevent us from reaching here
-    return TiValue();
+    return TiValue::encode(TiValue());
 }
 
 template <class Base>
@@ -421,7 +422,7 @@ void TiCallbackObject<Base>::getOwnPropertyNames(TiExcState* exec, PropertyNameA
             typedef OpaqueTiClassStaticValuesTable::const_iterator iterator;
             iterator end = staticValues->end();
             for (iterator it = staticValues->begin(); it != end; ++it) {
-                UString::Rep* name = it->first.get();
+                StringImpl* name = it->first.get();
                 StaticValueEntry* entry = it->second;
                 if (entry->getProperty && (!(entry->attributes & kTiPropertyAttributeDontEnum) || (mode == IncludeDontEnumProperties)))
                     propertyNames.add(Identifier(exec, name));
@@ -432,7 +433,7 @@ void TiCallbackObject<Base>::getOwnPropertyNames(TiExcState* exec, PropertyNameA
             typedef OpaqueTiClassStaticFunctionsTable::const_iterator iterator;
             iterator end = staticFunctions->end();
             for (iterator it = staticFunctions->begin(); it != end; ++it) {
-                UString::Rep* name = it->first.get();
+                StringImpl* name = it->first.get();
                 StaticFunctionEntry* entry = it->second;
                 if (!(entry->attributes & kTiPropertyAttributeDontEnum) || (mode == IncludeDontEnumProperties))
                     propertyNames.add(Identifier(exec, name));
@@ -463,7 +464,7 @@ double TiCallbackObject<Base>::toNumber(TiExcState* exec) const
                 value = convertToType(ctx, thisRef, kTITypeNumber, &exception);
             }
             if (exception) {
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
                 return 0;
             }
 
@@ -490,7 +491,7 @@ UString TiCallbackObject<Base>::toString(TiExcState* exec) const
                 value = convertToType(ctx, thisRef, kTITypeString, &exception);
             }
             if (exception) {
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
                 return "";
             }
             if (value)
@@ -523,16 +524,14 @@ bool TiCallbackObject<Base>::inherits(TiClassRef c) const
 }
 
 template <class Base>
-TiValue TiCallbackObject<Base>::staticValueGetter(TiExcState* exec, TiValue slotBase, const Identifier& propertyName)
+TiValue TiCallbackObject<Base>::getStaticValue(TiExcState* exec, const Identifier& propertyName)
 {
-    TiCallbackObject* thisObj = asCallbackObject(slotBase);
-    
-    TiObjectRef thisRef = toRef(thisObj);
+    TiObjectRef thisRef = toRef(this);
     RefPtr<OpaqueTiString> propertyNameRef;
     
-    for (TiClassRef jsClass = thisObj->classRef(); jsClass; jsClass = jsClass->parentClass)
+    for (TiClassRef jsClass = classRef(); jsClass; jsClass = jsClass->parentClass)
         if (OpaqueTiClassStaticValuesTable* staticValues = jsClass->staticValues(exec))
-            if (StaticValueEntry* entry = staticValues->get(propertyName.ustring().rep()))
+            if (StaticValueEntry* entry = staticValues->get(propertyName.impl()))
                 if (TiObjectGetPropertyCallback getProperty = entry->getProperty) {
                     if (!propertyNameRef)
                         propertyNameRef = OpaqueTiString::create(propertyName.ustring());
@@ -543,14 +542,14 @@ TiValue TiCallbackObject<Base>::staticValueGetter(TiExcState* exec, TiValue slot
                         value = getProperty(toRef(exec), thisRef, propertyNameRef.get(), &exception);
                     }
                     if (exception) {
-                        exec->setException(toJS(exec, exception));
+                        throwError(exec, toJS(exec, exception));
                         return jsUndefined();
                     }
                     if (value)
                         return toJS(exec, value);
                 }
 
-    return throwError(exec, ReferenceError, "Static value property defined with NULL getProperty callback.");
+    return TiValue();
 }
 
 template <class Base>
@@ -565,17 +564,18 @@ TiValue TiCallbackObject<Base>::staticFunctionGetter(TiExcState* exec, TiValue s
     
     for (TiClassRef jsClass = thisObj->classRef(); jsClass; jsClass = jsClass->parentClass) {
         if (OpaqueTiClassStaticFunctionsTable* staticFunctions = jsClass->staticFunctions(exec)) {
-            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.ustring().rep())) {
+            if (StaticFunctionEntry* entry = staticFunctions->get(propertyName.impl())) {
                 if (TiObjectCallAsFunctionCallback callAsFunction = entry->callAsFunction) {
-                    TiObject* o = new (exec) TiCallbackFunction(exec, callAsFunction, propertyName);
-                    thisObj->putDirect(propertyName, o, entry->attributes);
+                    
+                    TiObject* o = new (exec) TiCallbackFunction(exec, asGlobalObject(thisObj->getAnonymousValue(0)), callAsFunction, propertyName);
+                    thisObj->putDirect(exec->globalData(), propertyName, o, entry->attributes);
                     return o;
                 }
             }
         }
     }
     
-    return throwError(exec, ReferenceError, "Static function property defined with NULL callAsFunction callback.");
+    return throwError(exec, createReferenceError(exec, "Static function property defined with NULL callAsFunction callback."));
 }
 
 template <class Base>
@@ -597,14 +597,14 @@ TiValue TiCallbackObject<Base>::callbackGetter(TiExcState* exec, TiValue slotBas
                 value = getProperty(toRef(exec), thisRef, propertyNameRef.get(), &exception);
             }
             if (exception) {
-                exec->setException(toJS(exec, exception));
+                throwError(exec, toJS(exec, exception));
                 return jsUndefined();
             }
             if (value)
                 return toJS(exec, value);
         }
             
-    return throwError(exec, ReferenceError, "hasProperty callback returned true for a property that doesn't exist.");
+    return throwError(exec, createReferenceError(exec, "hasProperty callback returned true for a property that doesn't exist."));
 }
 
 } // namespace TI

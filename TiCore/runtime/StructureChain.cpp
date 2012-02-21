@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,19 +38,35 @@
 #include <wtf/RefPtr.h>
 
 namespace TI {
+    
+ClassInfo StructureChain::s_info = { "StructureChain", 0, 0, 0 };
 
-StructureChain::StructureChain(Structure* head)
+StructureChain::StructureChain(TiGlobalData& globalData, Structure* structure, Structure* head)
+    : TiCell(globalData, structure)
 {
     size_t size = 0;
     for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
         ++size;
     
-    m_vector.set(new RefPtr<Structure>[size + 1]);
+    m_vector = adoptArrayPtr(new WriteBarrier<Structure>[size + 1]);
 
     size_t i = 0;
     for (Structure* current = head; current; current = current->storedPrototype().isNull() ? 0 : asObject(current->storedPrototype())->structure())
-        m_vector[i++] = current;
-    m_vector[i] = 0;
+        m_vector[i++].set(globalData, this, current);
+    m_vector[i].clear();
+}
+
+StructureChain::~StructureChain()
+{
+}
+
+void StructureChain::visitChildren(SlotVisitor& visitor)
+{
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    size_t i = 0;
+    while (m_vector[i])
+        visitor.append(&m_vector[i++]);
 }
 
 } // namespace TI

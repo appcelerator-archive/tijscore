@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,7 +28,6 @@
 #include "config.h"
 
 #include "ThreadSpecific.h"
-#include <wtf/Noncopyable.h>
 
 #if USE(PTHREADS)
 #error This file should not be compiled by ports that do not use Windows native ThreadSpecific implementation.

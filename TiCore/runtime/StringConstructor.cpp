@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,54 +28,74 @@
 #include "config.h"
 #include "StringConstructor.h"
 
+#include "Executable.h"
+#include "JITCode.h"
 #include "TiFunction.h"
 #include "TiGlobalObject.h"
-#include "PrototypeFunction.h"
 #include "StringPrototype.h"
 
 namespace TI {
 
-static NEVER_INLINE TiValue stringFromCharCodeSlowCase(TiExcState* exec, const ArgList& args)
-{
-    unsigned length = args.size();
-    UChar* buf;
-    PassRefPtr<UStringImpl> impl = UStringImpl::createUninitialized(length, buf);
-    for (unsigned i = 0; i < length; ++i)
-        buf[i] = static_cast<UChar>(args.at(i).toUInt32(exec));
-    return jsString(exec, impl);
+static EncodedTiValue JSC_HOST_CALL stringFromCharCode(TiExcState*);
+
 }
 
-static TiValue JSC_HOST_CALL stringFromCharCode(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
-{
-    if (LIKELY(args.size() == 1))
-        return jsSingleCharacterString(exec, args.at(0).toUInt32(exec));
-    return stringFromCharCodeSlowCase(exec, args);
-}
+#include "StringConstructor.lut.h"
+
+namespace TI {
+
+const ClassInfo StringConstructor::s_info = { "Function", &InternalFunction::s_info, 0, TiExcState::stringConstructorTable };
+
+/* Source for StringConstructor.lut.h
+@begin stringConstructorTable
+  fromCharCode          stringFromCharCode         DontEnum|Function 1
+@end
+*/
 
 ASSERT_CLASS_FITS_IN_CELL(StringConstructor);
 
-StringConstructor::StringConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, Structure* prototypeFunctionStructure, StringPrototype* stringPrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, stringPrototype->classInfo()->className))
+StringConstructor::StringConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, StringPrototype* stringPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, stringPrototype->classInfo()->className))
 {
-    // ECMA 15.5.3.1 String.prototype
-    putDirectWithoutTransition(exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
-
-    // ECMA 15.5.3.2 fromCharCode()
-#if ENABLE(JIT) && ENABLE(JIT_OPTIMIZE_NATIVE_CALL)
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().fromCharCode, exec->globalData().getThunk(fromCharCodeThunkGenerator), stringFromCharCode), DontEnum);
-#else
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().fromCharCode, stringFromCharCode), DontEnum);
-#endif
-    // no. of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, stringPrototype, ReadOnly | DontEnum | DontDelete);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontEnum | DontDelete);
 }
 
-// ECMA 15.5.2
-static TiObject* constructWithStringConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+bool StringConstructor::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
 {
-    if (args.isEmpty())
-        return new (exec) StringObject(exec, exec->lexicalGlobalObject()->stringObjectStructure());
-    return new (exec) StringObject(exec, exec->lexicalGlobalObject()->stringObjectStructure(), args.at(0).toString(exec));
+    return getStaticFunctionSlot<InternalFunction>(exec, TiExcState::stringConstructorTable(exec), this, propertyName, slot);
+}
+
+bool StringConstructor::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<InternalFunction>(exec, TiExcState::stringConstructorTable(exec), this, propertyName, descriptor);
+}
+
+// ------------------------------ Functions --------------------------------
+
+static NEVER_INLINE TiValue stringFromCharCodeSlowCase(TiExcState* exec)
+{
+    unsigned length = exec->argumentCount();
+    UChar* buf;
+    PassRefPtr<StringImpl> impl = StringImpl::createUninitialized(length, buf);
+    for (unsigned i = 0; i < length; ++i)
+        buf[i] = static_cast<UChar>(exec->argument(i).toUInt32(exec));
+    return jsString(exec, impl);
+}
+
+static EncodedTiValue JSC_HOST_CALL stringFromCharCode(TiExcState* exec)
+{
+    if (LIKELY(exec->argumentCount() == 1))
+        return TiValue::encode(jsSingleCharacterString(exec, exec->argument(0).toUInt32(exec)));
+    return TiValue::encode(stringFromCharCodeSlowCase(exec));
+}
+
+static EncodedTiValue JSC_HOST_CALL constructWithStringConstructor(TiExcState* exec)
+{
+    TiGlobalObject* globalObject = asInternalFunction(exec->callee())->globalObject();
+    if (!exec->argumentCount())
+        return TiValue::encode(new (exec) StringObject(exec, globalObject->stringObjectStructure()));
+    return TiValue::encode(new (exec) StringObject(exec, globalObject->stringObjectStructure(), exec->argument(0).toString(exec)));
 }
 
 ConstructType StringConstructor::getConstructData(ConstructData& constructData)
@@ -84,12 +104,11 @@ ConstructType StringConstructor::getConstructData(ConstructData& constructData)
     return ConstructTypeHost;
 }
 
-// ECMA 15.5.1
-static TiValue JSC_HOST_CALL callStringConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callStringConstructor(TiExcState* exec)
 {
-    if (args.isEmpty())
-        return jsEmptyString(exec);
-    return jsString(exec, args.at(0).toString(exec));
+    if (!exec->argumentCount())
+        return TiValue::encode(jsEmptyString(exec));
+    return TiValue::encode(jsString(exec, exec->argument(0).toString(exec)));
 }
 
 CallType StringConstructor::getCallData(CallData& callData)

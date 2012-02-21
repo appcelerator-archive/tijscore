@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,22 +40,21 @@ namespace TI {
 
 class TiCallbackFunction : public InternalFunction {
 public:
-    TiCallbackFunction(TiExcState*, TiObjectCallAsFunctionCallback, const Identifier& name);
+    TiCallbackFunction(TiExcState*, TiGlobalObject*, TiObjectCallAsFunctionCallback, const Identifier& name);
 
-    static const ClassInfo info;
+    static const ClassInfo s_info;
     
     // InternalFunction mish-mashes constructor and function behavior -- we should 
     // refactor the code so this override isn't necessary
-    static PassRefPtr<Structure> createStructure(TiValue proto) 
+    static Structure* createStructure(TiGlobalData& globalData, TiValue proto) 
     { 
-        return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+        return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); 
     }
 
 private:
     virtual CallType getCallData(CallData&);
-    virtual const ClassInfo* classInfo() const { return &info; }
 
-    static TiValue JSC_HOST_CALL call(TiExcState*, TiObject*, TiValue, const ArgList&);
+    static EncodedTiValue JSC_HOST_CALL call(TiExcState*);
 
     TiObjectCallAsFunctionCallback m_callback;
 };

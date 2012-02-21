@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,6 +41,7 @@
 #include "Platform.h"
 
 #include <wtf/Assertions.h>
+#include <wtf/FastAllocBase.h>
 #include <wtf/Locker.h>
 #include <wtf/Noncopyable.h>
 
@@ -52,8 +53,6 @@
 #include <pthread.h>
 #elif PLATFORM(GTK)
 #include "GOwnPtr.h"
-typedef struct _GMutex GMutex;
-typedef struct _GCond GCond;
 #endif
 
 #if PLATFORM(QT)
@@ -105,7 +104,8 @@ typedef void* PlatformReadWriteLock;
 typedef void* PlatformCondition;
 #endif
     
-class Mutex : public Noncopyable {
+class Mutex {
+    WTF_MAKE_NONCOPYABLE(Mutex); WTF_MAKE_FAST_ALLOCATED;
 public:
     Mutex();
     ~Mutex();
@@ -122,7 +122,8 @@ private:
 
 typedef Locker<Mutex> MutexLocker;
 
-class ReadWriteLock : public Noncopyable {
+class ReadWriteLock {
+    WTF_MAKE_NONCOPYABLE(ReadWriteLock);
 public:
     ReadWriteLock();
     ~ReadWriteLock();
@@ -139,7 +140,8 @@ private:
     PlatformReadWriteLock m_readWriteLock;
 };
 
-class ThreadCondition : public Noncopyable {
+class ThreadCondition {
+    WTF_MAKE_NONCOPYABLE(ThreadCondition);
 public:
     ThreadCondition();
     ~ThreadCondition();
@@ -155,10 +157,20 @@ private:
     PlatformCondition m_condition;
 };
 
+#if OS(WINDOWS)
+// The absoluteTime is in seconds, starting on January 1, 1970. The time is assumed to use the same time zone as WTI::currentTime().
+// Returns an interval in milliseconds suitable for passing to one of the Win32 wait functions (e.g., ::WaitForSingleObject).
+DWORD absoluteTimeToWaitTimeoutInterval(double absoluteTime);
+#endif
+
 } // namespace WTI
 
 using WTI::Mutex;
 using WTI::MutexLocker;
 using WTI::ThreadCondition;
+
+#if OS(WINDOWS)
+using WTI::absoluteTimeToWaitTimeoutInterval;
+#endif
 
 #endif // ThreadingPrimitives_h

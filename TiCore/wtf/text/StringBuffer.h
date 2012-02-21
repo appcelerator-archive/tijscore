@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,13 +37,13 @@
 #define StringBuffer_h
 
 #include <wtf/Assertions.h>
-#include <wtf/Noncopyable.h>
 #include <wtf/unicode/Unicode.h>
 #include <limits>
 
-namespace WebCore {
+namespace WTI {
 
-class StringBuffer : public Noncopyable {
+class StringBuffer {
+    WTF_MAKE_NONCOPYABLE(StringBuffer);
 public:
     explicit StringBuffer(unsigned length)
         : m_length(length)
@@ -87,5 +87,7 @@ private:
 };
 
 } // namespace WTI
+
+using WTI::StringBuffer;
 
 #endif // StringBuffer_h

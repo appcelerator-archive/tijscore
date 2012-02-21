@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -45,7 +45,11 @@ WTFThreadData* WTFThreadData::staticData;
 WTFThreadData::WTFThreadData()
     : m_atomicStringTable(0)
     , m_atomicStringTableDestructor(0)
+#if USE(JSC)
+    , m_stackBounds(StackBounds::currentThreadStackBounds())
+#endif
 {
+#if USE(JSC)
     static TI::IdentifierTable* sharedIdentifierTable = new TI::IdentifierTable();
     if (pthread_main_np() || isWebThread())
         m_defaultIdentifierTable = sharedIdentifierTable;
@@ -53,13 +57,16 @@ WTFThreadData::WTFThreadData()
         m_defaultIdentifierTable = new TI::IdentifierTable();
 
     m_currentIdentifierTable = m_defaultIdentifierTable;
+#endif
 }
 
 WTFThreadData::~WTFThreadData()
 {
     if (m_atomicStringTableDestructor)
         m_atomicStringTableDestructor(m_atomicStringTable);
+#if USE(JSC)
     delete m_defaultIdentifierTable;
+#endif
 }
 
-} // namespace WebCore
+}

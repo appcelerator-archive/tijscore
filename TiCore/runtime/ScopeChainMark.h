@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,12 +31,6 @@
 #include "ScopeChain.h"
 
 namespace TI {
-
-    inline void ScopeChain::markAggregate(MarkStack& markStack) const
-    {
-        for (ScopeChainNode* n = m_node; n; n = n->next)
-            markStack.append(n->object);
-    }
 
 } // namespace TI
 

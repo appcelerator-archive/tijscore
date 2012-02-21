@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,10 +31,12 @@
 #include "FastAllocBase.h"
 #include "Noncopyable.h"
 #include "NotFound.h"
+#include "StdLibExtras.h"
 #include "ValueCheck.h"
 #include "VectorTraits.h"
 #include <limits>
 #include <utility>
+#include <wtf/Alignment.h>
 
 #if PLATFORM(QT)
 #include <QDataStream>
@@ -45,18 +47,7 @@ namespace WTI {
     using std::min;
     using std::max;
 
-    // WTF_ALIGN_OF / WTF_ALIGNED
-    #if COMPILER(GCC) || COMPILER(MINGW) || COMPILER(RVCT) || COMPILER(WINSCW)
-        #define WTF_ALIGN_OF(type) __alignof__(type)
-        #define WTF_ALIGNED(variable_type, variable, n) variable_type variable __attribute__((__aligned__(n)))
-    #elif COMPILER(MSVC)
-        #define WTF_ALIGN_OF(type) __alignof(type)
-        #define WTF_ALIGNED(variable_type, variable, n) __declspec(align(n)) variable_type variable
-    #else
-        #error WTF_ALIGN macros need alignment control.
-    #endif
-
-    #if COMPILER(GCC) && (((__GNUC__ * 100) + __GNUC_MINOR__) >= 303)
+    #if COMPILER(GCC) && !COMPILER(INTEL) && (((__GNUC__ * 100) + __GNUC_MINOR__) >= 303)
         typedef char __attribute__((__may_alias__)) AlignedBufferChar; 
     #else
         typedef char AlignedBufferChar; 
@@ -135,7 +126,11 @@ namespace WTI {
         {
             while (src != srcEnd) {
                 new (dst) T(*src);
+#if COMPILER(SUNCC) && __SUNPRO_CC <= 0x590
+                const_cast<T*>(src)->~T(); // Work around obscure SunCC 12 compiler bug.
+#else
                 src->~T();
+#endif
                 ++dst;
                 ++src;
             }
@@ -283,10 +278,12 @@ namespace WTI {
     };
 
     template<typename T>
-    class VectorBufferBase : public Noncopyable {
+    class VectorBufferBase {
+        WTF_MAKE_NONCOPYABLE(VectorBufferBase);
     public:
         void allocateBuffer(size_t newCapacity)
         {
+            ASSERT(newCapacity);
             m_capacity = newCapacity;
             if (newCapacity > std::numeric_limits<size_t>::max() / sizeof(T))
                 CRASH();
@@ -295,6 +292,7 @@ namespace WTI {
 
         bool tryAllocateBuffer(size_t newCapacity)
         {
+            ASSERT(newCapacity);
             if (newCapacity > std::numeric_limits<size_t>::max() / sizeof(T))
                 return false;
 
@@ -365,7 +363,10 @@ namespace WTI {
 
         VectorBuffer(size_t capacity)
         {
-            allocateBuffer(capacity);
+            // Calling malloc(0) might take a lock and may actually do an
+            // allocation on some systems (e.g. Brew).
+            if (capacity)
+                allocateBuffer(capacity);
         }
 
         ~VectorBuffer()
@@ -397,6 +398,7 @@ namespace WTI {
 
     template<typename T, size_t inlineCapacity>
     class VectorBuffer : private VectorBufferBase<T> {
+        WTF_MAKE_NONCOPYABLE(VectorBuffer);
     private:
         typedef VectorBufferBase<T> Base;
     public:
@@ -419,6 +421,7 @@ namespace WTI {
 
         void allocateBuffer(size_t newCapacity)
         {
+            // FIXME: This should ASSERT(!m_buffer) to catch misuse/leaks.
             if (newCapacity > inlineCapacity)
                 Base::allocateBuffer(newCapacity);
             else {
@@ -488,18 +491,14 @@ namespace WTI {
         using Base::m_capacity;
 
         static const size_t m_inlineBufferSize = inlineCapacity * sizeof(T);
-#if PLATFORM(ARM)
-        // FIXME: <rdar://problem/6546253&6546260>
-        T* inlineBuffer() { return reinterpret_cast<T*>(static_cast<void*>(m_inlineBuffer.buffer)); }
-#else
-        T* inlineBuffer() { return reinterpret_cast<T*>(m_inlineBuffer.buffer); }
-#endif
+        T* inlineBuffer() { return reinterpret_cast_ptr<T*>(m_inlineBuffer.buffer); }
 
         AlignedBuffer<m_inlineBufferSize, WTF_ALIGN_OF(T)> m_inlineBuffer;
     };
 
     template<typename T, size_t inlineCapacity = 0>
-    class Vector : public FastAllocBase {
+    class Vector {
+        WTF_MAKE_FAST_ALLOCATED;
     private:
         typedef VectorBuffer<T, inlineCapacity> Buffer;
         typedef VectorTypeOperations<T> TypeOperations;
@@ -568,7 +567,9 @@ namespace WTI {
         T& last() { return at(size() - 1); }
         const T& last() const { return at(size() - 1); }
 
+        template<typename U> bool contains(const U&) const;
         template<typename U> size_t find(const U&) const;
+        template<typename U> size_t reverseFind(const U&) const;
 
         void shrink(size_t size);
         void grow(size_t size);
@@ -624,6 +625,8 @@ namespace WTI {
             std::swap(m_size, other.m_size);
             m_buffer.swap(other.m_buffer);
         }
+
+        void reverse();
 
         void checkConsistency();
 
@@ -698,6 +701,12 @@ namespace WTI {
                 return *this;
         }
         
+// Works around an assert in VS2010. See https://connect.microsoft.com/VisualStudio/feedback/details/558044/std-copy-should-not-check-dest-when-first-last
+#if COMPILER(MSVC) && defined(_ITERATOR_DEBUG_LEVEL) && _ITERATOR_DEBUG_LEVEL
+        if (!begin())
+            return *this;
+#endif
+
         std::copy(other.begin(), other.begin() + size(), begin());
         TypeOperations::uninitializedCopy(other.begin() + size(), other.end(), end());
         m_size = other.size();
@@ -705,13 +714,17 @@ namespace WTI {
         return *this;
     }
 
+    inline bool typelessPointersAreEqual(const void* a, const void* b) { return a == b; }
+
     template<typename T, size_t inlineCapacity>
     template<size_t otherCapacity> 
     Vector<T, inlineCapacity>& Vector<T, inlineCapacity>::operator=(const Vector<T, otherCapacity>& other)
     {
-        if (&other == this)
-            return *this;
-        
+        // If the inline capacities match, we should call the more specific
+        // template.  If the inline capacities don't match, the two objects
+        // shouldn't be allocated the same address.
+        ASSERT(!typelessPointersAreEqual(&other, this));
+
         if (size() > other.size())
             shrink(other.size());
         else if (other.size() > capacity()) {
@@ -721,6 +734,12 @@ namespace WTI {
                 return *this;
         }
         
+// Works around an assert in VS2010. See https://connect.microsoft.com/VisualStudio/feedback/details/558044/std-copy-should-not-check-dest-when-first-last
+#if COMPILER(MSVC) && defined(_ITERATOR_DEBUG_LEVEL) && _ITERATOR_DEBUG_LEVEL
+        if (!begin())
+            return *this;
+#endif
+
         std::copy(other.begin(), other.begin() + size(), begin());
         TypeOperations::uninitializedCopy(other.begin() + size(), other.end(), end());
         m_size = other.size();
@@ -730,11 +749,30 @@ namespace WTI {
 
     template<typename T, size_t inlineCapacity>
     template<typename U>
+    bool Vector<T, inlineCapacity>::contains(const U& value) const
+    {
+        return find(value) != notFound;
+    }
+ 
+    template<typename T, size_t inlineCapacity>
+    template<typename U>
     size_t Vector<T, inlineCapacity>::find(const U& value) const
     {
         for (size_t i = 0; i < size(); ++i) {
             if (at(i) == value)
                 return i;
+        }
+        return notFound;
+    }
+
+    template<typename T, size_t inlineCapacity>
+    template<typename U>
+    size_t Vector<T, inlineCapacity>::reverseFind(const U& value) const
+    {
+        for (size_t i = 1; i <= size(); ++i) {
+            const size_t index = size() - i;
+            if (at(index) == value)
+                return index;
         }
         return notFound;
     }
@@ -1065,6 +1103,13 @@ namespace WTI {
         TypeOperations::destruct(beginSpot, endSpot); 
         TypeOperations::moveOverlapping(endSpot, end(), beginSpot);
         m_size -= length;
+    }
+
+    template<typename T, size_t inlineCapacity>
+    inline void Vector<T, inlineCapacity>::reverse()
+    {
+        for (size_t i = 0; i < m_size / 2; ++i)
+            std::swap(at(i), at(m_size - 1 - i));
     }
 
     template<typename T, size_t inlineCapacity>

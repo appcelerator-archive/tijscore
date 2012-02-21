@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,24 +37,34 @@
 #include "Error.h"
 #include "ExceptionHelpers.h"
 #include "TiArray.h"
+#include "TiGlobalObject.h"
 #include "LiteralParser.h"
+#include "Local.h"
+#include "LocalScope.h"
 #include "Lookup.h"
 #include "PropertyNameArray.h"
-#include "StringBuilder.h"
+#include "UStringBuilder.h"
+#include "UStringConcatenate.h"
 #include <wtf/MathExtras.h>
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(JSONObject);
 
-static TiValue JSC_HOST_CALL JSONProtoFuncParse(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL JSONProtoFuncStringify(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL JSONProtoFuncParse(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL JSONProtoFuncStringify(TiExcState*);
 
 }
 
 #include "JSONObject.lut.h"
 
 namespace TI {
+
+JSONObject::JSONObject(TiGlobalObject* globalObject, Structure* structure)
+    : TiObjectWithGlobalObject(globalObject, structure)
+{
+    ASSERT(inherits(&s_info));
+}
 
 // PropertyNameForFunctionCall objects must be on the stack, since the TiValue that they create is not marked.
 class PropertyNameForFunctionCall {
@@ -70,25 +80,25 @@ private:
     mutable TiValue m_value;
 };
 
-class Stringifier : public Noncopyable {
+class Stringifier {
+    WTF_MAKE_NONCOPYABLE(Stringifier);
 public:
-    Stringifier(TiExcState*, TiValue replacer, TiValue space);
-    ~Stringifier();
-    TiValue stringify(TiValue);
+    Stringifier(TiExcState*, const Local<Unknown>& replacer, const Local<Unknown>& space);
+    Local<Unknown> stringify(Handle<Unknown>);
 
-    void markAggregate(MarkStack&);
+    void visitAggregate(SlotVisitor&);
 
 private:
     class Holder {
     public:
-        Holder(TiObject*);
+        Holder(TiGlobalData&, TiObject*);
 
-        TiObject* object() const { return m_object; }
+        TiObject* object() const { return m_object.get(); }
 
-        bool appendNextProperty(Stringifier&, StringBuilder&);
+        bool appendNextProperty(Stringifier&, UStringBuilder&);
 
     private:
-        TiObject* const m_object;
+        Local<TiObject> m_object;
         const bool m_isArray;
         bool m_isTiArray;
         unsigned m_index;
@@ -98,28 +108,26 @@ private:
 
     friend class Holder;
 
-    static void appendQuotedString(StringBuilder&, const UString&);
+    static void appendQuotedString(UStringBuilder&, const UString&);
 
     TiValue toJSON(TiValue, const PropertyNameForFunctionCall&);
 
     enum StringifyResult { StringifyFailed, StringifySucceeded, StringifyFailedDueToUndefinedValue };
-    StringifyResult appendStringifiedValue(StringBuilder&, TiValue, TiObject* holder, const PropertyNameForFunctionCall&);
+    StringifyResult appendStringifiedValue(UStringBuilder&, TiValue, TiObject* holder, const PropertyNameForFunctionCall&);
 
     bool willIndent() const;
     void indent();
     void unindent();
-    void startNewLine(StringBuilder&) const;
+    void startNewLine(UStringBuilder&) const;
 
-    Stringifier* const m_nextStringifierToMark;
     TiExcState* const m_exec;
-    const TiValue m_replacer;
+    const Local<Unknown> m_replacer;
     bool m_usingArrayReplacer;
     PropertyNameArray m_arrayReplacerPropertyNames;
     CallType m_replacerCallType;
     CallData m_replacerCallData;
     const UString m_gap;
 
-    HashSet<TiObject*> m_holderCycleDetector;
     Vector<Holder, 16> m_holderStack;
     UString m_repeatedGap;
     UString m_indent;
@@ -132,11 +140,11 @@ static inline TiValue unwrapBoxedPrimitive(TiExcState* exec, TiValue value)
     if (!value.isObject())
         return value;
     TiObject* object = asObject(value);
-    if (object->inherits(&NumberObject::info))
-        return jsNumber(exec, object->toNumber(exec));
-    if (object->inherits(&StringObject::info))
+    if (object->inherits(&NumberObject::s_info))
+        return jsNumber(object->toNumber(exec));
+    if (object->inherits(&StringObject::s_info))
         return jsString(exec, object->toString(exec));
-    if (object->inherits(&BooleanObject::info))
+    if (object->inherits(&BooleanObject::s_info))
         return object->toPrimitive(exec);
     return value;
 }
@@ -164,8 +172,8 @@ static inline UString gap(TiExcState* exec, TiValue space)
 
     // If the space value is a string, use it as the gap string, otherwise use no gap string.
     UString spaces = space.getString(exec);
-    if (spaces.size() > maxGapLength) {
-        spaces = spaces.substr(0, maxGapLength);
+    if (spaces.length() > maxGapLength) {
+        spaces = spaces.substringSharingImpl(0, maxGapLength);
     }
     return spaces;
 }
@@ -189,30 +197,27 @@ TiValue PropertyNameForFunctionCall::value(TiExcState* exec) const
         if (m_identifier)
             m_value = jsString(exec, m_identifier->ustring());
         else
-            m_value = jsNumber(exec, m_number);
+            m_value = jsNumber(m_number);
     }
     return m_value;
 }
 
 // ------------------------------ Stringifier --------------------------------
 
-Stringifier::Stringifier(TiExcState* exec, TiValue replacer, TiValue space)
-    : m_nextStringifierToMark(exec->globalData().firstStringifierToMark)
-    , m_exec(exec)
+Stringifier::Stringifier(TiExcState* exec, const Local<Unknown>& replacer, const Local<Unknown>& space)
+    : m_exec(exec)
     , m_replacer(replacer)
     , m_usingArrayReplacer(false)
     , m_arrayReplacerPropertyNames(exec)
     , m_replacerCallType(CallTypeNone)
-    , m_gap(gap(exec, space))
+    , m_gap(gap(exec, space.get()))
 {
-    exec->globalData().firstStringifierToMark = this;
-
     if (!m_replacer.isObject())
         return;
 
-    if (asObject(m_replacer)->inherits(&TiArray::info)) {
+    if (m_replacer.asObject()->inherits(&TiArray::s_info)) {
         m_usingArrayReplacer = true;
-        TiObject* array = asObject(m_replacer);
+        Handle<TiObject> array = m_replacer.asObject();
         unsigned length = array->get(exec, exec->globalData().propertyNames->length).toUInt32(exec);
         for (unsigned i = 0; i < length; ++i) {
             TiValue name = array->get(exec, i);
@@ -232,7 +237,7 @@ Stringifier::Stringifier(TiExcState* exec, TiValue replacer, TiValue space)
             }
 
             if (name.isObject()) {
-                if (!asObject(name)->inherits(&NumberObject::info) && !asObject(name)->inherits(&StringObject::info))
+                if (!asObject(name)->inherits(&NumberObject::s_info) && !asObject(name)->inherits(&StringObject::s_info))
                     continue;
                 propertyName = name.toString(exec);
                 if (exec->hadException())
@@ -243,52 +248,34 @@ Stringifier::Stringifier(TiExcState* exec, TiValue replacer, TiValue space)
         return;
     }
 
-    m_replacerCallType = asObject(m_replacer)->getCallData(m_replacerCallData);
+    m_replacerCallType = m_replacer.asObject()->getCallData(m_replacerCallData);
 }
 
-Stringifier::~Stringifier()
-{
-    ASSERT(m_exec->globalData().firstStringifierToMark == this);
-    m_exec->globalData().firstStringifierToMark = m_nextStringifierToMark;
-}
-
-void Stringifier::markAggregate(MarkStack& markStack)
-{
-    for (Stringifier* stringifier = this; stringifier; stringifier = stringifier->m_nextStringifierToMark) {
-        size_t size = m_holderStack.size();
-        for (size_t i = 0; i < size; ++i)
-            markStack.append(m_holderStack[i].object());
-    }
-}
-
-TiValue Stringifier::stringify(TiValue value)
+Local<Unknown> Stringifier::stringify(Handle<Unknown> value)
 {
     TiObject* object = constructEmptyObject(m_exec);
     if (m_exec->hadException())
-        return jsNull();
+        return Local<Unknown>(m_exec->globalData(), jsNull());
 
     PropertyNameForFunctionCall emptyPropertyName(m_exec->globalData().propertyNames->emptyIdentifier);
-    object->putDirect(m_exec->globalData().propertyNames->emptyIdentifier, value);
+    object->putDirect(m_exec->globalData(), m_exec->globalData().propertyNames->emptyIdentifier, value.get());
 
-    StringBuilder result;
-    if (appendStringifiedValue(result, value, object, emptyPropertyName) != StringifySucceeded)
-        return jsUndefined();
+    UStringBuilder result;
+    if (appendStringifiedValue(result, value.get(), object, emptyPropertyName) != StringifySucceeded)
+        return Local<Unknown>(m_exec->globalData(), jsUndefined());
     if (m_exec->hadException())
-        return jsNull();
+        return Local<Unknown>(m_exec->globalData(), jsNull());
 
-    return jsString(m_exec, result.build());
+    return Local<Unknown>(m_exec->globalData(), jsString(m_exec, result.toUString()));
 }
 
-void Stringifier::appendQuotedString(StringBuilder& builder, const UString& value)
+void Stringifier::appendQuotedString(UStringBuilder& builder, const UString& value)
 {
-    int length = value.size();
-
-    // String length plus 2 for quote marks plus 8 so we can accomodate a few escaped characters.
-    builder.reserveCapacity(builder.size() + length + 2 + 8);
+    int length = value.length();
 
     builder.append('"');
 
-    const UChar* data = value.data();
+    const UChar* data = value.characters();
     for (int i = 0; i < length; ++i) {
         int start = i;
         while (i < length && (data[i] > 0x1F && data[i] != '"' && data[i] != '\\'))
@@ -329,7 +316,7 @@ void Stringifier::appendQuotedString(StringBuilder& builder, const UString& valu
                 static const char hexDigits[] = "0123456789abcdef";
                 UChar ch = data[i];
                 UChar hex[] = { '\\', 'u', hexDigits[(ch >> 12) & 0xF], hexDigits[(ch >> 8) & 0xF], hexDigits[(ch >> 4) & 0xF], hexDigits[ch & 0xF] };
-                builder.append(hex, sizeof(hex) / sizeof(UChar));
+                builder.append(hex, WTF_ARRAY_LENGTH(hex));
                 break;
         }
     }
@@ -357,11 +344,11 @@ inline TiValue Stringifier::toJSON(TiValue value, const PropertyNameForFunctionC
         return value;
 
     TiValue list[] = { propertyName.value(m_exec) };
-    ArgList args(list, sizeof(list) / sizeof(TiValue));
+    ArgList args(list, WTF_ARRAY_LENGTH(list));
     return call(m_exec, object, callType, callData, value, args);
 }
 
-Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& builder, TiValue value, TiObject* holder, const PropertyNameForFunctionCall& propertyName)
+Stringifier::StringifyResult Stringifier::appendStringifiedValue(UStringBuilder& builder, TiValue value, TiObject* holder, const PropertyNameForFunctionCall& propertyName)
 {
     // Call the toJSON function.
     value = toJSON(value, propertyName);
@@ -371,13 +358,13 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
     // Call the replacer function.
     if (m_replacerCallType != CallTypeNone) {
         TiValue list[] = { propertyName.value(m_exec), value };
-        ArgList args(list, sizeof(list) / sizeof(TiValue));
-        value = call(m_exec, m_replacer, m_replacerCallType, m_replacerCallData, holder, args);
+        ArgList args(list, WTF_ARRAY_LENGTH(list));
+        value = call(m_exec, m_replacer.get(), m_replacerCallType, m_replacerCallData, holder, args);
         if (m_exec->hadException())
             return StringifyFailed;
     }
 
-    if (value.isUndefined() && !holder->inherits(&TiArray::info))
+    if (value.isUndefined() && !holder->inherits(&TiArray::s_info))
         return StringifyFailedDueToUndefinedValue;
 
     if (value.isNull()) {
@@ -406,7 +393,7 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
         if (!isfinite(numericValue))
             builder.append("null");
         else
-            builder.append(UString::from(numericValue));
+            builder.append(UString::number(numericValue));
         return StringifySucceeded;
     }
 
@@ -417,7 +404,7 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
 
     CallData callData;
     if (object->getCallData(callData) != CallTypeNone) {
-        if (holder->inherits(&TiArray::info)) {
+        if (holder->inherits(&TiArray::s_info)) {
             builder.append("null");
             return StringifySucceeded;
         }
@@ -425,12 +412,14 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
     }
 
     // Handle cycle detection, and put the holder on the stack.
-    if (!m_holderCycleDetector.add(object).second) {
-        throwError(m_exec, TypeError, "JSON.stringify cannot serialize cyclic structures.");
-        return StringifyFailed;
+    for (unsigned i = 0; i < m_holderStack.size(); i++) {
+        if (m_holderStack[i].object() == object) {
+            throwError(m_exec, createTypeError(m_exec, "JSON.stringify cannot serialize cyclic structures."));
+            return StringifyFailed;
+        }
     }
     bool holderStackWasEmpty = m_holderStack.isEmpty();
-    m_holderStack.append(object);
+    m_holderStack.append(Holder(m_exec->globalData(), object));
     if (!holderStackWasEmpty)
         return StringifySucceeded;
 
@@ -444,13 +433,12 @@ Stringifier::StringifyResult Stringifier::appendStringifiedValue(StringBuilder& 
                 return StringifyFailed;
             if (!--tickCount) {
                 if (localTimeoutChecker.didTimeOut(m_exec)) {
-                    m_exec->setException(createInterruptedExecutionException(&m_exec->globalData()));
+                    throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
                     return StringifyFailed;
                 }
                 tickCount = localTimeoutChecker.ticksUntilNextCheck();
             }
         }
-        m_holderCycleDetector.remove(m_holderStack.last().object());
         m_holderStack.removeLast();
     } while (!m_holderStack.isEmpty());
     return StringifySucceeded;
@@ -464,20 +452,20 @@ inline bool Stringifier::willIndent() const
 inline void Stringifier::indent()
 {
     // Use a single shared string, m_repeatedGap, so we don't keep allocating new ones as we indent and unindent.
-    unsigned newSize = m_indent.size() + m_gap.size();
-    if (newSize > m_repeatedGap.size())
-        m_repeatedGap = makeString(m_repeatedGap, m_gap);
-    ASSERT(newSize <= m_repeatedGap.size());
-    m_indent = m_repeatedGap.substr(0, newSize);
+    unsigned newSize = m_indent.length() + m_gap.length();
+    if (newSize > m_repeatedGap.length())
+        m_repeatedGap = makeUString(m_repeatedGap, m_gap);
+    ASSERT(newSize <= m_repeatedGap.length());
+    m_indent = m_repeatedGap.substringSharingImpl(0, newSize);
 }
 
 inline void Stringifier::unindent()
 {
-    ASSERT(m_indent.size() >= m_gap.size());
-    m_indent = m_repeatedGap.substr(0, m_indent.size() - m_gap.size());
+    ASSERT(m_indent.length() >= m_gap.length());
+    m_indent = m_repeatedGap.substringSharingImpl(0, m_indent.length() - m_gap.length());
 }
 
-inline void Stringifier::startNewLine(StringBuilder& builder) const
+inline void Stringifier::startNewLine(UStringBuilder& builder) const
 {
     if (m_gap.isEmpty())
         return;
@@ -485,14 +473,14 @@ inline void Stringifier::startNewLine(StringBuilder& builder) const
     builder.append(m_indent);
 }
 
-inline Stringifier::Holder::Holder(TiObject* object)
-    : m_object(object)
-    , m_isArray(object->inherits(&TiArray::info))
+inline Stringifier::Holder::Holder(TiGlobalData& globalData, TiObject* object)
+    : m_object(globalData, object)
+    , m_isArray(object->inherits(&TiArray::s_info))
     , m_index(0)
 {
 }
 
-bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBuilder& builder)
+bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, UStringBuilder& builder)
 {
     ASSERT(m_index <= m_size);
 
@@ -501,7 +489,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
     // First time through, initialize.
     if (!m_index) {
         if (m_isArray) {
-            m_isTiArray = isTiArray(&exec->globalData(), m_object);
+            m_isTiArray = isTiArray(&exec->globalData(), m_object.get());
             m_size = m_object->get(exec, exec->globalData().propertyNames->length).toUInt32(exec);
             builder.append('[');
         } else {
@@ -521,7 +509,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
     // Last time through, finish up and return false.
     if (m_index == m_size) {
         stringifier.unindent();
-        if (m_size && builder[builder.size() - 1] != '{')
+        if (m_size && builder[builder.length() - 1] != '{')
             stringifier.startNewLine(builder);
         builder.append(m_isArray ? ']' : '}');
         return false;
@@ -534,10 +522,10 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
     if (m_isArray) {
         // Get the value.
         TiValue value;
-        if (m_isTiArray && asArray(m_object)->canGetIndex(index))
-            value = asArray(m_object)->getIndex(index);
+        if (m_isTiArray && asArray(m_object.get())->canGetIndex(index))
+            value = asArray(m_object.get())->getIndex(index);
         else {
-            PropertySlot slot(m_object);
+            PropertySlot slot(m_object.get());
             if (!m_object->getOwnPropertySlot(exec, index, slot))
                 slot.setUndefined();
             if (exec->hadException())
@@ -551,10 +539,10 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
         stringifier.startNewLine(builder);
 
         // Append the stringified value.
-        stringifyResult = stringifier.appendStringifiedValue(builder, value, m_object, index);
+        stringifyResult = stringifier.appendStringifiedValue(builder, value, m_object.get(), index);
     } else {
         // Get the value.
-        PropertySlot slot(m_object);
+        PropertySlot slot(m_object.get());
         Identifier& propertyName = m_propertyNames->propertyNameVector()[index];
         if (!m_object->getOwnPropertySlot(exec, propertyName, slot))
             return true;
@@ -562,7 +550,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
         if (exec->hadException())
             return false;
 
-        rollBackPoint = builder.size();
+        rollBackPoint = builder.length();
 
         // Append the separator string.
         if (builder[rollBackPoint - 1] != '{')
@@ -576,7 +564,7 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
             builder.append(' ');
 
         // Append the stringified value.
-        stringifyResult = stringifier.appendStringifiedValue(builder, value, m_object, propertyName);
+        stringifyResult = stringifier.appendStringifiedValue(builder, value, m_object.get(), propertyName);
     }
 
     // From this point on, no access to the this pointer or to any members, because the
@@ -602,12 +590,12 @@ bool Stringifier::Holder::appendNextProperty(Stringifier& stringifier, StringBui
 
 // ------------------------------ JSONObject --------------------------------
 
-const ClassInfo JSONObject::info = { "JSON", 0, 0, TiExcState::jsonTable };
+const ClassInfo JSONObject::s_info = { "JSON", &TiObjectWithGlobalObject::s_info, 0, TiExcState::jsonTable };
 
 /* Source for JSONObject.lut.h
 @begin jsonTable
-  parse         JSONProtoFuncParse             DontEnum|Function 1
-  stringify     JSONProtoFuncStringify         DontEnum|Function 1
+  parse         JSONProtoFuncParse             DontEnum|Function 2
+  stringify     JSONProtoFuncStringify         DontEnum|Function 3
 @end
 */
 
@@ -623,16 +611,11 @@ bool JSONObject::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& pr
     return getStaticFunctionDescriptor<TiObject>(exec, TiExcState::jsonTable(exec), this, propertyName, descriptor);
 }
 
-void JSONObject::markStringifiers(MarkStack& markStack, Stringifier* stringifier)
-{
-    stringifier->markAggregate(markStack);
-}
-
 class Walker {
 public:
-    Walker(TiExcState* exec, TiObject* function, CallType callType, CallData callData)
+    Walker(TiExcState* exec, Handle<TiObject> function, CallType callType, CallData callData)
         : m_exec(exec)
-        , m_function(function)
+        , m_function(exec->globalData(), function)
         , m_callType(callType)
         , m_callData(callData)
     {
@@ -643,13 +626,13 @@ private:
     {
         TiValue args[] = { property, unfiltered };
         ArgList argList(args, 2);
-        return call(m_exec, m_function, m_callType, m_callData, thisObj, argList);
+        return call(m_exec, m_function.get(), m_callType, m_callData, thisObj, argList);
     }
 
     friend class Holder;
 
     TiExcState* m_exec;
-    TiObject* m_function;
+    Local<TiObject> m_function;
     CallType m_callType;
     CallData m_callData;
 };
@@ -663,8 +646,8 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
 {
     Vector<PropertyNameArray, 16> propertyStack;
     Vector<uint32_t, 16> indexStack;
-    Vector<TiObject*, 16> objectStack;
-    Vector<TiArray*, 16> arrayStack;
+    LocalStack<TiObject, 16> objectStack(m_exec->globalData());
+    LocalStack<TiArray, 16> arrayStack(m_exec->globalData());
     
     Vector<WalkerState, 16> stateStack;
     WalkerState state = StateUnknown;
@@ -679,32 +662,28 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
             arrayStartState:
             case ArrayStartState: {
                 ASSERT(inValue.isObject());
-                ASSERT(isTiArray(&m_exec->globalData(), asObject(inValue)) || asObject(inValue)->inherits(&TiArray::info));
-                if (objectStack.size() + arrayStack.size() > maximumFilterRecursion) {
-                    m_exec->setException(createStackOverflowError(m_exec));
-                    return jsUndefined();
-                }
+                ASSERT(isTiArray(&m_exec->globalData(), asObject(inValue)) || asObject(inValue)->inherits(&TiArray::s_info));
+                if (objectStack.size() + arrayStack.size() > maximumFilterRecursion)
+                    return throwError(m_exec, createStackOverflowError(m_exec));
 
                 TiArray* array = asArray(inValue);
-                arrayStack.append(array);
+                arrayStack.push(array);
                 indexStack.append(0);
                 // fallthrough
             }
             arrayStartVisitMember:
             case ArrayStartVisitMember: {
                 if (!--tickCount) {
-                    if (localTimeoutChecker.didTimeOut(m_exec)) {
-                        m_exec->setException(createInterruptedExecutionException(&m_exec->globalData()));
-                        return jsUndefined();
-                    }
+                    if (localTimeoutChecker.didTimeOut(m_exec))
+                        return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
                     tickCount = localTimeoutChecker.ticksUntilNextCheck();
                 }
 
-                TiArray* array = arrayStack.last();
+                TiArray* array = arrayStack.peek();
                 uint32_t index = indexStack.last();
                 if (index == array->length()) {
                     outValue = array;
-                    arrayStack.removeLast();
+                    arrayStack.pop();
                     indexStack.removeLast();
                     break;
                 }
@@ -726,13 +705,13 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
                 // fallthrough
             }
             case ArrayEndVisitMember: {
-                TiArray* array = arrayStack.last();
-                TiValue filteredValue = callReviver(array, jsString(m_exec, UString::from(indexStack.last())), outValue);
+                TiArray* array = arrayStack.peek();
+                TiValue filteredValue = callReviver(array, jsString(m_exec, UString::number(indexStack.last())), outValue);
                 if (filteredValue.isUndefined())
                     array->deleteProperty(m_exec, indexStack.last());
                 else {
                     if (isTiArray(&m_exec->globalData(), array) && array->canSetIndex(indexStack.last()))
-                        array->setIndex(indexStack.last(), filteredValue);
+                        array->setIndex(m_exec->globalData(), indexStack.last(), filteredValue);
                     else
                         array->put(m_exec, indexStack.last(), filteredValue);
                 }
@@ -744,14 +723,12 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
             objectStartState:
             case ObjectStartState: {
                 ASSERT(inValue.isObject());
-                ASSERT(!isTiArray(&m_exec->globalData(), asObject(inValue)) && !asObject(inValue)->inherits(&TiArray::info));
-                if (objectStack.size() + arrayStack.size() > maximumFilterRecursion) {
-                    m_exec->setException(createStackOverflowError(m_exec));
-                    return jsUndefined();
-                }
+                ASSERT(!isTiArray(&m_exec->globalData(), asObject(inValue)) && !asObject(inValue)->inherits(&TiArray::s_info));
+                if (objectStack.size() + arrayStack.size() > maximumFilterRecursion)
+                    return throwError(m_exec, createStackOverflowError(m_exec));
 
                 TiObject* object = asObject(inValue);
-                objectStack.append(object);
+                objectStack.push(object);
                 indexStack.append(0);
                 propertyStack.append(PropertyNameArray(m_exec));
                 object->getOwnPropertyNames(m_exec, propertyStack.last());
@@ -760,19 +737,17 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
             objectStartVisitMember:
             case ObjectStartVisitMember: {
                 if (!--tickCount) {
-                    if (localTimeoutChecker.didTimeOut(m_exec)) {
-                        m_exec->setException(createInterruptedExecutionException(&m_exec->globalData()));
-                        return jsUndefined();
-                    }
+                    if (localTimeoutChecker.didTimeOut(m_exec))
+                        return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
                     tickCount = localTimeoutChecker.ticksUntilNextCheck();
                 }
 
-                TiObject* object = objectStack.last();
+                TiObject* object = objectStack.peek();
                 uint32_t index = indexStack.last();
                 PropertyNameArray& properties = propertyStack.last();
                 if (index == properties.size()) {
                     outValue = object;
-                    objectStack.removeLast();
+                    objectStack.pop();
                     indexStack.removeLast();
                     propertyStack.removeLast();
                     break;
@@ -795,7 +770,7 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
                 // fallthrough
             }
             case ObjectEndVisitMember: {
-                TiObject* object = objectStack.last();
+                TiObject* object = objectStack.peek();
                 Identifier prop = propertyStack.last()[indexStack.last()];
                 PutPropertySlot slot;
                 TiValue filteredValue = callReviver(object, jsString(m_exec, prop.ustring()), outValue);
@@ -815,7 +790,7 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
                     break;
                 }
                 TiObject* object = asObject(inValue);
-                if (isTiArray(&m_exec->globalData(), object) || object->inherits(&TiArray::info))
+                if (isTiArray(&m_exec->globalData(), object) || object->inherits(&TiArray::s_info))
                     goto arrayStartState;
                 goto objectStartState;
         }
@@ -826,10 +801,8 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
         stateStack.removeLast();
 
         if (!--tickCount) {
-            if (localTimeoutChecker.didTimeOut(m_exec)) {
-                m_exec->setException(createInterruptedExecutionException(&m_exec->globalData()));
-                return jsUndefined();
-            }
+            if (localTimeoutChecker.didTimeOut(m_exec))
+                return throwError(m_exec, createInterruptedExecutionException(&m_exec->globalData()));
             tickCount = localTimeoutChecker.ticksUntilNextCheck();
         }
     }
@@ -840,45 +813,48 @@ NEVER_INLINE TiValue Walker::walk(TiValue unfiltered)
 }
 
 // ECMA-262 v5 15.12.2
-TiValue JSC_HOST_CALL JSONProtoFuncParse(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL JSONProtoFuncParse(TiExcState* exec)
 {
-    if (args.isEmpty())
-        return throwError(exec, GeneralError, "JSON.parse requires at least one parameter");
-    TiValue value = args.at(0);
+    if (!exec->argumentCount())
+        return throwVMError(exec, createError(exec, "JSON.parse requires at least one parameter"));
+    TiValue value = exec->argument(0);
     UString source = value.toString(exec);
     if (exec->hadException())
-        return jsNull();
-    
-    LiteralParser jsonParser(exec, source, LiteralParser::StrictJSON);
+        return TiValue::encode(jsNull());
+
+    LocalScope scope(exec->globalData());
+    LiteralParser jsonParser(exec, source.characters(), source.length(), LiteralParser::StrictJSON);
     TiValue unfiltered = jsonParser.tryLiteralParse();
     if (!unfiltered)
-        return throwError(exec, SyntaxError, "Unable to parse JSON string");
+        return throwVMError(exec, createSyntaxError(exec, "Unable to parse JSON string"));
     
-    if (args.size() < 2)
-        return unfiltered;
+    if (exec->argumentCount() < 2)
+        return TiValue::encode(unfiltered);
     
-    TiValue function = args.at(1);
+    TiValue function = exec->argument(1);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return unfiltered;
-    return Walker(exec, asObject(function), callType, callData).walk(unfiltered);
+        return TiValue::encode(unfiltered);
+    return TiValue::encode(Walker(exec, Local<TiObject>(exec->globalData(), asObject(function)), callType, callData).walk(unfiltered));
 }
 
 // ECMA-262 v5 15.12.3
-TiValue JSC_HOST_CALL JSONProtoFuncStringify(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL JSONProtoFuncStringify(TiExcState* exec)
 {
-    if (args.isEmpty())
-        return throwError(exec, GeneralError, "No input to stringify");
-    TiValue value = args.at(0);
-    TiValue replacer = args.at(1);
-    TiValue space = args.at(2);
-    return Stringifier(exec, replacer, space).stringify(value);
+    if (!exec->argumentCount())
+        return throwVMError(exec, createError(exec, "No input to stringify"));
+    LocalScope scope(exec->globalData());
+    Local<Unknown> value(exec->globalData(), exec->argument(0));
+    Local<Unknown> replacer(exec->globalData(), exec->argument(1));
+    Local<Unknown> space(exec->globalData(), exec->argument(2));
+    return TiValue::encode(Stringifier(exec, replacer, space).stringify(value).get());
 }
 
 UString JSONStringify(TiExcState* exec, TiValue value, unsigned indent)
 {
-    TiValue result = Stringifier(exec, jsNull(), jsNumber(exec, indent)).stringify(value);
+    LocalScope scope(exec->globalData());
+    Local<Unknown> result = Stringifier(exec, Local<Unknown>(exec->globalData(), jsNull()), Local<Unknown>(exec->globalData(), jsNumber(indent))).stringify(Local<Unknown>(exec->globalData(), value));
     if (result.isUndefinedOrNull())
         return UString();
     return result.getString(exec);

@@ -2,11 +2,11 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
- * Copyright (C) 2006 Apple Inc. All rights reserved.
+ * Copyright (C) 2006, 2010 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -35,6 +35,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <string.h>
 
 #if HAVE(STRINGS_H) 
 #include <strings.h> 
@@ -50,17 +51,30 @@ inline int snprintf(char* buffer, size_t count, const char* format, ...)
     va_start(args, format);
     result = _vsnprintf(buffer, count, format, args);
     va_end(args);
+
+    // In the case where the string entirely filled the buffer, _vsnprintf will not
+    // null-terminate it, but snprintf must.
+    if (count > 0)
+        buffer[count - 1] = '\0';
+
     return result;
 }
 
-#if COMPILER(MSVC7_OR_LOWER) || OS(WINCE)
-
-inline int vsnprintf(char* buffer, size_t count, const char* format, va_list args)
+inline double wtf_vsnprintf(char* buffer, size_t count, const char* format, va_list args)
 {
-    return _vsnprintf(buffer, count, format, args);
+    int result = _vsnprintf(buffer, count, format, args);
+
+    // In the case where the string entirely filled the buffer, _vsnprintf will not
+    // null-terminate it, but vsnprintf must.
+    if (count > 0)
+        buffer[count - 1] = '\0';
+
+    return result;
 }
 
-#endif
+// Work around a difference in Microsoft's implementation of vsnprintf, where 
+// vsnprintf does not null terminate the buffer. WebKit can rely on the null termination.
+#define vsnprintf(buffer, count, format, args) wtf_vsnprintf(buffer, count, format, args)
 
 #if OS(WINCE)
 
@@ -93,8 +107,7 @@ inline int strcasecmp(const char* s1, const char* s2)
 
 #endif
 
-#if OS(WINDOWS) || OS(LINUX) || OS(SOLARIS)
-// FIXME: should check HAVE_STRNSTR
+#if !HAVE(STRNSTR)
 
 inline char* strnstr(const char* buffer, const char* target, size_t bufferLength)
 {

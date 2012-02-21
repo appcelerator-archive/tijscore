@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,8 +39,8 @@
 // Provides customizable overrides of fastMalloc/fastFree and operator new/delete
 //
 // Provided functionality:
+//    Macro: WTF_MAKE_FAST_ALLOCATED
 //    namespace WTI {
-//        class FastAllocBase;
 //
 //        T*    fastNew<T>();
 //        T*    fastNew<T>(arg);
@@ -55,7 +55,16 @@
 // FastDelete assumes that the underlying
 //
 // Example usage:
-//    class Widget : public FastAllocBase { ... };
+//    class Widget {
+//        WTF_MAKE_FAST_ALLOCATED
+//    ...
+//    };
+//
+//    struct Data {
+//        WTF_MAKE_FAST_ALLOCATED
+//    public:
+//    ...
+//    };
 //
 //    char* charPtr = fastNew<char>();
 //    fastDelete(charPtr);
@@ -90,40 +99,40 @@
 #include "FastMalloc.h"
 #include "TypeTraits.h"
 
+#define WTF_MAKE_FAST_ALLOCATED \
+public: \
+    void* operator new(size_t, void* p) { return p; } \
+    void* operator new[](size_t, void* p) { return p; } \
+    \
+    void* operator new(size_t size) \
+    { \
+        void* p = ::WTI::fastMalloc(size); \
+         ::WTI::fastMallocMatchValidateMalloc(p, ::WTI::Internal::AllocTypeClassNew); \
+        return p; \
+    } \
+    \
+    void operator delete(void* p) \
+    { \
+        ::WTI::fastMallocMatchValidateFree(p, ::WTI::Internal::AllocTypeClassNew); \
+        ::WTI::fastFree(p); \
+    } \
+    \
+    void* operator new[](size_t size) \
+    { \
+        void* p = ::WTI::fastMalloc(size); \
+        ::WTI::fastMallocMatchValidateMalloc(p, ::WTI::Internal::AllocTypeClassNewArray); \
+        return p; \
+    } \
+    \
+    void operator delete[](void* p) \
+    { \
+         ::WTI::fastMallocMatchValidateFree(p, ::WTI::Internal::AllocTypeClassNewArray); \
+         ::WTI::fastFree(p); \
+    } \
+private: \
+typedef int ThisIsHereToForceASemicolonAfterThisMacro
+
 namespace WTI {
-
-    class FastAllocBase {
-    public:
-        // Placement operator new.
-        void* operator new(size_t, void* p) { return p; }
-        void* operator new[](size_t, void* p) { return p; }
-
-        void* operator new(size_t size)
-        {
-            void* p = fastMalloc(size);
-            fastMallocMatchValidateMalloc(p, Internal::AllocTypeClassNew);
-            return p;
-        }
-
-        void operator delete(void* p)
-        {
-            fastMallocMatchValidateFree(p, Internal::AllocTypeClassNew);
-            fastFree(p);
-        }
-
-        void* operator new[](size_t size)
-        {
-            void* p = fastMalloc(size);
-            fastMallocMatchValidateMalloc(p, Internal::AllocTypeClassNewArray);
-            return p;
-        }
-
-        void operator delete[](void* p)
-        {
-            fastMallocMatchValidateFree(p, Internal::AllocTypeClassNewArray);
-            fastFree(p);
-        }
-    };
 
     // fastNew / fastDelete
 
@@ -414,7 +423,6 @@ namespace WTI {
 
 } // namespace WTI
 
-using WTI::FastAllocBase;
 using WTI::fastDeleteSkippingDestructor;
 
 #endif // FastAllocBase_h

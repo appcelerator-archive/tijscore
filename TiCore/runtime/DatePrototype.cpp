@@ -2,13 +2,14 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
  *  Copyright (C) 2008, 2009 Torch Mobile, Inc. All rights reserved.
+ *  Copyright (C) 2010 Torch Mobile (Beijing) Co. Ltd. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -45,6 +46,7 @@
 #include <limits.h>
 #include <locale.h>
 #include <math.h>
+#include <stdlib.h>
 #include <time.h>
 #include <wtf/Assertions.h>
 #include <wtf/DateMath.h>
@@ -76,52 +78,51 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(DatePrototype);
 
-static TiValue JSC_HOST_CALL dateProtoFuncGetDate(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetDay(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetFullYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetHours(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetMilliSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetMinutes(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetMonth(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetTime(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetTimezoneOffset(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCDate(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCDay(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCFullYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCHours(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCMilliseconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCMinutes(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCMonth(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetUTCSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncGetYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetDate(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetFullYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetHours(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetMilliSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetMinutes(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetMonth(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetTime(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCDate(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCFullYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCHours(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCMilliseconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCMinutes(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCMonth(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetUTCSeconds(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncSetYear(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToDateString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToGMTString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToLocaleDateString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToLocaleString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToLocaleTimeString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL dateProtoFuncToISOString(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-static TiValue JSC_HOST_CALL dateProtoFuncToJSON(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetDate(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetDay(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetFullYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetHours(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMilliSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMinutes(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMonth(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetTime(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetTimezoneOffset(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCDate(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCDay(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCFullYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCHours(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMilliseconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMinutes(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMonth(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncGetYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetDate(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetFullYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetHours(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMilliSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMinutes(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMonth(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetTime(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCDate(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCFullYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCHours(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMilliseconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMinutes(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMonth(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCSeconds(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncSetYear(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToDateString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToGMTString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleDateString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleTimeString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToISOString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL dateProtoFuncToJSON(TiExcState*);
 
 }
 
@@ -133,7 +134,7 @@ enum LocaleDateTimeFormat { LocaleDateAndTime, LocaleDate, LocaleTime };
  
 
 // FIXME: Since this is superior to the strftime-based version, why limit this to PLATFORM(MAC)?
-// Instead we should consider using this whenever PLATFORM(CF) is true.
+// Instead we should consider using this whenever USE(CF) is true.
 
 static CFDateFormatterStyle styleFromArgString(const UString& string, CFDateFormatterStyle defaultStyle)
 {
@@ -148,7 +149,7 @@ static CFDateFormatterStyle styleFromArgString(const UString& string, CFDateForm
     return defaultStyle;
 }
 
-static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMilliseconds, LocaleDateTimeFormat format, const ArgList& args)
+static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMilliseconds, LocaleDateTimeFormat format)
 {
     CFDateFormatterStyle dateStyle = (format != LocaleTime ? kCFDateFormatterLongStyle : kCFDateFormatterNoStyle);
     CFDateFormatterStyle timeStyle = (format != LocaleDate ? kCFDateFormatterLongStyle : kCFDateFormatterNoStyle);
@@ -156,16 +157,16 @@ static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMi
     bool useCustomFormat = false;
     UString customFormatString;
 
-    UString arg0String = args.at(0).toString(exec);
-    if (arg0String == "custom" && !args.at(1).isUndefined()) {
+    UString arg0String = exec->argument(0).toString(exec);
+    if (arg0String == "custom" && !exec->argument(1).isUndefined()) {
         useCustomFormat = true;
-        customFormatString = args.at(1).toString(exec);
-    } else if (format == LocaleDateAndTime && !args.at(1).isUndefined()) {
+        customFormatString = exec->argument(1).toString(exec);
+    } else if (format == LocaleDateAndTime && !exec->argument(1).isUndefined()) {
         dateStyle = styleFromArgString(arg0String, dateStyle);
-        timeStyle = styleFromArgString(args.at(1).toString(exec), timeStyle);
-    } else if (format != LocaleTime && !args.at(0).isUndefined())
+        timeStyle = styleFromArgString(exec->argument(1).toString(exec), timeStyle);
+    } else if (format != LocaleTime && !exec->argument(0).isUndefined())
         dateStyle = styleFromArgString(arg0String, dateStyle);
-    else if (format != LocaleDate && !args.at(0).isUndefined())
+    else if (format != LocaleDate && !exec->argument(0).isUndefined())
         timeStyle = styleFromArgString(arg0String, timeStyle);
 
     CFLocaleRef locale = CFLocaleCopyCurrent();
@@ -173,7 +174,7 @@ static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMi
     CFRelease(locale);
 
     if (useCustomFormat) {
-        CFStringRef customFormatCFString = CFStringCreateWithCharacters(0, customFormatString.data(), customFormatString.size());
+        CFStringRef customFormatCFString = CFStringCreateWithCharacters(0, customFormatString.characters(), customFormatString.length());
         CFDateFormatterSetFormat(formatter, customFormatCFString);
         CFRelease(customFormatCFString);
     }
@@ -185,7 +186,7 @@ static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMi
     // We truncate the string returned from CFDateFormatter if it's absurdly long (> 200 characters).
     // That's not great error handling, but it just won't happen so it doesn't matter.
     UChar buffer[200];
-    const size_t bufferLength = sizeof(buffer) / sizeof(buffer[0]);
+    const size_t bufferLength = WTF_ARRAY_LENGTH(buffer);
     size_t length = CFStringGetLength(string);
     ASSERT(length <= bufferLength);
     if (length > bufferLength)
@@ -202,12 +203,12 @@ static TiCell* formatLocaleDate(TiExcState* exec, DateInstance*, double timeInMi
 // ms (representing milliseconds) and t (representing the rest of the date structure) appropriately.
 //
 // Format of member function: f([hour,] [min,] [sec,] [ms])
-static bool fillStructuresUsingTimeArgs(TiExcState* exec, const ArgList& args, int maxArgs, double* ms, GregorianDateTime* t)
+static bool fillStructuresUsingTimeArgs(TiExcState* exec, int maxArgs, double* ms, GregorianDateTime* t)
 {
     double milliseconds = 0;
     bool ok = true;
     int idx = 0;
-    int numArgs = args.size();
+    int numArgs = exec->argumentCount();
     
     // JS allows extra trailing arguments -- ignore them
     if (numArgs > maxArgs)
@@ -216,19 +217,25 @@ static bool fillStructuresUsingTimeArgs(TiExcState* exec, const ArgList& args, i
     // hours
     if (maxArgs >= 4 && idx < numArgs) {
         t->hour = 0;
-        milliseconds += args.at(idx++).toInt32(exec, ok) * msPerHour;
+        double hours = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(hours);
+        milliseconds += hours * msPerHour;
     }
 
     // minutes
     if (maxArgs >= 3 && idx < numArgs && ok) {
         t->minute = 0;
-        milliseconds += args.at(idx++).toInt32(exec, ok) * msPerMinute;
+        double minutes = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(minutes);
+        milliseconds += minutes * msPerMinute;
     }
     
     // seconds
     if (maxArgs >= 2 && idx < numArgs && ok) {
         t->second = 0;
-        milliseconds += args.at(idx++).toInt32(exec, ok) * msPerSecond;
+        double seconds = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(seconds);
+        milliseconds += seconds * msPerSecond;
     }
     
     if (!ok)
@@ -236,7 +243,7 @@ static bool fillStructuresUsingTimeArgs(TiExcState* exec, const ArgList& args, i
         
     // milliseconds
     if (idx < numArgs) {
-        double millis = args.at(idx).toNumber(exec);
+        double millis = exec->argument(idx).toIntegerPreserveNaN(exec);
         ok = isfinite(millis);
         milliseconds += millis;
     } else
@@ -250,34 +257,40 @@ static bool fillStructuresUsingTimeArgs(TiExcState* exec, const ArgList& args, i
 // ms (representing milliseconds) and t (representing the rest of the date structure) appropriately.
 //
 // Format of member function: f([years,] [months,] [days])
-static bool fillStructuresUsingDateArgs(TiExcState *exec, const ArgList& args, int maxArgs, double *ms, GregorianDateTime *t)
+static bool fillStructuresUsingDateArgs(TiExcState *exec, int maxArgs, double *ms, GregorianDateTime *t)
 {
     int idx = 0;
     bool ok = true;
-    int numArgs = args.size();
+    int numArgs = exec->argumentCount();
   
     // JS allows extra trailing arguments -- ignore them
     if (numArgs > maxArgs)
         numArgs = maxArgs;
   
     // years
-    if (maxArgs >= 3 && idx < numArgs)
-        t->year = args.at(idx++).toInt32(exec, ok) - 1900;
-    
+    if (maxArgs >= 3 && idx < numArgs) {
+        double years = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(years);
+        t->year = toInt32(years - 1900);
+    }
     // months
-    if (maxArgs >= 2 && idx < numArgs && ok)   
-        t->month = args.at(idx++).toInt32(exec, ok);
-    
+    if (maxArgs >= 2 && idx < numArgs && ok) {
+        double months = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(months);
+        t->month = toInt32(months);
+    }
     // days
-    if (idx < numArgs && ok) {   
+    if (idx < numArgs && ok) {
+        double days = exec->argument(idx++).toIntegerPreserveNaN(exec);
+        ok = isfinite(days);
         t->monthDay = 0;
-        *ms += args.at(idx).toInt32(exec, ok) * msPerDay;
+        *ms += days * msPerDay;
     }
     
     return ok;
 }
 
-const ClassInfo DatePrototype::info = {"Date", &DateInstance::info, 0, TiExcState::dateTable};
+const ClassInfo DatePrototype::s_info = {"Date", &DateInstance::s_info, 0, TiExcState::dateTable};
 
 /* Source for DatePrototype.lut.h
 @begin dateTable
@@ -326,16 +339,19 @@ const ClassInfo DatePrototype::info = {"Date", &DateInstance::info, 0, TiExcStat
   setUTCFullYear        dateProtoFuncSetUTCFullYear          DontEnum|Function       3
   setYear               dateProtoFuncSetYear                 DontEnum|Function       1
   getYear               dateProtoFuncGetYear                 DontEnum|Function       0
-  toJSON                dateProtoFuncToJSON                  DontEnum|Function       0
+  toJSON                dateProtoFuncToJSON                  DontEnum|Function       1
 @end
 */
 
 // ECMA 15.9.4
 
-DatePrototype::DatePrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure)
+DatePrototype::DatePrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure)
     : DateInstance(exec, structure)
 {
+    ASSERT(inherits(&s_info));
+
     // The constructor will be added later, after DateConstructor has been built.
+    putAnonymousValue(exec->globalData(), 0, globalObject);
 }
 
 bool DatePrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -351,390 +367,419 @@ bool DatePrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier&
 
 // Functions
 
-TiValue JSC_HOST_CALL dateProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     DateConversionBuffer date;
     DateConversionBuffer time;
     formatDate(*gregorianDateTime, date);
     formatTime(*gregorianDateTime, time);
-    return jsMakeNontrivialString(exec, date, " ", time);
+    return TiValue::encode(jsMakeNontrivialString(exec, date, " ", time));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToUTCString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     DateConversionBuffer date;
     DateConversionBuffer time;
     formatDateUTCVariant(*gregorianDateTime, date);
     formatTimeUTC(*gregorianDateTime, time);
-    return jsMakeNontrivialString(exec, date, " ", time);
+    return TiValue::encode(jsMakeNontrivialString(exec, date, " ", time));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToISOString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToISOString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
     
     DateInstance* thisDateObj = asDateInstance(thisValue); 
     
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     // Maximum amount of space we need in buffer: 6 (max. digits in year) + 2 * 5 (2 characters each for month, day, hour, minute, second) + 4 (. + 3 digits for milliseconds)
     // 6 for formatting and one for null termination = 27.  We add one extra character to allow us to force null termination.
     char buffer[28];
     snprintf(buffer, sizeof(buffer) - 1, "%04d-%02d-%02dT%02d:%02d:%02d.%03dZ", 1900 + gregorianDateTime->year, gregorianDateTime->month + 1, gregorianDateTime->monthDay, gregorianDateTime->hour, gregorianDateTime->minute, gregorianDateTime->second, static_cast<int>(fmod(thisDateObj->internalNumber(), 1000)));
     buffer[sizeof(buffer) - 1] = 0;
-    return jsNontrivialString(exec, buffer);
+    return TiValue::encode(jsNontrivialString(exec, buffer));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToDateString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToDateString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     DateConversionBuffer date;
     formatDate(*gregorianDateTime, date);
-    return jsNontrivialString(exec, date);
+    return TiValue::encode(jsNontrivialString(exec, date));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToTimeString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     DateConversionBuffer time;
     formatTime(*gregorianDateTime, time);
-    return jsNontrivialString(exec, time);
+    return TiValue::encode(jsNontrivialString(exec, time));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToLocaleString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
-    return formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleDateAndTime, args);
+    return TiValue::encode(formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleDateAndTime));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToLocaleDateString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleDateString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
-    return formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleDate, args);
+    return TiValue::encode(formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleDate));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToLocaleTimeString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToLocaleTimeString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
-    return formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleTime, args);
+    return TiValue::encode(formatLocaleDate(exec, thisDateObj, thisDateObj->internalNumber(), LocaleTime));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetTime(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetTime(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
-    return asDateInstance(thisValue)->internalValue(); 
+    return TiValue::encode(asDateInstance(thisValue)->internalValue());
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetFullYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetFullYear(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, 1900 + gregorianDateTime->year);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(1900 + gregorianDateTime->year));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCFullYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCFullYear(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, 1900 + gregorianDateTime->year);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(1900 + gregorianDateTime->year));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToGMTString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToGMTString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNontrivialString(exec, "Invalid Date");
+        return TiValue::encode(jsNontrivialString(exec, "Invalid Date"));
     DateConversionBuffer date;
     DateConversionBuffer time;
     formatDateUTCVariant(*gregorianDateTime, date);
     formatTimeUTC(*gregorianDateTime, time);
-    return jsMakeNontrivialString(exec, date, " ", time);
+    return TiValue::encode(jsMakeNontrivialString(exec, date, " ", time));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetMonth(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMonth(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->month);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->month));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCMonth(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMonth(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->month);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->month));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetDate(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetDate(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->monthDay);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->monthDay));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCDate(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCDate(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->monthDay);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->monthDay));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetDay(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetDay(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->weekDay);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->weekDay));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCDay(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCDay(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->weekDay);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->weekDay));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetHours(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetHours(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->hour);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->hour));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCHours(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCHours(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->hour);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->hour));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetMinutes(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMinutes(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->minute);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->minute));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCMinutes(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMinutes(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->minute);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->minute));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetSeconds(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->second);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->second));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCSeconds(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTimeUTC(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, gregorianDateTime->second);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(gregorianDateTime->second));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetMilliSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetMilliSeconds(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
     double milli = thisDateObj->internalNumber();
     if (isnan(milli))
-        return jsNaN(exec);
+        return TiValue::encode(jsNaN());
 
     double secs = floor(milli / msPerSecond);
     double ms = milli - secs * msPerSecond;
-    return jsNumber(exec, ms);
+    return TiValue::encode(jsNumber(ms));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetUTCMilliseconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetUTCMilliseconds(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
     double milli = thisDateObj->internalNumber();
     if (isnan(milli))
-        return jsNaN(exec);
+        return TiValue::encode(jsNaN());
 
     double secs = floor(milli / msPerSecond);
     double ms = milli - secs * msPerSecond;
-    return jsNumber(exec, ms);
+    return TiValue::encode(jsNumber(ms));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetTimezoneOffset(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetTimezoneOffset(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
-    return jsNumber(exec, -gregorianDateTime->utcOffset / minutesPerHour);
+        return TiValue::encode(jsNaN());
+    return TiValue::encode(jsNumber(-gregorianDateTime->utcOffset / minutesPerHour));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetTime(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetTime(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
-    double milli = timeClip(args.at(0).toNumber(exec));
-    TiValue result = jsNumber(exec, milli);
-    thisDateObj->setInternalValue(result);
-    return result;
+    double milli = timeClip(exec->argument(0).toNumber(exec));
+    TiValue result = jsNumber(milli);
+    thisDateObj->setInternalValue(exec->globalData(), result);
+    return TiValue::encode(result);
 }
 
-static TiValue setNewValueFromTimeArgs(TiExcState* exec, TiValue thisValue, const ArgList& args, int numArgsToUse, bool inputIsUTC)
+static EncodedTiValue setNewValueFromTimeArgs(TiExcState* exec, int numArgsToUse, bool inputIsUTC)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue);
     double milli = thisDateObj->internalNumber();
     
-    if (args.isEmpty() || isnan(milli)) {
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    if (!exec->argumentCount() || isnan(milli)) {
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     }
      
     double secs = floor(milli / msPerSecond);
@@ -744,31 +789,32 @@ static TiValue setNewValueFromTimeArgs(TiExcState* exec, TiValue thisValue, cons
         ? thisDateObj->gregorianDateTimeUTC(exec)
         : thisDateObj->gregorianDateTime(exec);
     if (!other)
-        return jsNaN(exec);
+        return TiValue::encode(jsNaN());
 
     GregorianDateTime gregorianDateTime;
     gregorianDateTime.copyFrom(*other);
-    if (!fillStructuresUsingTimeArgs(exec, args, numArgsToUse, &ms, &gregorianDateTime)) {
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    if (!fillStructuresUsingTimeArgs(exec, numArgsToUse, &ms, &gregorianDateTime)) {
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     } 
     
-    TiValue result = jsNumber(exec, gregorianDateTimeToMS(exec, gregorianDateTime, ms, inputIsUTC));
-    thisDateObj->setInternalValue(result);
-    return result;
+    TiValue result = jsNumber(gregorianDateTimeToMS(exec, gregorianDateTime, ms, inputIsUTC));
+    thisDateObj->setInternalValue(exec->globalData(), result);
+    return TiValue::encode(result);
 }
 
-static TiValue setNewValueFromDateArgs(TiExcState* exec, TiValue thisValue, const ArgList& args, int numArgsToUse, bool inputIsUTC)
+static EncodedTiValue setNewValueFromDateArgs(TiExcState* exec, int numArgsToUse, bool inputIsUTC)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue);
-    if (args.isEmpty()) {
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    if (!exec->argumentCount()) {
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     }      
     
     double milli = thisDateObj->internalNumber();
@@ -783,115 +829,116 @@ static TiValue setNewValueFromDateArgs(TiExcState* exec, TiValue thisValue, cons
             ? thisDateObj->gregorianDateTimeUTC(exec)
             : thisDateObj->gregorianDateTime(exec);
         if (!other)
-            return jsNaN(exec);
+            return TiValue::encode(jsNaN());
         gregorianDateTime.copyFrom(*other);
     }
     
-    if (!fillStructuresUsingDateArgs(exec, args, numArgsToUse, &ms, &gregorianDateTime)) {
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    if (!fillStructuresUsingDateArgs(exec, numArgsToUse, &ms, &gregorianDateTime)) {
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     } 
            
-    TiValue result = jsNumber(exec, gregorianDateTimeToMS(exec, gregorianDateTime, ms, inputIsUTC));
-    thisDateObj->setInternalValue(result);
-    return result;
+    TiValue result = jsNumber(gregorianDateTimeToMS(exec, gregorianDateTime, ms, inputIsUTC));
+    thisDateObj->setInternalValue(exec->globalData(), result);
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetMilliSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMilliSeconds(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 1, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 1, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCMilliseconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMilliseconds(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 1, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 1, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetSeconds(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 2, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 2, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCSeconds(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCSeconds(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 2, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 2, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetMinutes(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMinutes(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 3, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 3, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCMinutes(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMinutes(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 3, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 3, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetHours(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetHours(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 4, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 4, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCHours(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCHours(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromTimeArgs(exec, thisValue, args, 4, inputIsUTC);
+    return setNewValueFromTimeArgs(exec, 4, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetDate(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetDate(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromDateArgs(exec, thisValue, args, 1, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 1, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCDate(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCDate(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromDateArgs(exec, thisValue, args, 1, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 1, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetMonth(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetMonth(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromDateArgs(exec, thisValue, args, 2, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 2, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCMonth(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCMonth(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromDateArgs(exec, thisValue, args, 2, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 2, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetFullYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetFullYear(TiExcState* exec)
 {
     const bool inputIsUTC = false;
-    return setNewValueFromDateArgs(exec, thisValue, args, 3, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 3, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetUTCFullYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetUTCFullYear(TiExcState* exec)
 {
     const bool inputIsUTC = true;
-    return setNewValueFromDateArgs(exec, thisValue, args, 3, inputIsUTC);
+    return setNewValueFromDateArgs(exec, 3, inputIsUTC);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncSetYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncSetYear(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue);     
-    if (args.isEmpty()) { 
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    if (!exec->argumentCount()) { 
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     }
     
     double milli = thisDateObj->internalNumber();
@@ -909,56 +956,57 @@ TiValue JSC_HOST_CALL dateProtoFuncSetYear(TiExcState* exec, TiObject*, TiValue 
             gregorianDateTime.copyFrom(*other);
     }
     
-    bool ok = true;
-    int32_t year = args.at(0).toInt32(exec, ok);
-    if (!ok) {
-        TiValue result = jsNaN(exec);
-        thisDateObj->setInternalValue(result);
-        return result;
+    double year = exec->argument(0).toIntegerPreserveNaN(exec);
+    if (!isfinite(year)) {
+        TiValue result = jsNaN();
+        thisDateObj->setInternalValue(exec->globalData(), result);
+        return TiValue::encode(result);
     }
             
-    gregorianDateTime.year = (year > 99 || year < 0) ? year - 1900 : year;
-    TiValue result = jsNumber(exec, gregorianDateTimeToMS(exec, gregorianDateTime, ms, false));
-    thisDateObj->setInternalValue(result);
-    return result;
+    gregorianDateTime.year = toInt32((year > 99 || year < 0) ? year - 1900 : year);
+    TiValue result = jsNumber(gregorianDateTimeToMS(exec, gregorianDateTime, ms, false));
+    thisDateObj->setInternalValue(exec->globalData(), result);
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncGetYear(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncGetYear(TiExcState* exec)
 {
-    if (!thisValue.inherits(&DateInstance::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+    if (!thisValue.inherits(&DateInstance::s_info))
+        return throwVMTypeError(exec);
 
     DateInstance* thisDateObj = asDateInstance(thisValue); 
 
     const GregorianDateTime* gregorianDateTime = thisDateObj->gregorianDateTime(exec);
     if (!gregorianDateTime)
-        return jsNaN(exec);
+        return TiValue::encode(jsNaN());
 
     // NOTE: IE returns the full year even in getYear.
-    return jsNumber(exec, gregorianDateTime->year);
+    return TiValue::encode(jsNumber(gregorianDateTime->year));
 }
 
-TiValue JSC_HOST_CALL dateProtoFuncToJSON(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL dateProtoFuncToJSON(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     TiObject* object = thisValue.toThisObject(exec);
     if (exec->hadException())
-        return jsNull();
+        return TiValue::encode(jsNull());
     
     TiValue toISOValue = object->get(exec, exec->globalData().propertyNames->toISOString);
     if (exec->hadException())
-        return jsNull();
+        return TiValue::encode(jsNull());
 
     CallData callData;
-    CallType callType = toISOValue.getCallData(callData);
+    CallType callType = getCallData(toISOValue, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError, "toISOString is not a function");
+        return throwVMError(exec, createTypeError(exec, "toISOString is not a function"));
 
     TiValue result = call(exec, asObject(toISOValue), callType, callData, object, exec->emptyList());
     if (exec->hadException())
-        return jsNull();
+        return TiValue::encode(jsNull());
     if (result.isObject())
-        return throwError(exec, TypeError, "toISOString did not return a primitive value");
-    return result;
+        return throwVMError(exec, createTypeError(exec, "toISOString did not return a primitive value"));
+    return TiValue::encode(result);
 }
 
 } // namespace TI

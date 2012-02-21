@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -54,7 +54,7 @@ void Collator::setOrderLowerFirst(bool)
 
 PassOwnPtr<Collator> Collator::userDefault()
 {
-    return new Collator(0);
+    return adoptPtr(new Collator(0));
 }
 
 // A default implementation for platforms that lack Unicode-aware collation.

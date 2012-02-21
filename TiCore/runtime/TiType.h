@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,10 +40,11 @@ namespace TI {
         NumberType        = 3,
         NullType          = 4,
         StringType        = 5,
+        LeafType          = 6,
         // The CompoundType value must come before any TiType that may have children
-        CompoundType      = 6,
-        ObjectType        = 7,
-        GetterSetterType  = 8
+        CompoundType      = 7,
+        ObjectType        = 8,
+        GetterSetterType  = 9
     };
 
 } // namespace TI

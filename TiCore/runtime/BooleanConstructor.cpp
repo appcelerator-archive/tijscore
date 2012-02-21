@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,26 +35,27 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(BooleanConstructor);
 
-BooleanConstructor::BooleanConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, BooleanPrototype* booleanPrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, booleanPrototype->classInfo()->className))
+BooleanConstructor::BooleanConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, BooleanPrototype* booleanPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, booleanPrototype->classInfo()->className))
 {
-    putDirectWithoutTransition(exec->propertyNames().prototype, booleanPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, booleanPrototype, DontEnum | DontDelete | ReadOnly);
 
     // no. of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 1), ReadOnly | DontDelete | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(1), ReadOnly | DontDelete | DontEnum);
 }
 
 // ECMA 15.6.2
 TiObject* constructBoolean(TiExcState* exec, const ArgList& args)
 {
-    BooleanObject* obj = new (exec) BooleanObject(exec->lexicalGlobalObject()->booleanObjectStructure());
-    obj->setInternalValue(jsBoolean(args.at(0).toBoolean(exec)));
+    BooleanObject* obj = new (exec) BooleanObject(exec->globalData(), asInternalFunction(exec->callee())->globalObject()->booleanObjectStructure());
+    obj->setInternalValue(exec->globalData(), jsBoolean(args.at(0).toBoolean(exec)));
     return obj;
 }
 
-static TiObject* constructWithBooleanConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithBooleanConstructor(TiExcState* exec)
 {
-    return constructBoolean(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructBoolean(exec, args));
 }
 
 ConstructType BooleanConstructor::getConstructData(ConstructData& constructData)
@@ -64,9 +65,9 @@ ConstructType BooleanConstructor::getConstructData(ConstructData& constructData)
 }
 
 // ECMA 15.6.1
-static TiValue JSC_HOST_CALL callBooleanConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callBooleanConstructor(TiExcState* exec)
 {
-    return jsBoolean(args.at(0).toBoolean(exec));
+    return TiValue::encode(jsBoolean(exec->argument(0).toBoolean(exec)));
 }
 
 CallType BooleanConstructor::getCallData(CallData& callData)
@@ -75,10 +76,10 @@ CallType BooleanConstructor::getCallData(CallData& callData)
     return CallTypeHost;
 }
 
-TiObject* constructBooleanFromImmediateBoolean(TiExcState* exec, TiValue immediateBooleanValue)
+TiObject* constructBooleanFromImmediateBoolean(TiExcState* exec, TiGlobalObject* globalObject, TiValue immediateBooleanValue)
 {
-    BooleanObject* obj = new (exec) BooleanObject(exec->lexicalGlobalObject()->booleanObjectStructure());
-    obj->setInternalValue(immediateBooleanValue);
+    BooleanObject* obj = new (exec) BooleanObject(exec->globalData(), globalObject->booleanObjectStructure());
+    obj->setInternalValue(exec->globalData(), immediateBooleanValue);
     return obj;
 }
 

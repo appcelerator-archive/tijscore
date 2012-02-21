@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -56,12 +56,15 @@ namespace TI {
     // assertions working, so that clients that use the shared context don't break.
 
     class TiExcState;
+    class TiGlobalData;
 
     enum TiLockBehavior { SilenceAssertionsOnly, LockForReal };
 
-    class TiLock : public Noncopyable {
+    class TiLock {
+        WTF_MAKE_NONCOPYABLE(TiLock);
     public:
         TiLock(TiExcState*);
+        TiLock(TiGlobalData*);
 
         TiLock(TiLockBehavior lockBehavior)
             : m_lockBehavior(lockBehavior)
@@ -94,7 +97,8 @@ namespace TI {
 
         TiLockBehavior m_lockBehavior;
 
-        class DropAllLocks : public Noncopyable {
+        class DropAllLocks {
+            WTF_MAKE_NONCOPYABLE(DropAllLocks);
         public:
             DropAllLocks(TiExcState* exec);
             DropAllLocks(TiLockBehavior);

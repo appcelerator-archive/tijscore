@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,14 +29,14 @@
 #define WTF_HashCountedSet_h
 
 #include "Assertions.h"
-#include "FastAllocBase.h"
 #include "HashMap.h"
 #include "Vector.h"
 
 namespace WTI {
 
     template<typename Value, typename HashFunctions = typename DefaultHash<Value>::Hash,
-        typename Traits = HashTraits<Value> > class HashCountedSet : public FastAllocBase {
+        typename Traits = HashTraits<Value> > class HashCountedSet {
+        WTF_MAKE_FAST_ALLOCATED;
     private:
         typedef HashMap<Value, unsigned, HashFunctions, Traits> ImplType;
     public:

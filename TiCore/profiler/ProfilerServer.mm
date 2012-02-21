@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,11 +37,10 @@
 #import "TiRetainPtr.h"
 #import <Foundation/Foundation.h>
 
-#if PLATFORM(IPHONE_SIMULATOR)
-//#import <Foundation/NSDistributedNotificationCenter.h>
+#if PLATFORM(IOS_SIMULATOR)
+#import <Foundation/NSDistributedNotificationCenter.h>
 #endif
 
-/*
 @interface ProfilerServer : NSObject {
 @private
     NSString *_serverName;
@@ -73,7 +72,7 @@
     if ([defaults boolForKey:@"EnableJSProfiling"])
         [self startProfiling];
 
-#if PLATFORM(IPHONE_SIMULATOR)
+#if PLATFORM(IOS_SIMULATOR)
     // FIXME: <rdar://problem/6546135>
     // The catch-all notifications
     [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(startProfiling) name:@"ProfilerServerStartNotification" object:nil];
@@ -84,7 +83,7 @@
     NSProcessInfo *processInfo = [NSProcessInfo processInfo];
     _serverName = [[NSString alloc] initWithFormat:@"ProfilerServer-%d", [processInfo processIdentifier]];
 
-#if PLATFORM(IPHONE_SIMULATOR)
+#if PLATFORM(IOS_SIMULATOR)
     // FIXME: <rdar://problem/6546135>
     [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(startProfiling) name:[_serverName stringByAppendingString:@"-Start"] object:nil];
     [[NSDistributedNotificationCenter defaultCenter] addObserver:self selector:@selector(stopProfiling) name:[_serverName stringByAppendingString:@"-Stop"] object:nil];

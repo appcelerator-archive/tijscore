@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,30 +32,60 @@
 #include "TiString.h"
 #include "TiStringBuilder.h"
 #include "ObjectPrototype.h"
-#include "PrototypeFunction.h"
+#include "StringRecursionChecker.h"
 #include "UString.h"
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(ErrorPrototype);
 
-static TiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState*);
 
-// ECMA 15.9.4
-ErrorPrototype::ErrorPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure, Structure* prototypeFunctionStructure)
-    : ErrorInstance(structure)
-{
-    // The constructor will be added later in ErrorConstructor's constructor
-
-    putDirectWithoutTransition(exec->propertyNames().name, jsNontrivialString(exec, "Error"), DontEnum);
-    putDirectWithoutTransition(exec->propertyNames().message, jsNontrivialString(exec, "Unknown error"), DontEnum);
-
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toString, errorProtoFuncToString), DontEnum);
 }
 
-TiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+#include "ErrorPrototype.lut.h"
+
+namespace TI {
+
+const ClassInfo ErrorPrototype::s_info = { "Error", &ErrorInstance::s_info, 0, TiExcState::errorPrototypeTable };
+
+/* Source for ErrorPrototype.lut.h
+@begin errorPrototypeTable
+  toString          errorProtoFuncToString         DontEnum|Function 0
+@end
+*/
+
+ASSERT_CLASS_FITS_IN_CELL(ErrorPrototype);
+
+ErrorPrototype::ErrorPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure)
+    : ErrorInstance(&exec->globalData(), structure)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().name, jsNontrivialString(exec, "Error"), DontEnum);
+
+    ASSERT(inherits(&s_info));
+    putAnonymousValue(globalObject->globalData(), 0, globalObject);
+}
+
+bool ErrorPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<ErrorInstance>(exec, TiExcState::errorPrototypeTable(exec), this, propertyName, slot);
+}
+
+bool ErrorPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<ErrorInstance>(exec, TiExcState::errorPrototypeTable(exec), this, propertyName, descriptor);
+}
+
+// ------------------------------ Functions ---------------------------
+
+EncodedTiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState* exec)
+{
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+
+    StringRecursionChecker checker(exec, thisObj);
+    if (EncodedTiValue earlyReturnValue = checker.earlyReturnValue())
+        return earlyReturnValue;
+
     TiValue name = thisObj->get(exec, exec->propertyNames().name);
     TiValue message = thisObj->get(exec, exec->propertyNames().message);
 
@@ -63,12 +93,12 @@ TiValue JSC_HOST_CALL errorProtoFuncToString(TiExcState* exec, TiObject*, TiValu
 
     if (!name.isUndefined()) {
         if (!message.isUndefined())
-            return jsMakeNontrivialString(exec, name.toString(exec), ": ", message.toString(exec));
-        return jsNontrivialString(exec, name.toString(exec));
+            return TiValue::encode(jsMakeNontrivialString(exec, name.toString(exec), ": ", message.toString(exec)));
+        return TiValue::encode(jsNontrivialString(exec, name.toString(exec)));
     }
     if (!message.isUndefined())
-        return jsMakeNontrivialString(exec, "Error: ", message.toString(exec));
-    return jsNontrivialString(exec, "Error");
+        return TiValue::encode(jsMakeNontrivialString(exec, "Error: ", message.toString(exec)));
+    return TiValue::encode(jsNontrivialString(exec, "Error"));
 }
 
 } // namespace TI

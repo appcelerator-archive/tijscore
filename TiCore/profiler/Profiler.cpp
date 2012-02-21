@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,12 +39,14 @@
 #include "CommonIdentifiers.h"
 #include "CallFrame.h"
 #include "CodeBlock.h"
+#include "InternalFunction.h"
 #include "TiFunction.h"
 #include "TiGlobalObject.h"
 #include "Nodes.h"
 #include "Profile.h"
 #include "ProfileGenerator.h"
 #include "ProfileNode.h"
+#include "UStringConcatenate.h"
 #include <stdio.h>
 
 namespace TI {
@@ -71,25 +73,25 @@ void Profiler::startProfiling(TiExcState* exec, const UString& title)
 
     // Check if we currently have a Profile for this global TiExcState and title.
     // If so return early and don't create a new Profile.
-    TiExcState* globalExec = exec ? exec->lexicalGlobalObject()->globalExec() : 0;
+    TiGlobalObject* origin = exec ? exec->lexicalGlobalObject() : 0;
 
     for (size_t i = 0; i < m_currentProfiles.size(); ++i) {
         ProfileGenerator* profileGenerator = m_currentProfiles[i].get();
-        if (profileGenerator->originatingGlobalExec() == globalExec && profileGenerator->title() == title)
+        if (profileGenerator->origin() == origin && profileGenerator->title() == title)
             return;
     }
 
     s_sharedEnabledProfilerReference = this;
-    RefPtr<ProfileGenerator> profileGenerator = ProfileGenerator::create(title, exec, ++ProfilesUID);
+    RefPtr<ProfileGenerator> profileGenerator = ProfileGenerator::create(exec, title, ++ProfilesUID);
     m_currentProfiles.append(profileGenerator);
 }
 
 PassRefPtr<Profile> Profiler::stopProfiling(TiExcState* exec, const UString& title)
 {
-    TiExcState* globalExec = exec ? exec->lexicalGlobalObject()->globalExec() : 0;
+    TiGlobalObject* origin = exec ? exec->lexicalGlobalObject() : 0;
     for (ptrdiff_t i = m_currentProfiles.size() - 1; i >= 0; --i) {
         ProfileGenerator* profileGenerator = m_currentProfiles[i].get();
-        if (profileGenerator->originatingGlobalExec() == globalExec && (title.isNull() || profileGenerator->title() == title)) {
+        if (profileGenerator->origin() == origin && (title.isNull() || profileGenerator->title() == title)) {
             profileGenerator->stopProfiling();
             RefPtr<Profile> returnProfile = profileGenerator->profile();
 
@@ -104,42 +106,62 @@ PassRefPtr<Profile> Profiler::stopProfiling(TiExcState* exec, const UString& tit
     return 0;
 }
 
-static inline void dispatchFunctionToProfiles(const Vector<RefPtr<ProfileGenerator> >& profiles, ProfileGenerator::ProfileFunction function, const CallIdentifier& callIdentifier, unsigned currentProfileTargetGroup)
+void Profiler::stopProfiling(TiGlobalObject* origin)
 {
-    for (size_t i = 0; i < profiles.size(); ++i) {
-        if (profiles[i]->profileGroup() == currentProfileTargetGroup || !profiles[i]->originatingGlobalExec())
-            (profiles[i].get()->*function)(callIdentifier);
+    for (ptrdiff_t i = m_currentProfiles.size() - 1; i >= 0; --i) {
+        ProfileGenerator* profileGenerator = m_currentProfiles[i].get();
+        if (profileGenerator->origin() == origin) {
+            profileGenerator->stopProfiling();
+            m_currentProfiles.remove(i);
+            if (!m_currentProfiles.size())
+                s_sharedEnabledProfilerReference = 0;
+        }
     }
 }
 
-void Profiler::willExecute(TiExcState* exec, TiValue function)
+static inline void dispatchFunctionToProfiles(TiExcState* callerOrHandlerCallFrame, const Vector<RefPtr<ProfileGenerator> >& profiles, ProfileGenerator::ProfileFunction function, const CallIdentifier& callIdentifier, unsigned currentProfileTargetGroup)
 {
-    ASSERT(!m_currentProfiles.isEmpty());
-
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::willExecute, createCallIdentifier(exec, function, "", 0), exec->lexicalGlobalObject()->profileGroup());
+    for (size_t i = 0; i < profiles.size(); ++i) {
+        if (profiles[i]->profileGroup() == currentProfileTargetGroup || !profiles[i]->origin())
+            (profiles[i].get()->*function)(callerOrHandlerCallFrame, callIdentifier);
+    }
 }
 
-void Profiler::willExecute(TiExcState* exec, const UString& sourceURL, int startingLineNumber)
+void Profiler::willExecute(TiExcState* callerCallFrame, TiValue function)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    CallIdentifier callIdentifier = createCallIdentifier(exec, TiValue(), sourceURL, startingLineNumber);
-
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::willExecute, callIdentifier, exec->lexicalGlobalObject()->profileGroup());
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::willExecute, createCallIdentifier(callerCallFrame, function, "", 0), callerCallFrame->lexicalGlobalObject()->profileGroup());
 }
 
-void Profiler::didExecute(TiExcState* exec, TiValue function)
+void Profiler::willExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(exec, function, "", 0), exec->lexicalGlobalObject()->profileGroup());
+    CallIdentifier callIdentifier = createCallIdentifier(callerCallFrame, TiValue(), sourceURL, startingLineNumber);
+
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::willExecute, callIdentifier, callerCallFrame->lexicalGlobalObject()->profileGroup());
 }
 
-void Profiler::didExecute(TiExcState* exec, const UString& sourceURL, int startingLineNumber)
+void Profiler::didExecute(TiExcState* callerCallFrame, TiValue function)
 {
     ASSERT(!m_currentProfiles.isEmpty());
 
-    dispatchFunctionToProfiles(m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(exec, TiValue(), sourceURL, startingLineNumber), exec->lexicalGlobalObject()->profileGroup());
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(callerCallFrame, function, "", 0), callerCallFrame->lexicalGlobalObject()->profileGroup());
+}
+
+void Profiler::didExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber)
+{
+    ASSERT(!m_currentProfiles.isEmpty());
+
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(callerCallFrame, TiValue(), sourceURL, startingLineNumber), callerCallFrame->lexicalGlobalObject()->profileGroup());
+}
+
+void Profiler::exceptionUnwind(TiExcState* handlerCallFrame)
+{
+    ASSERT(!m_currentProfiles.isEmpty());
+
+    dispatchFunctionToProfiles(handlerCallFrame, m_currentProfiles, &ProfileGenerator::exceptionUnwind, createCallIdentifier(handlerCallFrame, TiValue(), "", 0), handlerCallFrame->lexicalGlobalObject()->profileGroup());
 }
 
 CallIdentifier Profiler::createCallIdentifier(TiExcState* exec, TiValue functionValue, const UString& defaultSourceURL, int defaultLineNumber)
@@ -148,14 +170,16 @@ CallIdentifier Profiler::createCallIdentifier(TiExcState* exec, TiValue function
         return CallIdentifier(GlobalCodeExecution, defaultSourceURL, defaultLineNumber);
     if (!functionValue.isObject())
         return CallIdentifier("(unknown)", defaultSourceURL, defaultLineNumber);
-    if (asObject(functionValue)->inherits(&TiFunction::info)) {
+    if (asObject(functionValue)->inherits(&TiFunction::s_info)) {
         TiFunction* function = asFunction(functionValue);
         if (!function->executable()->isHostFunction())
             return createCallIdentifierFromFunctionImp(exec, function);
     }
-    if (asObject(functionValue)->inherits(&InternalFunction::info))
+    if (asObject(functionValue)->inherits(&TiFunction::s_info))
+        return CallIdentifier(static_cast<TiFunction*>(asObject(functionValue))->name(exec), defaultSourceURL, defaultLineNumber);
+    if (asObject(functionValue)->inherits(&InternalFunction::s_info))
         return CallIdentifier(static_cast<InternalFunction*>(asObject(functionValue))->name(exec), defaultSourceURL, defaultLineNumber);
-    return CallIdentifier(makeString("(", asObject(functionValue)->className(), " object)"), defaultSourceURL, defaultLineNumber);
+    return CallIdentifier(makeUString("(", asObject(functionValue)->className(), " object)"), defaultSourceURL, defaultLineNumber);
 }
 
 CallIdentifier createCallIdentifierFromFunctionImp(TiExcState* exec, TiFunction* function)

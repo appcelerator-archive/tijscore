@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,36 +37,39 @@
 #define ProfileNode_h
 
 #include "CallIdentifier.h"
-#include <wtf/Vector.h>
+#include <wtf/HashCountedSet.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/Vector.h>
 
 namespace TI {
 
+    class TiExcState;
     class ProfileNode;
 
     typedef Vector<RefPtr<ProfileNode> >::const_iterator StackIterator;
-    typedef HashCountedSet<UString::Rep*> FunctionCallHashCount;
+    typedef HashCountedSet<StringImpl*> FunctionCallHashCount;
 
     class ProfileNode : public RefCounted<ProfileNode> {
     public:
-        static PassRefPtr<ProfileNode> create(const CallIdentifier& callIdentifier, ProfileNode* headNode, ProfileNode* parentNode)
+        static PassRefPtr<ProfileNode> create(TiExcState* callerCallFrame, const CallIdentifier& callIdentifier, ProfileNode* headNode, ProfileNode* parentNode)
         {
-            return adoptRef(new ProfileNode(callIdentifier, headNode, parentNode));
+            return adoptRef(new ProfileNode(callerCallFrame, callIdentifier, headNode, parentNode));
         }
-        static PassRefPtr<ProfileNode> create(ProfileNode* headNode, ProfileNode* node)
+        static PassRefPtr<ProfileNode> create(TiExcState* callerCallFrame, ProfileNode* headNode, ProfileNode* node)
         {
-            return adoptRef(new ProfileNode(headNode, node));
+            return adoptRef(new ProfileNode(callerCallFrame, headNode, node));
         }
 
         bool operator==(ProfileNode* node) { return m_callIdentifier == node->callIdentifier(); }
 
-        ProfileNode* willExecute(const CallIdentifier&);
+        ProfileNode* willExecute(TiExcState* callerCallFrame, const CallIdentifier&);
         ProfileNode* didExecute();
 
         void stopProfiling();
 
         // CallIdentifier members
+        TiExcState* callerCallFrame() const { return m_callerCallFrame; }
         const CallIdentifier& callIdentifier() const { return m_callIdentifier; }
         const UString& functionName() const { return m_callIdentifier.m_name; }
         const UString& url() const { return m_callIdentifier.m_url; }
@@ -134,8 +137,8 @@ namespace TI {
 #endif
 
     private:
-        ProfileNode(const CallIdentifier&, ProfileNode* headNode, ProfileNode* parentNode);
-        ProfileNode(ProfileNode* headNode, ProfileNode* nodeToCopy);
+        ProfileNode(TiExcState* callerCallFrame, const CallIdentifier&, ProfileNode* headNode, ProfileNode* parentNode);
+        ProfileNode(TiExcState* callerCallFrame, ProfileNode* headNode, ProfileNode* nodeToCopy);
 
         void startTimer();
         void resetChildrensSiblings();
@@ -153,6 +156,7 @@ namespace TI {
         static inline bool functionNameDescendingComparator(const RefPtr<ProfileNode>& a, const RefPtr<ProfileNode>& b) { return a->functionName() > b->functionName(); }
         static inline bool functionNameAscendingComparator(const RefPtr<ProfileNode>& a, const RefPtr<ProfileNode>& b) { return a->functionName() < b->functionName(); }
 
+        TiExcState* m_callerCallFrame;
         CallIdentifier m_callIdentifier;
         ProfileNode* m_head;
         ProfileNode* m_parent;

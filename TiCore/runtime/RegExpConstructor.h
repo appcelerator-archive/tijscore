@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,7 +38,9 @@ namespace TI {
     class RegExpPrototype;
     struct RegExpConstructorPrivate;
 
-    struct RegExpConstructorPrivate : FastAllocBase {
+    struct RegExpConstructorPrivate {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         // Global search cache / settings
         RegExpConstructorPrivate()
             : lastNumSubPatterns(0)
@@ -62,20 +64,20 @@ namespace TI {
 
     class RegExpConstructor : public InternalFunction {
     public:
-        RegExpConstructor(TiExcState*, NonNullPassRefPtr<Structure>, RegExpPrototype*);
+        RegExpConstructor(TiExcState*, TiGlobalObject*, Structure*, RegExpPrototype*);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
 
-        static const ClassInfo info;
+        static const ClassInfo s_info;
 
-        void performMatch(RegExp*, const UString&, int startOffset, int& position, int& length, int** ovector = 0);
+        void performMatch(TiGlobalData&, RegExp*, const UString&, int startOffset, int& position, int& length, int** ovector = 0);
         TiObject* arrayOfMatches(TiExcState*) const;
 
         void setInput(const UString&);
@@ -96,18 +98,16 @@ namespace TI {
         virtual ConstructType getConstructData(ConstructData&);
         virtual CallType getCallData(CallData&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-
         OwnPtr<RegExpConstructorPrivate> d;
     };
 
     RegExpConstructor* asRegExpConstructor(TiValue);
 
-    TiObject* constructRegExp(TiExcState*, const ArgList&);
+    TiObject* constructRegExp(TiExcState*, TiGlobalObject*, const ArgList&);
 
     inline RegExpConstructor* asRegExpConstructor(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&RegExpConstructor::info));
+        ASSERT(asObject(value)->inherits(&RegExpConstructor::s_info));
         return static_cast<RegExpConstructor*>(asObject(value));
     }
 
@@ -116,9 +116,9 @@ namespace TI {
       expression matching through the performMatch function. We use cached results to calculate, 
       e.g., RegExp.lastMatch and RegExp.leftParen.
     */
-    inline void RegExpConstructor::performMatch(RegExp* r, const UString& s, int startOffset, int& position, int& length, int** ovector)
+    ALWAYS_INLINE void RegExpConstructor::performMatch(TiGlobalData& globalData, RegExp* r, const UString& s, int startOffset, int& position, int& length, int** ovector)
     {
-        position = r->match(s, startOffset, &d->tempOvector());
+        position = r->match(globalData, s, startOffset, &d->tempOvector());
 
         if (ovector)
             *ovector = d->tempOvector().data();

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,12 +32,13 @@
 
 #include "config.h"
 #include "ByteArray.h"
+#include "StdLibExtras.h"
 
 namespace WTI {
 
 PassRefPtr<ByteArray> ByteArray::create(size_t size)
 {
-    unsigned char* buffer = new unsigned char[size + sizeof(ByteArray) - sizeof(size_t)];
+    unsigned char* buffer = new unsigned char[size + OBJECT_OFFSETOF(ByteArray, m_data)];
     ASSERT((reinterpret_cast<size_t>(buffer) & 3) == 0);
     return adoptRef(new (buffer) ByteArray(size));
 }

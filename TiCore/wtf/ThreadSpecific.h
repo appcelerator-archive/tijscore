@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -54,37 +54,49 @@
 #include <pthread.h>
 #elif PLATFORM(QT)
 #include <QThreadStorage>
+#elif PLATFORM(GTK)
+#include <glib.h>
 #elif OS(WINDOWS)
 #include <windows.h>
 #endif
 
 namespace WTI {
 
-#if !USE(PTHREADS) && !PLATFORM(QT) && OS(WINDOWS)
+#if !USE(PTHREADS) && !PLATFORM(QT) && !PLATFORM(GTK) && OS(WINDOWS)
 // ThreadSpecificThreadExit should be called each time when a thread is detached.
 // This is done automatically for threads created with WTI::createThread.
 void ThreadSpecificThreadExit();
 #endif
 
-template<typename T> class ThreadSpecific : public Noncopyable {
+template<typename T> class ThreadSpecific {
+    WTF_MAKE_NONCOPYABLE(ThreadSpecific);
 public:
     ThreadSpecific();
     T* operator->();
     operator T*();
     T& operator*();
-    ~ThreadSpecific();
+
+    void replace(T*);
 
 private:
-#if !USE(PTHREADS) && !PLATFORM(QT) && OS(WINDOWS)
+#if !USE(PTHREADS) && !PLATFORM(QT) && !PLATFORM(GTK) && OS(WINDOWS)
     friend void ThreadSpecificThreadExit();
 #endif
+
+    // Not implemented. It's technically possible to destroy a thread specific key, but one would need
+    // to make sure that all values have been destroyed already (usually, that all threads that used it
+    // have exited). It's unlikely that any user of this call will be in that situation - and having
+    // a destructor defined can be confusing, given that it has such strong pre-requisites to work correctly.
+    ~ThreadSpecific();
     
     T* get();
     void set(T*);
     void static destroy(void* ptr);
 
-#if USE(PTHREADS) || PLATFORM(QT) || OS(WINDOWS)
-    struct Data : Noncopyable {
+#if USE(PTHREADS) || PLATFORM(QT) || PLATFORM(GTK) || OS(WINDOWS)
+    struct Data {
+        WTF_MAKE_NONCOPYABLE(Data);
+    public:
         Data(T* value, ThreadSpecific<T>* owner) : value(value), owner(owner) {}
 #if PLATFORM(QT)
         ~Data() { owner->destroy(this); }
@@ -92,7 +104,7 @@ private:
 
         T* value;
         ThreadSpecific<T>* owner;
-#if !USE(PTHREADS) && !PLATFORM(QT)
+#if !USE(PTHREADS) && !PLATFORM(QT) && !PLATFORM(GTK)
         void (*destructor)(void*);
 #endif
     };
@@ -105,6 +117,8 @@ private:
     pthread_key_t m_key;
 #elif PLATFORM(QT)
     QThreadStorage<Data*> m_key;
+#elif PLATFORM(GTK)
+    GStaticPrivate m_key;
 #elif OS(WINDOWS)
     int m_index;
 #endif
@@ -115,11 +129,6 @@ private:
 template<typename T>
 inline ThreadSpecific<T>::ThreadSpecific()
     : m_value(0)
-{
-}
-
-template<typename T>
-inline ThreadSpecific<T>::~ThreadSpecific()
 {
 }
 
@@ -146,12 +155,6 @@ inline ThreadSpecific<T>::ThreadSpecific()
 }
 
 template<typename T>
-inline ThreadSpecific<T>::~ThreadSpecific()
-{
-    pthread_key_delete(m_key); // Does not invoke destructor functions.
-}
-
-template<typename T>
 inline T* ThreadSpecific<T>::get()
 {
     Data* data = static_cast<Data*>(pthread_getspecific(m_key));
@@ -173,12 +176,6 @@ inline ThreadSpecific<T>::ThreadSpecific()
 }
 
 template<typename T>
-inline ThreadSpecific<T>::~ThreadSpecific()
-{
-    // Does not invoke destructor functions. QThreadStorage will do it
-}
-
-template<typename T>
 inline T* ThreadSpecific<T>::get()
 {
     Data* data = static_cast<Data*>(m_key.localData());
@@ -191,6 +188,29 @@ inline void ThreadSpecific<T>::set(T* ptr)
     ASSERT(!get());
     Data* data = new Data(ptr, this);
     m_key.setLocalData(data);
+}
+
+#elif PLATFORM(GTK)
+
+template<typename T>
+inline ThreadSpecific<T>::ThreadSpecific()
+{
+    g_static_private_init(&m_key);
+}
+
+template<typename T>
+inline T* ThreadSpecific<T>::get()
+{
+    Data* data = static_cast<Data*>(g_static_private_get(&m_key));
+    return data ? data->value : 0;
+}
+
+template<typename T>
+inline void ThreadSpecific<T>::set(T* ptr)
+{
+    ASSERT(!get());
+    Data* data = new Data(ptr, this);
+    g_static_private_set(&m_key, data, destroy);
 }
 
 #elif OS(WINDOWS)
@@ -260,6 +280,9 @@ inline void ThreadSpecific<T>::destroy(void* ptr)
     // We want get() to keep working while data destructor works, because it can be called indirectly by the destructor.
     // Some pthreads implementations zero out the pointer before calling destroy(), so we temporarily reset it.
     pthread_setspecific(data->owner->m_key, ptr);
+#elif PLATFORM(GTK)
+    // See comment as above
+    g_static_private_set(&data->owner->m_key, data, 0);
 #endif
 #if PLATFORM(QT)
     // See comment as above
@@ -273,6 +296,8 @@ inline void ThreadSpecific<T>::destroy(void* ptr)
     pthread_setspecific(data->owner->m_key, 0);
 #elif PLATFORM(QT)
     // Do nothing here
+#elif PLATFORM(GTK)
+    g_static_private_set(&data->owner->m_key, 0, 0);
 #elif OS(WINDOWS)
     TlsSetValue(tlsKeys()[data->owner->m_index], 0);
 #else
@@ -292,7 +317,7 @@ inline ThreadSpecific<T>::operator T*()
     if (!ptr) {
         // Set up thread-specific value's memory pointer before invoking constructor, in case any function it calls
         // needs to access the value, to avoid recursion.
-        ptr = static_cast<T*>(fastMalloc(sizeof(T)));
+        ptr = static_cast<T*>(fastZeroedMalloc(sizeof(T)));
         set(ptr);
         new (ptr) T;
     }
@@ -309,6 +334,17 @@ template<typename T>
 inline T& ThreadSpecific<T>::operator*()
 {
     return *operator T*();
+}
+
+template<typename T>
+inline void ThreadSpecific<T>::replace(T* newPtr)
+{
+    ASSERT(newPtr);
+    Data* data = static_cast<Data*>(pthread_getspecific(m_key));
+    ASSERT(data);
+    data->value->~T();
+    fastFree(data->value);
+    data->value = newPtr;
 }
 
 }

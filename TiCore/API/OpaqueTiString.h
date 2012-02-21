@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,7 +40,7 @@ namespace TI {
     class TiGlobalData;
 }
 
-struct OpaqueTiString : public ThreadSafeShared<OpaqueTiString> {
+struct OpaqueTiString : public ThreadSafeRefCounted<OpaqueTiString> {
 
     static PassRefPtr<OpaqueTiString> create() // null
     {
@@ -61,7 +61,7 @@ struct OpaqueTiString : public ThreadSafeShared<OpaqueTiString> {
     TI::Identifier identifier(TI::TiGlobalData*) const;
 
 private:
-    friend class WTI::ThreadSafeShared<OpaqueTiString>;
+    friend class WTI::ThreadSafeRefCounted<OpaqueTiString>;
 
     OpaqueTiString()
         : m_characters(0)

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -126,10 +126,14 @@ namespace TI {
         static const bool needsDestruction = false;
     };
 
-    typedef HashMap<RefPtr<UString::Rep>, SymbolTableEntry, IdentifierRepHash, HashTraits<RefPtr<UString::Rep> >, SymbolTableIndexHashTraits> SymbolTable;
+    typedef HashMap<RefPtr<StringImpl>, SymbolTableEntry, IdentifierRepHash, HashTraits<RefPtr<StringImpl> >, SymbolTableIndexHashTraits> SymbolTable;
 
-    class SharedSymbolTable : public SymbolTable, public RefCounted<SharedSymbolTable>
-    {
+    class SharedSymbolTable : public SymbolTable, public RefCounted<SharedSymbolTable> {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
+        static PassRefPtr<SharedSymbolTable> create() { return adoptRef(new SharedSymbolTable); }
+    private:
+        SharedSymbolTable() { }
     };
     
 } // namespace TI

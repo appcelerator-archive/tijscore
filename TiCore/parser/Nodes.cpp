@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -74,7 +74,7 @@ void SourceElements::append(StatementNode* statement)
     m_statements.append(statement);
 }
 
-inline StatementNode* SourceElements::singleStatement() const
+StatementNode* SourceElements::singleStatement() const
 {
     size_t size = m_statements.size();
     return size == 1 ? m_statements[0] : 0;
@@ -82,7 +82,7 @@ inline StatementNode* SourceElements::singleStatement() const
 
 // -----------------------------ScopeNodeData ---------------------------
 
-ScopeNodeData::ScopeNodeData(ParserArena& arena, SourceElements* statements, VarStack* varStack, FunctionStack* funcStack, int numConstants)
+ScopeNodeData::ScopeNodeData(ParserArena& arena, SourceElements* statements, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, int numConstants)
     : m_numConstants(numConstants)
     , m_statements(statements)
 {
@@ -91,21 +91,22 @@ ScopeNodeData::ScopeNodeData(ParserArena& arena, SourceElements* statements, Var
         m_varStack.swap(*varStack);
     if (funcStack)
         m_functionStack.swap(*funcStack);
+    m_capturedVariables.swap(capturedVariables);
 }
 
 // ------------------------------ ScopeNode -----------------------------
 
-ScopeNode::ScopeNode(TiGlobalData* globalData)
+ScopeNode::ScopeNode(TiGlobalData* globalData, bool inStrictContext)
     : StatementNode(globalData)
     , ParserArenaRefCounted(globalData)
-    , m_features(NoFeatures)
+    , m_features(inStrictContext ? StrictModeFeature : NoFeatures)
 {
 }
 
-ScopeNode::ScopeNode(TiGlobalData* globalData, const SourceCode& source, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, CodeFeatures features, int numConstants)
+ScopeNode::ScopeNode(TiGlobalData* globalData, const SourceCode& source, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, CodeFeatures features, int numConstants)
     : StatementNode(globalData)
     , ParserArenaRefCounted(globalData)
-    , m_data(new ScopeNodeData(globalData->parser->arena(), children, varStack, funcStack, numConstants))
+    , m_data(adoptPtr(new ScopeNodeData(globalData->parser->arena(), children, varStack, funcStack, capturedVariables, numConstants)))
     , m_features(features)
     , m_source(source)
 {
@@ -118,14 +119,14 @@ StatementNode* ScopeNode::singleStatement() const
 
 // ------------------------------ ProgramNode -----------------------------
 
-inline ProgramNode::ProgramNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& source, CodeFeatures features, int numConstants)
-    : ScopeNode(globalData, source, children, varStack, funcStack, features, numConstants)
+inline ProgramNode::ProgramNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& source, CodeFeatures features, int numConstants)
+    : ScopeNode(globalData, source, children, varStack, funcStack, capturedVariables, features, numConstants)
 {
 }
 
-PassRefPtr<ProgramNode> ProgramNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& source, CodeFeatures features, int numConstants)
+PassRefPtr<ProgramNode> ProgramNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& source, CodeFeatures features, int numConstants)
 {
-    RefPtr<ProgramNode> node = new ProgramNode(globalData, children, varStack, funcStack, source, features, numConstants);
+    RefPtr<ProgramNode> node = new ProgramNode(globalData, children, varStack, funcStack, capturedVariables, source, features, numConstants);
 
     ASSERT(node->data()->m_arena.last() == node);
     node->data()->m_arena.removeLast();
@@ -136,14 +137,14 @@ PassRefPtr<ProgramNode> ProgramNode::create(TiGlobalData* globalData, SourceElem
 
 // ------------------------------ EvalNode -----------------------------
 
-inline EvalNode::EvalNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& source, CodeFeatures features, int numConstants)
-    : ScopeNode(globalData, source, children, varStack, funcStack, features, numConstants)
+inline EvalNode::EvalNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& source, CodeFeatures features, int numConstants)
+    : ScopeNode(globalData, source, children, varStack, funcStack, capturedVariables, features, numConstants)
 {
 }
 
-PassRefPtr<EvalNode> EvalNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& source, CodeFeatures features, int numConstants)
+PassRefPtr<EvalNode> EvalNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& source, CodeFeatures features, int numConstants)
 {
-    RefPtr<EvalNode> node = new EvalNode(globalData, children, varStack, funcStack, source, features, numConstants);
+    RefPtr<EvalNode> node = new EvalNode(globalData, children, varStack, funcStack, capturedVariables, source, features, numConstants);
 
     ASSERT(node->data()->m_arena.last() == node);
     node->data()->m_arena.removeLast();
@@ -160,13 +161,13 @@ FunctionParameters::FunctionParameters(ParameterNode* firstParameter)
         append(parameter->ident());
 }
 
-inline FunctionBodyNode::FunctionBodyNode(TiGlobalData* globalData)
-    : ScopeNode(globalData)
+inline FunctionBodyNode::FunctionBodyNode(TiGlobalData* globalData, bool inStrictContext)
+    : ScopeNode(globalData, inStrictContext)
 {
 }
 
-inline FunctionBodyNode::FunctionBodyNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& sourceCode, CodeFeatures features, int numConstants)
-    : ScopeNode(globalData, sourceCode, children, varStack, funcStack, features, numConstants)
+inline FunctionBodyNode::FunctionBodyNode(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& sourceCode, CodeFeatures features, int numConstants)
+    : ScopeNode(globalData, sourceCode, children, varStack, funcStack, capturedVariables, features, numConstants)
 {
 }
 
@@ -183,14 +184,14 @@ void FunctionBodyNode::finishParsing(PassRefPtr<FunctionParameters> parameters, 
     m_ident = ident;
 }
 
-FunctionBodyNode* FunctionBodyNode::create(TiGlobalData* globalData)
+FunctionBodyNode* FunctionBodyNode::create(TiGlobalData* globalData, bool inStrictContext)
 {
-    return new FunctionBodyNode(globalData);
+    return new FunctionBodyNode(globalData, inStrictContext);
 }
 
-PassRefPtr<FunctionBodyNode> FunctionBodyNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, const SourceCode& sourceCode, CodeFeatures features, int numConstants)
+PassRefPtr<FunctionBodyNode> FunctionBodyNode::create(TiGlobalData* globalData, SourceElements* children, VarStack* varStack, FunctionStack* funcStack, IdentifierSet& capturedVariables, const SourceCode& sourceCode, CodeFeatures features, int numConstants)
 {
-    RefPtr<FunctionBodyNode> node = new FunctionBodyNode(globalData, children, varStack, funcStack, sourceCode, features, numConstants);
+    RefPtr<FunctionBodyNode> node = new FunctionBodyNode(globalData, children, varStack, funcStack, capturedVariables, sourceCode, features, numConstants);
 
     ASSERT(node->data()->m_arena.last() == node);
     node->data()->m_arena.removeLast();

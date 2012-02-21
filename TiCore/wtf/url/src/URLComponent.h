@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 // Copyright 2010, Google Inc. All rights reserved.
@@ -44,13 +44,19 @@ public:
     URLComponent() : m_begin(0), m_length(-1) { }
     URLComponent(int begin, int length) : m_begin(begin), m_length(length) { }
 
+    // Helper that returns a component created with the given begin and ending
+    // points. The ending point is non-inclusive.
+    static inline URLComponent fromRange(int begin, int end)
+    {
+        return URLComponent(begin, end - begin);
+    }
+
     // Returns true if this component is valid, meaning the length is given. Even
     // valid components may be empty to record the fact that they exist.
     bool isValid() const { return m_length != -1; }
 
-    // Returns true if the given component is specified on false, the component
-    // is either empty or invalid.
-    bool isNonempty() const { return m_length > 0; }
+    bool isNonEmpty() const { return m_length > 0; }
+    bool isEmptyOrInvalid() const { return m_length <= 0; }
 
     void reset()
     {

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,6 +41,7 @@
 namespace TI {
 
     class TiExcState;
+    class TiGlobalObject;
     class Profile;
     class ProfileNode;
     class UString;
@@ -48,32 +49,34 @@ namespace TI {
 
     class ProfileGenerator : public RefCounted<ProfileGenerator>  {
     public:
-        static PassRefPtr<ProfileGenerator> create(const UString& title, TiExcState* originatingExec, unsigned uid);
+        static PassRefPtr<ProfileGenerator> create(TiExcState*, const UString& title, unsigned uid);
 
         // Members
         const UString& title() const;
         PassRefPtr<Profile> profile() const { return m_profile; }
-        TiExcState* originatingGlobalExec() const { return m_originatingGlobalExec; }
+        TiGlobalObject* origin() const { return m_origin; }
         unsigned profileGroup() const { return m_profileGroup; }
 
         // Collecting
-        void willExecute(const CallIdentifier&);
-        void didExecute(const CallIdentifier&);
+        void willExecute(TiExcState* callerCallFrame, const CallIdentifier&);
+        void didExecute(TiExcState* callerCallFrame, const CallIdentifier&);
+
+        void exceptionUnwind(TiExcState* handlerCallFrame, const CallIdentifier&);
 
         // Stopping Profiling
         void stopProfiling();
 
-        typedef void (ProfileGenerator::*ProfileFunction)(const CallIdentifier& callIdentifier);
+        typedef void (ProfileGenerator::*ProfileFunction)(TiExcState* callerOrHandlerCallFrame, const CallIdentifier& callIdentifier);
 
     private:
-        ProfileGenerator(const UString& title, TiExcState* originatingExec, unsigned uid);
+        ProfileGenerator(TiExcState*, const UString& title, unsigned uid);
         void addParentForConsoleStart(TiExcState*);
 
         void removeProfileStart();
         void removeProfileEnd();
 
         RefPtr<Profile> m_profile;
-        TiExcState* m_originatingGlobalExec;
+        TiGlobalObject* m_origin;
         unsigned m_profileGroup;
         RefPtr<ProfileNode> m_head;
         RefPtr<ProfileNode> m_currentNode;

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,14 +34,18 @@
 
 #include "TiStaticScopeObject.h"
 
-namespace TI {
+#include "Error.h"
 
+namespace TI {
 ASSERT_CLASS_FITS_IN_CELL(TiStaticScopeObject);
 
-void TiStaticScopeObject::markChildren(MarkStack& markStack)
+void TiStaticScopeObject::visitChildren(SlotVisitor& visitor)
 {
-    JSVariableObject::markChildren(markStack);
-    markStack.append(d()->registerStore.jsValue());
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    JSVariableObject::visitChildren(visitor);
+    visitor.append(&m_registerStore);
 }
 
 TiObject* TiStaticScopeObject::toThisObject(TiExcState* exec) const
@@ -49,17 +53,37 @@ TiObject* TiStaticScopeObject::toThisObject(TiExcState* exec) const
     return exec->globalThisValue();
 }
 
-void TiStaticScopeObject::put(TiExcState*, const Identifier& propertyName, TiValue value, PutPropertySlot&)
+TiValue TiStaticScopeObject::toStrictThisObject(TiExcState*) const
 {
-    if (symbolTablePut(propertyName, value))
+    return jsNull();
+}
+
+void TiStaticScopeObject::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
+{
+    if (slot.isStrictMode()) {
+        // Double lookup in strict mode, but this only occurs when
+        // a) indirectly writing to an exception slot
+        // b) writing to a function expression name
+        // (a) is unlikely, and (b) is an error.
+        // Also with a single entry the symbol table lookup should simply be
+        // a pointer compare.
+        PropertySlot slot;
+        bool isWritable = true;
+        symbolTableGet(propertyName, slot, isWritable);
+        if (!isWritable) {
+            throwError(exec, createTypeError(exec, StrictModeReadonlyPropertyWriteError));
+            return;
+        }
+    }
+    if (symbolTablePut(exec->globalData(), propertyName, value))
         return;
     
     ASSERT_NOT_REACHED();
 }
 
-void TiStaticScopeObject::putWithAttributes(TiExcState*, const Identifier& propertyName, TiValue value, unsigned attributes)
+void TiStaticScopeObject::putWithAttributes(TiExcState* exec, const Identifier& propertyName, TiValue value, unsigned attributes)
 {
-    if (symbolTablePutWithAttributes(propertyName, value, attributes))
+    if (symbolTablePutWithAttributes(exec->globalData(), propertyName, value, attributes))
         return;
     
     ASSERT_NOT_REACHED();
@@ -70,13 +94,7 @@ bool TiStaticScopeObject::isDynamicScope(bool&) const
     return false;
 }
 
-TiStaticScopeObject::~TiStaticScopeObject()
-{
-    ASSERT(d());
-    delete d();
-}
-
-inline bool TiStaticScopeObject::getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot& slot)
+bool TiStaticScopeObject::getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot& slot)
 {
     return symbolTableGet(propertyName, slot);
 }

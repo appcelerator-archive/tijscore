@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,19 +36,18 @@
 #ifndef SamplingTool_h
 #define SamplingTool_h
 
+#include "Strong.h"
+#include "Nodes.h"
+#include "Opcode.h"
 #include <wtf/Assertions.h>
 #include <wtf/HashMap.h>
 #include <wtf/Threading.h>
-
-#include "Nodes.h"
-#include "Opcode.h"
 
 namespace TI {
 
     class ScriptExecutable;
 
     class SamplingFlags {
-        friend class JIT;
     public:
         static void start();
         static void stop();
@@ -87,6 +86,11 @@ namespace TI {
             int m_flag;
         };
     
+        static const void* addressOfFlags()
+        {
+            return &s_flags;
+        }
+
 #endif
     private:
         static uint32_t s_flags;
@@ -102,8 +106,8 @@ namespace TI {
     struct Instruction;
 
     struct ScriptSampleRecord {
-        ScriptSampleRecord(ScriptExecutable* executable)
-            : m_executable(executable)
+        ScriptSampleRecord(TiGlobalData& globalData, ScriptExecutable* executable)
+            : m_executable(globalData, executable)
             , m_codeBlock(0)
             , m_sampleCount(0)
             , m_opcodeSampleCount(0)
@@ -120,7 +124,7 @@ namespace TI {
         
         void sample(CodeBlock*, Instruction*);
 
-        RefPtr<ScriptExecutable> m_executable;
+        Strong<ScriptExecutable> m_executable;
         CodeBlock* m_codeBlock;
         int m_sampleCount;
         int m_opcodeSampleCount;
@@ -149,7 +153,8 @@ namespace TI {
         friend class HostCallRecord;
         
 #if ENABLE(OPCODE_SAMPLING)
-        class CallRecord : public Noncopyable {
+        class CallRecord {
+            WTF_MAKE_NONCOPYABLE(CallRecord);
         public:
             CallRecord(SamplingTool* samplingTool)
                 : m_samplingTool(samplingTool)
@@ -179,7 +184,8 @@ namespace TI {
             }
         };
 #else
-        class CallRecord : public Noncopyable {
+        class CallRecord {
+            WTF_MAKE_NONCOPYABLE(CallRecord);
         public:
             CallRecord(SamplingTool*)
             {
@@ -285,7 +291,6 @@ namespace TI {
     // Implements a named set of counters, printed on exit if ENABLE(SAMPLING_COUNTERS).
     // See subclasses below, SamplingCounter, GlobalSamplingCounter and DeletableSamplingCounter.
     class AbstractSamplingCounter {
-        friend class JIT;
         friend class DeletableSamplingCounter;
     public:
         void count(uint32_t count = 1)
@@ -294,6 +299,8 @@ namespace TI {
         }
 
         static void dump();
+
+        int64_t* addressOfCounter() { return &m_counter; }
 
     protected:
         // Effectively the contructor, however called lazily in the case of GlobalSamplingCounter.

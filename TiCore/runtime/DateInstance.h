@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,13 +38,12 @@ namespace TI {
 
     class DateInstance : public JSWrapperObject {
     public:
-        DateInstance(TiExcState*, double);
-        DateInstance(TiExcState*, NonNullPassRefPtr<Structure>, double);
-        explicit DateInstance(TiExcState*, NonNullPassRefPtr<Structure>);
+        DateInstance(TiExcState*, Structure*, double);
+        explicit DateInstance(TiExcState*, Structure*);
 
         double internalNumber() const { return internalValue().uncheckedGetNumber(); }
 
-        static JS_EXPORTDATA const ClassInfo info;
+        static JS_EXPORTDATA const ClassInfo s_info;
 
         const GregorianDateTime* gregorianDateTime(TiExcState* exec) const
         {
@@ -60,18 +59,14 @@ namespace TI {
             return calculateGregorianDateTimeUTC(exec);
         }
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
-
-    protected:
-        static const unsigned StructureFlags = OverridesMarkChildren | JSWrapperObject::StructureFlags;
 
     private:
         const GregorianDateTime* calculateGregorianDateTime(TiExcState*) const;
         const GregorianDateTime* calculateGregorianDateTimeUTC(TiExcState*) const;
-        virtual const ClassInfo* classInfo() const { return &info; }
 
         mutable RefPtr<DateInstanceData> m_data;
     };
@@ -80,7 +75,7 @@ namespace TI {
 
     inline DateInstance* asDateInstance(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&DateInstance::info));
+        ASSERT(asObject(value)->inherits(&DateInstance::s_info));
         return static_cast<DateInstance*>(asObject(value));
     }
 

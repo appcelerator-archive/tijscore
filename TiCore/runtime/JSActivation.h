@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -49,16 +49,17 @@ namespace TI {
     class JSActivation : public JSVariableObject {
         typedef JSVariableObject Base;
     public:
-        JSActivation(CallFrame*, NonNullPassRefPtr<FunctionExecutable>);
+        JSActivation(CallFrame*, FunctionExecutable*);
         virtual ~JSActivation();
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 
         virtual bool isDynamicScope(bool& requiresDynamicChecks) const;
 
         virtual bool isActivationObject() const { return true; }
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
+        virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode);
 
         virtual void put(TiExcState*, const Identifier&, TiValue, PutPropertySlot&);
 
@@ -66,47 +67,44 @@ namespace TI {
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
 
         virtual TiObject* toThisObject(TiExcState*) const;
+        virtual TiValue toStrictThisObject(TiExcState*) const;
 
-        void copyRegisters(Arguments* arguments);
+        void copyRegisters(TiGlobalData&);
         
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
+        static const ClassInfo s_info;
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); }
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto) { return Structure::create(globalData, proto, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesMarkChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | NeedsThisConversion | OverridesVisitChildren | OverridesGetPropertyNames | JSVariableObject::StructureFlags;
 
     private:
-        struct JSActivationData : public JSVariableObjectData {
-            JSActivationData(NonNullPassRefPtr<FunctionExecutable> _functionExecutable, Register* registers)
-                : JSVariableObjectData(_functionExecutable->generatedBytecode().symbolTable(), registers)
-                , functionExecutable(_functionExecutable)
-            {
-                // We have to manually ref and deref the symbol table as JSVariableObjectData
-                // doesn't know about SharedSymbolTable
-                functionExecutable->generatedBytecode().sharedSymbolTable()->ref();
-            }
-            ~JSActivationData()
-            {
-                static_cast<SharedSymbolTable*>(symbolTable)->deref();
-            }
+        bool symbolTableGet(const Identifier&, PropertySlot&);
+        bool symbolTableGet(const Identifier&, PropertyDescriptor&);
+        bool symbolTableGet(const Identifier&, PropertySlot&, bool& slotIsWriteable);
+        bool symbolTablePut(TiGlobalData&, const Identifier&, TiValue);
+        bool symbolTablePutWithAttributes(TiGlobalData&, const Identifier&, TiValue, unsigned attributes);
 
-            RefPtr<FunctionExecutable> functionExecutable;
-        };
-        
         static TiValue argumentsGetter(TiExcState*, TiValue, const Identifier&);
         NEVER_INLINE PropertySlot::GetValueFunc getArgumentsGetter();
 
-        JSActivationData* d() const { return static_cast<JSActivationData*>(JSVariableObject::d); }
+        int m_numParametersMinusThis;
+        int m_numCapturedVars : 31;
+        bool m_requiresDynamicChecks : 1;
+        int m_argumentsRegister;
     };
 
     JSActivation* asActivation(TiValue);
 
     inline JSActivation* asActivation(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&JSActivation::info));
+        ASSERT(asObject(value)->inherits(&JSActivation::s_info));
         return static_cast<JSActivation*>(asObject(value));
+    }
+    
+    ALWAYS_INLINE JSActivation* Register::activation() const
+    {
+        return asActivation(jsValue());
     }
 
 } // namespace TI

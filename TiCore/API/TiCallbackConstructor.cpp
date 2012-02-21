@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,6 +35,7 @@
 
 #include "APIShims.h"
 #include "APICast.h"
+#include <runtime/Error.h>
 #include <runtime/TiGlobalObject.h>
 #include <runtime/TiLock.h>
 #include <runtime/ObjectPrototype.h>
@@ -42,13 +43,14 @@
 
 namespace TI {
 
-const ClassInfo TiCallbackConstructor::info = { "CallbackConstructor", 0, 0, 0 };
+const ClassInfo TiCallbackConstructor::s_info = { "CallbackConstructor", &TiObjectWithGlobalObject::s_info, 0, 0 };
 
-TiCallbackConstructor::TiCallbackConstructor(NonNullPassRefPtr<Structure> structure, TiClassRef jsClass, TiObjectCallAsConstructorCallback callback)
-    : TiObject(structure)
+TiCallbackConstructor::TiCallbackConstructor(TiGlobalObject* globalObject, Structure* structure, TiClassRef jsClass, TiObjectCallAsConstructorCallback callback)
+    : TiObjectWithGlobalObject(globalObject, structure)
     , m_class(jsClass)
     , m_callback(callback)
 {
+    ASSERT(inherits(&s_info));
     if (m_class)
         TiClassRetain(jsClass);
 }
@@ -59,17 +61,18 @@ TiCallbackConstructor::~TiCallbackConstructor()
         TiClassRelease(m_class);
 }
 
-static TiObject* constructTiCallback(TiExcState* exec, TiObject* constructor, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructTiCallback(TiExcState* exec)
 {
+    TiObject* constructor = exec->callee();
     TiContextRef ctx = toRef(exec);
     TiObjectRef constructorRef = toRef(constructor);
 
     TiObjectCallAsConstructorCallback callback = static_cast<TiCallbackConstructor*>(constructor)->callback();
     if (callback) {
-        int argumentCount = static_cast<int>(args.size());
+        int argumentCount = static_cast<int>(exec->argumentCount());
         Vector<TiValueRef, 16> arguments(argumentCount);
         for (int i = 0; i < argumentCount; i++)
-            arguments[i] = toRef(exec, args.at(i));
+            arguments[i] = toRef(exec, exec->argument(i));
 
         TiValueRef exception = 0;
         TiObjectRef result;
@@ -78,11 +81,11 @@ static TiObject* constructTiCallback(TiExcState* exec, TiObject* constructor, co
             result = callback(ctx, constructorRef, argumentCount, arguments.data(), &exception);
         }
         if (exception)
-            exec->setException(toJS(exec, exception));
-        return toJS(result);
+            throwError(exec, toJS(exec, exception));
+        return TiValue::encode(toJS(result));
     }
     
-    return toJS(TiObjectMake(ctx, static_cast<TiCallbackConstructor*>(constructor)->classRef(), 0));
+    return TiValue::encode(toJS(TiObjectMake(ctx, static_cast<TiCallbackConstructor*>(constructor)->classRef(), 0)));
 }
 
 ConstructType TiCallbackConstructor::getConstructData(ConstructData& constructData)

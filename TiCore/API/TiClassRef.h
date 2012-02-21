@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,14 +35,15 @@
 
 #include "TiObjectRef.h"
 
-#include <runtime/TiObject.h>
-#include <runtime/Protect.h>
-#include <runtime/UString.h>
-#include <runtime/WeakGCPtr.h>
+#include "Weak.h"
+#include "TiObject.h"
+#include "Protect.h"
+#include "UString.h"
 #include <wtf/HashMap.h>
-#include <wtf/RefCounted.h>
 
-struct StaticValueEntry : FastAllocBase {
+struct StaticValueEntry {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     StaticValueEntry(TiObjectGetPropertyCallback _getProperty, TiObjectSetPropertyCallback _setProperty, TiPropertyAttributes _attributes)
         : getProperty(_getProperty), setProperty(_setProperty), attributes(_attributes)
     {
@@ -53,7 +54,9 @@ struct StaticValueEntry : FastAllocBase {
     TiPropertyAttributes attributes;
 };
 
-struct StaticFunctionEntry : FastAllocBase {
+struct StaticFunctionEntry {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
     StaticFunctionEntry(TiObjectCallAsFunctionCallback _callAsFunction, TiPropertyAttributes _attributes)
         : callAsFunction(_callAsFunction), attributes(_attributes)
     {
@@ -63,15 +66,17 @@ struct StaticFunctionEntry : FastAllocBase {
     TiPropertyAttributes attributes;
 };
 
-typedef HashMap<RefPtr<TI::UString::Rep>, StaticValueEntry*> OpaqueTiClassStaticValuesTable;
-typedef HashMap<RefPtr<TI::UString::Rep>, StaticFunctionEntry*> OpaqueTiClassStaticFunctionsTable;
+typedef HashMap<RefPtr<StringImpl>, StaticValueEntry*> OpaqueTiClassStaticValuesTable;
+typedef HashMap<RefPtr<StringImpl>, StaticFunctionEntry*> OpaqueTiClassStaticFunctionsTable;
 
 struct OpaqueTiClass;
 
 // An OpaqueTiClass (TiClass) is created without a context, so it can be used with any context, even across context groups.
 // This structure holds data members that vary across context groups.
-struct OpaqueTiClassContextData : Noncopyable {
-    OpaqueTiClassContextData(OpaqueTiClass*);
+struct OpaqueTiClassContextData {
+    WTF_MAKE_NONCOPYABLE(OpaqueTiClassContextData); WTF_MAKE_FAST_ALLOCATED;
+public:
+    OpaqueTiClassContextData(TI::TiGlobalData&, OpaqueTiClass*);
     ~OpaqueTiClassContextData();
 
     // It is necessary to keep OpaqueTiClass alive because of the following rare scenario:
@@ -84,10 +89,10 @@ struct OpaqueTiClassContextData : Noncopyable {
 
     OpaqueTiClassStaticValuesTable* staticValues;
     OpaqueTiClassStaticFunctionsTable* staticFunctions;
-    TI::WeakGCPtr<TI::TiObject> cachedPrototype;
+    TI::Weak<TI::TiObject> cachedPrototype;
 };
 
-struct OpaqueTiClass : public ThreadSafeShared<OpaqueTiClass> {
+struct OpaqueTiClass : public ThreadSafeRefCounted<OpaqueTiClass> {
     static PassRefPtr<OpaqueTiClass> create(const TiClassDefinition*);
     static PassRefPtr<OpaqueTiClass> createNoAutomaticPrototype(const TiClassDefinition*);
     ~OpaqueTiClass();

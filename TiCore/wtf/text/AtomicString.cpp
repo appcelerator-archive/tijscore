@@ -2,11 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  * Copyright (C) 2004, 2005, 2006, 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2010 Patrick Gansterer <paroga@paroga.com>
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -27,16 +28,19 @@
 
 #include "config.h"
 
-#include <libkern/OSAtomic.h>
-
 #include "AtomicString.h"
 
 #include "StringHash.h"
 #include <wtf/HashSet.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
+#include <wtf/unicode/UTF8.h>
 
-namespace WebCore {
+#include <libkern/OSAtomic.h>
+
+namespace WTI {
+
+using namespace Unicode;
 
 COMPILE_ASSERT(sizeof(AtomicString) == sizeof(String), atomic_string_and_string_must_be_same_size);
 
@@ -94,10 +98,20 @@ static inline HashSet<StringImpl*>& stringTable()
     return table->table();
 }
 
+template<typename T, typename HashTranslator>
+static inline PassRefPtr<StringImpl> addToStringTable(const T& value)
+{
+    pair<HashSet<StringImpl*>::iterator, bool> addResult = stringTable().add<T, HashTranslator>(value);
+
+    // If the string is newly-translated, then we need to adopt it.
+    // The boolean in the pair tells us if that is so.
+    return addResult.second ? adoptRef(*addResult.first) : *addResult.first;
+}
+
 struct CStringTranslator {
     static unsigned hash(const char* c)
     {
-        return StringImpl::computeHash(c);
+        return StringHasher::computeHash(c);
     }
 
     static bool equal(StringImpl* r, const char* s)
@@ -109,12 +123,12 @@ struct CStringTranslator {
             if (d[i] != c)
                 return false;
         }
-        return s[length] == 0;
+        return !s[length];
     }
 
     static void translate(StringImpl*& location, const char* const& c, unsigned hash)
     {
-        location = StringImpl::create(c).releaseRef(); 
+        location = StringImpl::create(c).leakRef();
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -135,12 +149,10 @@ PassRefPtr<StringImpl> AtomicString::add(const char* c)
     if (!c)
         return 0;
     if (!*c)
-        return StringImpl::empty();    
+        return StringImpl::empty();
+
     AtomicStringTableLocker locker;
-    pair<HashSet<StringImpl*>::iterator, bool> addResult = stringTable().add<const char*, CStringTranslator>(c);
-    if (!addResult.second)
-        return *addResult.first;
-    return adoptRef(*addResult.first);
+    return addToStringTable<const char*, CStringTranslator>(c);
 }
 
 struct UCharBuffer {
@@ -155,7 +167,7 @@ static inline bool equal(StringImpl* string, const UChar* characters, unsigned l
 
     // FIXME: perhaps we should have a more abstract macro that indicates when
     // going 4 bytes at a time is unsafe
-#if CPU(ARM) || CPU(SH4)
+#if CPU(ARM) || CPU(SH4) || CPU(MIPS) || CPU(SPARC)
     const UChar* stringCharacters = string->characters();
     for (unsigned i = 0; i != length; ++i) {
         if (*stringCharacters++ != *characters++)
@@ -181,20 +193,25 @@ static inline bool equal(StringImpl* string, const UChar* characters, unsigned l
 #endif
 }
 
+bool operator==(const AtomicString& string, const Vector<UChar>& vector)
+{
+    return string.impl() && equal(string.impl(), vector.data(), vector.size());
+}
+
 struct UCharBufferTranslator {
     static unsigned hash(const UCharBuffer& buf)
     {
-        return StringImpl::computeHash(buf.s, buf.length);
+        return StringHasher::computeHash(buf.s, buf.length);
     }
 
     static bool equal(StringImpl* const& str, const UCharBuffer& buf)
     {
-        return WebCore::equal(str, buf.s, buf.length);
+        return WTI::equal(str, buf.s, buf.length);
     }
 
     static void translate(StringImpl*& location, const UCharBuffer& buf, unsigned hash)
     {
-        location = StringImpl::create(buf.s, buf.length).releaseRef(); 
+        location = StringImpl::create(buf.s, buf.length).leakRef();
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -209,18 +226,65 @@ struct HashAndCharacters {
 struct HashAndCharactersTranslator {
     static unsigned hash(const HashAndCharacters& buffer)
     {
-        ASSERT(buffer.hash == StringImpl::computeHash(buffer.characters, buffer.length));
+        ASSERT(buffer.hash == StringHasher::computeHash(buffer.characters, buffer.length));
         return buffer.hash;
     }
 
     static bool equal(StringImpl* const& string, const HashAndCharacters& buffer)
     {
-        return WebCore::equal(string, buffer.characters, buffer.length);
+        return WTI::equal(string, buffer.characters, buffer.length);
     }
 
     static void translate(StringImpl*& location, const HashAndCharacters& buffer, unsigned hash)
     {
-        location = StringImpl::create(buffer.characters, buffer.length).releaseRef();
+        location = StringImpl::create(buffer.characters, buffer.length).leakRef();
+        location->setHash(hash);
+        location->setIsAtomic(true);
+    }
+};
+
+struct HashAndUTF8Characters {
+    unsigned hash;
+    const char* characters;
+    unsigned length;
+    unsigned utf16Length;
+};
+
+struct HashAndUTF8CharactersTranslator {
+    static unsigned hash(const HashAndUTF8Characters& buffer)
+    {
+        return buffer.hash;
+    }
+
+    static bool equal(StringImpl* const& string, const HashAndUTF8Characters& buffer)
+    {
+        if (buffer.utf16Length != string->length())
+            return false;
+
+        const UChar* stringCharacters = string->characters();
+
+        // If buffer contains only ASCII characters UTF-8 and UTF16 length are the same.
+        if (buffer.utf16Length != buffer.length)
+            return equalUTF16WithUTF8(stringCharacters, stringCharacters + string->length(), buffer.characters, buffer.characters + buffer.length);
+
+        for (unsigned i = 0; i < buffer.length; ++i) {
+            ASSERT(isASCII(buffer.characters[i]));
+            if (stringCharacters[i] != buffer.characters[i])
+                return false;
+        }
+
+        return true;
+    }
+
+    static void translate(StringImpl*& location, const HashAndUTF8Characters& buffer, unsigned hash)
+    {
+        UChar* target;
+        location = StringImpl::createUninitialized(buffer.utf16Length, target).releaseRef();
+
+        const char* source = buffer.characters;
+        if (convertUTF8ToUTF16(&source, source + buffer.length, &target, target + buffer.utf16Length) != conversionOK)
+            ASSERT_NOT_REACHED();
+
         location->setHash(hash);
         location->setIsAtomic(true);
     }
@@ -231,16 +295,12 @@ PassRefPtr<StringImpl> AtomicString::add(const UChar* s, unsigned length)
     if (!s)
         return 0;
 
-    if (length == 0)
+    if (!length)
         return StringImpl::empty();
     
-    UCharBuffer buf = { s, length }; 
+    UCharBuffer buffer = { s, length };
     AtomicStringTableLocker locker;
-    pair<HashSet<StringImpl*>::iterator, bool> addResult = stringTable().add<UCharBuffer, UCharBufferTranslator>(buf);
-
-    // If the string is newly-translated, then we need to adopt it.
-    // The boolean in the pair tells us if that is so.
-    return addResult.second ? adoptRef(*addResult.first) : *addResult.first;
+    return addToStringTable<UCharBuffer, UCharBufferTranslator>(buffer);
 }
 
 PassRefPtr<StringImpl> AtomicString::add(const UChar* s, unsigned length, unsigned existingHash)
@@ -248,15 +308,12 @@ PassRefPtr<StringImpl> AtomicString::add(const UChar* s, unsigned length, unsign
     ASSERT(s);
     ASSERT(existingHash);
 
-    if (length == 0)
+    if (!length)
         return StringImpl::empty();
-    
-    HashAndCharacters buffer = { existingHash, s, length }; 
+
+    HashAndCharacters buffer = { existingHash, s, length };
     AtomicStringTableLocker locker;
-    pair<HashSet<StringImpl*>::iterator, bool> addResult = stringTable().add<HashAndCharacters, HashAndCharactersTranslator>(buffer);
-    if (!addResult.second)
-        return *addResult.first;
-    return adoptRef(*addResult.first);
+    return addToStringTable<HashAndCharacters, HashAndCharactersTranslator>(buffer);
 }
 
 PassRefPtr<StringImpl> AtomicString::add(const UChar* s)
@@ -268,16 +325,12 @@ PassRefPtr<StringImpl> AtomicString::add(const UChar* s)
     while (s[length] != UChar(0))
         length++;
 
-    if (length == 0)
+    if (!length)
         return StringImpl::empty();
 
-    UCharBuffer buf = {s, length}; 
+    UCharBuffer buffer = { s, length };
     AtomicStringTableLocker locker;
-    pair<HashSet<StringImpl*>::iterator, bool> addResult = stringTable().add<UCharBuffer, UCharBufferTranslator>(buf);
-
-    // If the string is newly-translated, then we need to adopt it.
-    // The boolean in the pair tells us if that is so.
-    return addResult.second ? adoptRef(*addResult.first) : *addResult.first;
+    return addToStringTable<UCharBuffer, UCharBufferTranslator>(buffer);
 }
 
 PassRefPtr<StringImpl> AtomicString::addSlowCase(StringImpl* r)
@@ -285,7 +338,7 @@ PassRefPtr<StringImpl> AtomicString::addSlowCase(StringImpl* r)
     if (!r || r->isAtomic())
         return r;
 
-    if (r->length() == 0)
+    if (!r->length())
         return StringImpl::empty();
 
     AtomicStringTableLocker locker;
@@ -300,7 +353,7 @@ AtomicStringImpl* AtomicString::find(const UChar* s, unsigned length, unsigned e
     ASSERT(s);
     ASSERT(existingHash);
 
-    if (length == 0)
+    if (!length)
         return static_cast<AtomicStringImpl*>(StringImpl::empty());
 
     HashAndCharacters buffer = { existingHash, s, length }; 
@@ -316,15 +369,32 @@ void AtomicString::remove(StringImpl* r)
     AtomicStringTableLocker locker;
     stringTable().remove(r);
 }
-    
+
 AtomicString AtomicString::lower() const
 {
     // Note: This is a hot function in the Dromaeo benchmark.
     StringImpl* impl = this->impl();
+    if (UNLIKELY(!impl))
+        return *this;
     RefPtr<StringImpl> newImpl = impl->lower();
     if (LIKELY(newImpl == impl))
         return *this;
     return AtomicString(newImpl);
 }
 
+AtomicString AtomicString::fromUTF8Internal(const char* charactersStart, const char* charactersEnd)
+{
+    HashAndUTF8Characters buffer;
+    buffer.characters = charactersStart;
+    buffer.hash = calculateStringHashAndLengthFromUTF8(charactersStart, charactersEnd, buffer.length, buffer.utf16Length);
+
+    if (!buffer.hash)
+        return nullAtom;
+
+    AtomicString atomicString;
+    AtomicStringTableLocker locker;
+    atomicString.m_string = addToStringTable<HashAndUTF8Characters, HashAndUTF8CharactersTranslator>(buffer);
+    return atomicString;
 }
+
+} // namespace WTI

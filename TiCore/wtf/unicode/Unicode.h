@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,7 +39,9 @@
 #elif USE(GLIB_UNICODE)
 #include <wtf/unicode/glib/UnicodeGLib.h>
 #elif USE(WINCE_UNICODE)
-#include <wtf/unicode/wince/UnicodeWince.h>
+#include <wtf/unicode/wince/UnicodeWinCE.h>
+#elif USE(BREWMP_UNICODE)
+#include <wtf/unicode/brew/UnicodeBrew.h>
 #else
 //#error "Unknown Unicode implementation"
 #include <wtf/unicode/foundation/UnicodeFoundation.h>

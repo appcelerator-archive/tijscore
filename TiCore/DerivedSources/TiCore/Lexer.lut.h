@@ -1,3 +1,10 @@
+/**
+ * Appcelerator Titanium License
+ * This source code and all modifications done by Appcelerator
+ * are licensed under the Apache Public License (version 2) and
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
+ */
+
 // Automatically generated from ../../parser/Keywords.table using ../../create_hash_table. DO NOT EDIT!
 
 namespace TI {

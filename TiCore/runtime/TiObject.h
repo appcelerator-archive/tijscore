@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,7 +36,6 @@
 #include "Completion.h"
 #include "CallFrame.h"
 #include "TiCell.h"
-#include "JSNumberCell.h"
 #include "MarkStack.h"
 #include "PropertySlot.h"
 #include "PutPropertySlot.h"
@@ -62,6 +61,9 @@ namespace TI {
     class Structure;
     struct HashTable;
 
+    TiObject* throwTypeError(TiExcState*, const UString&);
+    extern const char* StrictModeReadonlyPropertyWriteError;
+
     // ECMA 262-3 8.6.1
     // Property attributes
     enum Attribute {
@@ -74,29 +76,29 @@ namespace TI {
         Setter       = 1 << 6   // property is a setter
     };
 
-    typedef EncodedTiValue* PropertyStorage;
-    typedef const EncodedTiValue* ConstPropertyStorage;
+    typedef WriteBarrierBase<Unknown>* PropertyStorage;
+    typedef const WriteBarrierBase<Unknown>* ConstPropertyStorage;
 
     class TiObject : public TiCell {
         friend class BatchedTransitionOptimizer;
         friend class JIT;
         friend class TiCell;
+        friend void setUpStaticFunctionSlot(TiExcState* exec, const HashEntry* entry, TiObject* thisObj, const Identifier& propertyName, PropertySlot& slot);
 
     public:
-        explicit TiObject(NonNullPassRefPtr<Structure>);
-
-        virtual void markChildren(MarkStack&);
-        ALWAYS_INLINE void markChildrenDirect(MarkStack& markStack);
+        virtual void visitChildren(SlotVisitor&);
+        ALWAYS_INLINE void visitChildrenDirect(SlotVisitor&);
 
         // The inline virtual destructor cannot be the first virtual function declared
         // in the class as it results in the vtable being generated as a weak symbol
         virtual ~TiObject();
 
         TiValue prototype() const;
-        void setPrototype(TiValue prototype);
+        void setPrototype(TiGlobalData&, TiValue prototype);
+        bool setPrototypeWithCycleCheck(TiGlobalData&, TiValue prototype);
         
-        void setStructure(NonNullPassRefPtr<Structure>);
-        Structure* inheritorID();
+        void setStructure(TiGlobalData&, Structure*);
+        Structure* inheritorID(TiGlobalData&);
 
         virtual UString className() const;
 
@@ -114,6 +116,9 @@ namespace TI {
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue value, PutPropertySlot&);
         virtual void put(TiExcState*, unsigned propertyName, TiValue value);
 
+        virtual void putWithAttributes(TiGlobalData*, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot);
+        virtual void putWithAttributes(TiGlobalData*, const Identifier& propertyName, TiValue value, unsigned attributes);
+        virtual void putWithAttributes(TiGlobalData*, unsigned propertyName, TiValue value, unsigned attributes);
         virtual void putWithAttributes(TiExcState*, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot);
         virtual void putWithAttributes(TiExcState*, const Identifier& propertyName, TiValue value, unsigned attributes);
         virtual void putWithAttributes(TiExcState*, unsigned propertyName, TiValue value, unsigned attributes);
@@ -139,61 +144,65 @@ namespace TI {
         virtual bool toBoolean(TiExcState*) const;
         virtual double toNumber(TiExcState*) const;
         virtual UString toString(TiExcState*) const;
-        virtual TiObject* toObject(TiExcState*) const;
+        virtual TiObject* toObject(TiExcState*, TiGlobalObject*) const;
 
         virtual TiObject* toThisObject(TiExcState*) const;
+        virtual TiValue toStrictThisObject(TiExcState*) const;
         virtual TiObject* unwrappedObject();
 
         bool getPropertySpecificValue(TiExcState* exec, const Identifier& propertyName, TiCell*& specificFunction) const;
 
         // This get function only looks at the property map.
-        TiValue getDirect(const Identifier& propertyName) const
+        TiValue getDirect(TiGlobalData& globalData, const Identifier& propertyName) const
         {
-            size_t offset = m_structure->get(propertyName);
+            size_t offset = m_structure->get(globalData, propertyName);
             return offset != WTI::notFound ? getDirectOffset(offset) : TiValue();
         }
 
-        TiValue* getDirectLocation(const Identifier& propertyName)
+        WriteBarrierBase<Unknown>* getDirectLocation(TiGlobalData& globalData, const Identifier& propertyName)
         {
-            size_t offset = m_structure->get(propertyName);
+            size_t offset = m_structure->get(globalData, propertyName);
             return offset != WTI::notFound ? locationForOffset(offset) : 0;
         }
 
-        TiValue* getDirectLocation(const Identifier& propertyName, unsigned& attributes)
+        WriteBarrierBase<Unknown>* getDirectLocation(TiGlobalData& globalData, const Identifier& propertyName, unsigned& attributes)
         {
             TiCell* specificFunction;
-            size_t offset = m_structure->get(propertyName, attributes, specificFunction);
+            size_t offset = m_structure->get(globalData, propertyName, attributes, specificFunction);
             return offset != WTI::notFound ? locationForOffset(offset) : 0;
         }
 
-        size_t offsetForLocation(TiValue* location) const
+        size_t offsetForLocation(WriteBarrierBase<Unknown>* location) const
         {
-            return location - reinterpret_cast<const TiValue*>(propertyStorage());
+            return location - propertyStorage();
         }
 
-        void transitionTo(Structure*);
+        void transitionTo(TiGlobalData&, Structure*);
 
-        void removeDirect(const Identifier& propertyName);
-        bool hasCustomProperties() { return !m_structure->isEmpty(); }
+        void removeDirect(TiGlobalData&, const Identifier& propertyName);
+        bool hasCustomProperties() { return m_structure->didTransition(); }
         bool hasGetterSetterProperties() { return m_structure->hasGetterSetterProperties(); }
 
-        void putDirect(const Identifier& propertyName, TiValue value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot);
-        void putDirect(const Identifier& propertyName, TiValue value, unsigned attr = 0);
-        void putDirect(const Identifier& propertyName, TiValue value, PutPropertySlot&);
+        bool putDirect(TiGlobalData&, const Identifier& propertyName, TiValue, unsigned attr, bool checkReadOnly, PutPropertySlot&);
+        void putDirect(TiGlobalData&, const Identifier& propertyName, TiValue, unsigned attr = 0);
+        bool putDirect(TiGlobalData&, const Identifier& propertyName, TiValue, PutPropertySlot&);
 
-        void putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attr = 0);
-        void putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot);
+        void putDirectFunction(TiGlobalData&, const Identifier& propertyName, TiCell*, unsigned attr = 0);
+        void putDirectFunction(TiGlobalData&, const Identifier& propertyName, TiCell*, unsigned attr, bool checkReadOnly, PutPropertySlot&);
         void putDirectFunction(TiExcState* exec, InternalFunction* function, unsigned attr = 0);
+        void putDirectFunction(TiExcState* exec, TiFunction* function, unsigned attr = 0);
 
-        void putDirectWithoutTransition(const Identifier& propertyName, TiValue value, unsigned attr = 0);
-        void putDirectFunctionWithoutTransition(const Identifier& propertyName, TiCell* value, unsigned attr = 0);
+        void putDirectWithoutTransition(TiGlobalData&, const Identifier& propertyName, TiValue, unsigned attr = 0);
+        void putDirectFunctionWithoutTransition(TiGlobalData&, const Identifier& propertyName, TiCell* value, unsigned attr = 0);
         void putDirectFunctionWithoutTransition(TiExcState* exec, InternalFunction* function, unsigned attr = 0);
+        void putDirectFunctionWithoutTransition(TiExcState* exec, TiFunction* function, unsigned attr = 0);
 
         // Fast access to known property offsets.
-        TiValue getDirectOffset(size_t offset) const { return TiValue::decode(propertyStorage()[offset]); }
-        void putDirectOffset(size_t offset, TiValue value) { propertyStorage()[offset] = TiValue::encode(value); }
+        TiValue getDirectOffset(size_t offset) const { return propertyStorage()[offset].get(); }
+        void putDirectOffset(TiGlobalData& globalData, size_t offset, TiValue value) { propertyStorage()[offset].set(globalData, this, value); }
+        void putUndefinedAtDirectOffset(size_t offset) { propertyStorage()[offset].setUndefined(); }
 
-        void fillGetterPropertySlot(PropertySlot&, TiValue* location);
+        void fillGetterPropertySlot(PropertySlot&, WriteBarrierBase<Unknown>* location);
 
         virtual void defineGetter(TiExcState*, const Identifier& propertyName, TiObject* getterFunction, unsigned attributes = 0);
         virtual void defineSetter(TiExcState*, const Identifier& propertyName, TiObject* setterFunction, unsigned attributes = 0);
@@ -204,39 +213,68 @@ namespace TI {
         virtual bool isGlobalObject() const { return false; }
         virtual bool isVariableObject() const { return false; }
         virtual bool isActivationObject() const { return false; }
-        virtual bool isNotAnObjectErrorStub() const { return false; }
+        virtual bool isStrictModeFunction() const { return false; }
+        virtual bool isErrorInstance() const { return false; }
+
+        void seal(TiGlobalData&);
+        void freeze(TiGlobalData&);
+        virtual void preventExtensions(TiGlobalData&);
+        bool isSealed(TiGlobalData& globalData) { return m_structure->isSealed(globalData); }
+        bool isFrozen(TiGlobalData& globalData) { return m_structure->isFrozen(globalData); }
+        bool isExtensible() { return m_structure->isExtensible(); }
 
         virtual ComplType exceptionType() const { return Throw; }
 
         void allocatePropertyStorage(size_t oldSize, size_t newSize);
-        void allocatePropertyStorageInline(size_t oldSize, size_t newSize);
-        bool isUsingInlineStorage() const { return m_structure->isUsingInlineStorage(); }
+        bool isUsingInlineStorage() const { return static_cast<const void*>(m_propertyStorage) == static_cast<const void*>(this + 1); }
 
-        static const unsigned inlineStorageCapacity = sizeof(EncodedTiValue) == 2 * sizeof(void*) ? 4 : 3;
-        static const unsigned nonInlineBaseStorageCapacity = 16;
+        static const unsigned baseExternalStorageCapacity = 16;
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        void flattenDictionaryObject(TiGlobalData& globalData)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            m_structure->flattenDictionaryStructure(globalData, this);
         }
 
-        void flattenDictionaryObject()
-        {
-            m_structure->flattenDictionaryStructure(this);
-        }
-
-    protected:
-        static const unsigned StructureFlags = 0;
-
-        void putAnonymousValue(unsigned index, TiValue value)
+        void putAnonymousValue(TiGlobalData& globalData, unsigned index, TiValue value)
         {
             ASSERT(index < m_structure->anonymousSlotCount());
-            *locationForOffset(index) = value;
+            locationForOffset(index)->set(globalData, this, value);
+        }
+        void clearAnonymousValue(unsigned index)
+        {
+            ASSERT(index < m_structure->anonymousSlotCount());
+            locationForOffset(index)->clear();
         }
         TiValue getAnonymousValue(unsigned index) const
         {
             ASSERT(index < m_structure->anonymousSlotCount());
-            return *locationForOffset(index);
+            return locationForOffset(index)->get();
+        }
+
+        static size_t offsetOfInlineStorage();
+        
+        static JS_EXPORTDATA const ClassInfo s_info;
+
+    protected:
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+        static const unsigned StructureFlags = 0;
+
+        void putThisToAnonymousValue(unsigned index)
+        {
+            locationForOffset(index)->setWithoutWriteBarrier(this);
+        }
+
+        // To instantiate objects you likely want JSFinalObject, below.
+        // To create derived types you likely want JSNonFinalObject, below.
+        TiObject(TiGlobalData&, Structure*, PropertyStorage inlineStorage);
+        TiObject(VPtrStealingHackType, PropertyStorage inlineStorage)
+            : TiCell(VPtrStealingHack)
+            , m_propertyStorage(inlineStorage)
+        {
         }
 
     private:
@@ -248,40 +286,118 @@ namespace TI {
         void getString(TiExcState* exec);
         void isObject();
         void isString();
-#if USE(JSVALUE32)
-        void isNumber();
-#endif
+        
+        ConstPropertyStorage propertyStorage() const { return m_propertyStorage; }
+        PropertyStorage propertyStorage() { return m_propertyStorage; }
 
-        ConstPropertyStorage propertyStorage() const { return (isUsingInlineStorage() ? m_inlineStorage : m_externalStorage); }
-        PropertyStorage propertyStorage() { return (isUsingInlineStorage() ? m_inlineStorage : m_externalStorage); }
-
-        const TiValue* locationForOffset(size_t offset) const
+        const WriteBarrierBase<Unknown>* locationForOffset(size_t offset) const
         {
-            return reinterpret_cast<const TiValue*>(&propertyStorage()[offset]);
+            return &propertyStorage()[offset];
         }
 
-        TiValue* locationForOffset(size_t offset)
+        WriteBarrierBase<Unknown>* locationForOffset(size_t offset)
         {
-            return reinterpret_cast<TiValue*>(&propertyStorage()[offset]);
+            return &propertyStorage()[offset];
         }
 
-        void putDirectInternal(const Identifier& propertyName, TiValue value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot, TiCell*);
-        void putDirectInternal(TiGlobalData&, const Identifier& propertyName, TiValue value, unsigned attr, bool checkReadOnly, PutPropertySlot& slot);
+        bool putDirectInternal(TiGlobalData&, const Identifier& propertyName, TiValue, unsigned attr, bool checkReadOnly, PutPropertySlot&, TiCell*);
+        bool putDirectInternal(TiGlobalData&, const Identifier& propertyName, TiValue, unsigned attr, bool checkReadOnly, PutPropertySlot&);
         void putDirectInternal(TiGlobalData&, const Identifier& propertyName, TiValue value, unsigned attr = 0);
 
         bool inlineGetOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
 
         const HashEntry* findPropertyHashEntry(TiExcState*, const Identifier& propertyName) const;
-        Structure* createInheritorID();
+        Structure* createInheritorID(TiGlobalData&);
 
-        union {
-            PropertyStorage m_externalStorage;
-            EncodedTiValue m_inlineStorage[inlineStorageCapacity];
-        };
-
-        RefPtr<Structure> m_inheritorID;
+        PropertyStorage m_propertyStorage;
+        WriteBarrier<Structure> m_inheritorID;
     };
+
+
+#if USE(JSVALUE32_64)
+#define JSNonFinalObject_inlineStorageCapacity 4
+#define JSFinalObject_inlineStorageCapacity 6
+#else
+#define JSNonFinalObject_inlineStorageCapacity 2
+#define JSFinalObject_inlineStorageCapacity 4
+#endif
+
+COMPILE_ASSERT((JSFinalObject_inlineStorageCapacity >= JSNonFinalObject_inlineStorageCapacity), final_storage_is_at_least_as_large_as_non_final);
+
+    // JSNonFinalObject is a type of TiObject that has some internal storage,
+    // but also preserves some space in the collector cell for additional
+    // data members in derived types.
+    class JSNonFinalObject : public TiObject {
+        friend class TiObject;
+
+    public:
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+    protected:
+        explicit JSNonFinalObject(VPtrStealingHackType)
+            : TiObject(VPtrStealingHack, m_inlineStorage)
+        {
+        }
     
+        explicit JSNonFinalObject(TiGlobalData& globalData, Structure* structure)
+            : TiObject(globalData, structure, m_inlineStorage)
+        {
+            ASSERT(!(OBJECT_OFFSETOF(JSNonFinalObject, m_inlineStorage) % sizeof(double)));
+            ASSERT(this->structure()->propertyStorageCapacity() == JSNonFinalObject_inlineStorageCapacity);
+        }
+
+    private:
+        WriteBarrier<Unknown> m_inlineStorage[JSNonFinalObject_inlineStorageCapacity];
+    };
+
+    // JSFinalObject is a type of TiObject that contains sufficent internal
+    // storage to fully make use of the colloctor cell containing it.
+    class JSFinalObject : public TiObject {
+        friend class TiObject;
+
+    public:
+        static JSFinalObject* create(TiExcState* exec, Structure* structure)
+        {
+            return new (exec) JSFinalObject(exec->globalData(), structure);
+        }
+
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+    private:
+        explicit JSFinalObject(TiGlobalData& globalData, Structure* structure)
+            : TiObject(globalData, structure, m_inlineStorage)
+        {
+            ASSERT(OBJECT_OFFSETOF(JSFinalObject, m_inlineStorage) % sizeof(double) == 0);
+            ASSERT(this->structure()->propertyStorageCapacity() == JSFinalObject_inlineStorageCapacity);
+        }
+
+        static const unsigned StructureFlags = TiObject::StructureFlags | IsJSFinalObject;
+
+        WriteBarrierBase<Unknown> m_inlineStorage[JSFinalObject_inlineStorageCapacity];
+    };
+
+inline size_t TiObject::offsetOfInlineStorage()
+{
+    ASSERT(OBJECT_OFFSETOF(JSFinalObject, m_inlineStorage) == OBJECT_OFFSETOF(JSNonFinalObject, m_inlineStorage));
+    return OBJECT_OFFSETOF(JSFinalObject, m_inlineStorage);
+}
+
+inline TiObject* constructEmptyObject(TiExcState* exec, Structure* structure)
+{
+    return JSFinalObject::create(exec, structure);
+}
+
+inline Structure* createEmptyObjectStructure(TiGlobalData& globalData, TiValue prototype)
+{
+    return JSFinalObject::createStructure(globalData, prototype);
+}
+
 inline TiObject* asObject(TiCell* cell)
 {
     ASSERT(cell->isObject());
@@ -293,23 +409,22 @@ inline TiObject* asObject(TiValue value)
     return asObject(value.asCell());
 }
 
-inline TiObject::TiObject(NonNullPassRefPtr<Structure> structure)
-    : TiCell(structure.releaseRef()) // ~TiObject balances this ref()
+inline TiObject::TiObject(TiGlobalData& globalData, Structure* structure, PropertyStorage inlineStorage)
+    : TiCell(globalData, structure)
+    , m_propertyStorage(inlineStorage)
 {
-    ASSERT(m_structure->propertyStorageCapacity() == inlineStorageCapacity);
+    ASSERT(inherits(&s_info));
+    ASSERT(m_structure->propertyStorageCapacity() < baseExternalStorageCapacity);
     ASSERT(m_structure->isEmpty());
     ASSERT(prototype().isNull() || Heap::heap(this) == Heap::heap(prototype()));
-#if USE(JSVALUE64) || USE(JSVALUE32_64)
-    ASSERT(OBJECT_OFFSETOF(TiObject, m_inlineStorage) % sizeof(double) == 0);
-#endif
+    ASSERT(static_cast<void*>(inlineStorage) == static_cast<void*>(this + 1));
+    ASSERT(m_structure->typeInfo().type() == ObjectType);
 }
 
 inline TiObject::~TiObject()
 {
-    ASSERT(m_structure);
     if (!isUsingInlineStorage())
-        delete [] m_externalStorage;
-    m_structure->deref();
+        delete [] m_propertyStorage;
 }
 
 inline TiValue TiObject::prototype() const
@@ -317,29 +432,43 @@ inline TiValue TiObject::prototype() const
     return m_structure->storedPrototype();
 }
 
-inline void TiObject::setPrototype(TiValue prototype)
+inline bool TiObject::setPrototypeWithCycleCheck(TiGlobalData& globalData, TiValue prototype)
+{
+    TiValue nextPrototypeValue = prototype;
+    while (nextPrototypeValue && nextPrototypeValue.isObject()) {
+        TiObject* nextPrototype = asObject(nextPrototypeValue)->unwrappedObject();
+        if (nextPrototype == this)
+            return false;
+        nextPrototypeValue = nextPrototype->prototype();
+    }
+    setPrototype(globalData, prototype);
+    return true;
+}
+
+inline void TiObject::setPrototype(TiGlobalData& globalData, TiValue prototype)
 {
     ASSERT(prototype);
-    RefPtr<Structure> newStructure = Structure::changePrototypeTransition(m_structure, prototype);
-    setStructure(newStructure.release());
+    setStructure(globalData, Structure::changePrototypeTransition(globalData, m_structure.get(), prototype));
 }
 
-inline void TiObject::setStructure(NonNullPassRefPtr<Structure> structure)
+inline void TiObject::setStructure(TiGlobalData& globalData, Structure* structure)
 {
-    m_structure->deref();
-    m_structure = structure.releaseRef(); // ~TiObject balances this ref()
+    ASSERT(structure->typeInfo().overridesVisitChildren() == m_structure->typeInfo().overridesVisitChildren());
+    m_structure.set(globalData, this, structure);
 }
 
-inline Structure* TiObject::inheritorID()
+inline Structure* TiObject::inheritorID(TiGlobalData& globalData)
 {
-    if (m_inheritorID)
+    if (m_inheritorID) {
+        ASSERT(m_inheritorID->isEmpty());
         return m_inheritorID.get();
-    return createInheritorID();
+    }
+    return createInheritorID(globalData);
 }
 
 inline bool Structure::isUsingInlineStorage() const
 {
-    return (propertyStorageCapacity() == TiObject::inlineStorageCapacity);
+    return propertyStorageCapacity() < TiObject::baseExternalStorageCapacity;
 }
 
 inline bool TiCell::inherits(const ClassInfo* info) const
@@ -359,11 +488,11 @@ inline bool TiValue::inherits(const ClassInfo* classInfo) const
 
 ALWAYS_INLINE bool TiObject::inlineGetOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    if (TiValue* location = getDirectLocation(propertyName)) {
-        if (m_structure->hasGetterSetterProperties() && location[0].isGetterSetter())
+    if (WriteBarrierBase<Unknown>* location = getDirectLocation(exec->globalData(), propertyName)) {
+        if (m_structure->hasGetterSetterProperties() && location->isGetterSetter())
             fillGetterPropertySlot(slot, location);
         else
-            slot.setValueSlot(this, location, offsetForLocation(location));
+            slot.setValue(this, location->get(), offsetForLocation(location));
         return true;
     }
 
@@ -437,7 +566,7 @@ inline TiValue TiObject::get(TiExcState* exec, unsigned propertyName) const
     return jsUndefined();
 }
 
-inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot, TiCell* specificFunction)
+inline bool TiObject::putDirectInternal(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot, TiCell* specificFunction)
 {
     ASSERT(value);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
@@ -445,15 +574,16 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
     if (m_structure->isDictionary()) {
         unsigned currentAttributes;
         TiCell* currentSpecificFunction;
-        size_t offset = m_structure->get(propertyName, currentAttributes, currentSpecificFunction);
+        size_t offset = m_structure->get(globalData, propertyName, currentAttributes, currentSpecificFunction);
         if (offset != WTI::notFound) {
             // If there is currently a specific function, and there now either isn't,
             // or the new value is different, then despecify.
             if (currentSpecificFunction && (specificFunction != currentSpecificFunction))
-                m_structure->despecifyDictionaryFunction(propertyName);
+                m_structure->despecifyDictionaryFunction(globalData, propertyName);
             if (checkReadOnly && currentAttributes & ReadOnly)
-                return;
-            putDirectOffset(offset, value);
+                return false;
+
+            putDirectOffset(globalData, offset, value);
             // At this point, the objects structure only has a specific value set if previously there
             // had been one set, and if the new value being specified is the same (otherwise we would
             // have despecified, above).  So, if currentSpecificFunction is not set, or if the new
@@ -462,44 +592,47 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
             // If there was previously a value, and the new value is the same, then we cannot cache.
             if (!currentSpecificFunction || (specificFunction != currentSpecificFunction))
                 slot.setExistingProperty(this, offset);
-            return;
+            return true;
         }
 
+        if (checkReadOnly && !isExtensible())
+            return false;
+
         size_t currentCapacity = m_structure->propertyStorageCapacity();
-        offset = m_structure->addPropertyWithoutTransition(propertyName, attributes, specificFunction);
+        offset = m_structure->addPropertyWithoutTransition(globalData, propertyName, attributes, specificFunction);
         if (currentCapacity != m_structure->propertyStorageCapacity())
             allocatePropertyStorage(currentCapacity, m_structure->propertyStorageCapacity());
 
         ASSERT(offset < m_structure->propertyStorageCapacity());
-        putDirectOffset(offset, value);
+        putDirectOffset(globalData, offset, value);
         // See comment on setNewProperty call below.
         if (!specificFunction)
             slot.setNewProperty(this, offset);
-        return;
+        return true;
     }
 
     size_t offset;
     size_t currentCapacity = m_structure->propertyStorageCapacity();
-    if (RefPtr<Structure> structure = Structure::addPropertyTransitionToExistingStructure(m_structure, propertyName, attributes, specificFunction, offset)) {    
+    if (Structure* structure = Structure::addPropertyTransitionToExistingStructure(m_structure.get(), propertyName, attributes, specificFunction, offset)) {    
         if (currentCapacity != structure->propertyStorageCapacity())
             allocatePropertyStorage(currentCapacity, structure->propertyStorageCapacity());
 
         ASSERT(offset < structure->propertyStorageCapacity());
-        setStructure(structure.release());
-        putDirectOffset(offset, value);
+        setStructure(globalData, structure);
+        putDirectOffset(globalData, offset, value);
         // This is a new property; transitions with specific values are not currently cachable,
         // so leave the slot in an uncachable state.
         if (!specificFunction)
             slot.setNewProperty(this, offset);
-        return;
+        return true;
     }
 
     unsigned currentAttributes;
     TiCell* currentSpecificFunction;
-    offset = m_structure->get(propertyName, currentAttributes, currentSpecificFunction);
+    offset = m_structure->get(globalData, propertyName, currentAttributes, currentSpecificFunction);
     if (offset != WTI::notFound) {
         if (checkReadOnly && currentAttributes & ReadOnly)
-            return;
+            return false;
 
         // There are three possibilities here:
         //  (1) There is an existing specific value set, and we're overwriting with *the same value*.
@@ -513,110 +646,104 @@ inline void TiObject::putDirectInternal(const Identifier& propertyName, TiValue 
         if (currentSpecificFunction) {
             // case (1) Do the put, then return leaving the slot uncachable.
             if (specificFunction == currentSpecificFunction) {
-                putDirectOffset(offset, value);
-                return;
+                putDirectOffset(globalData, offset, value);
+                return true;
             }
             // case (2) Despecify, fall through to (3).
-            setStructure(Structure::despecifyFunctionTransition(m_structure, propertyName));
+            setStructure(globalData, Structure::despecifyFunctionTransition(globalData, m_structure.get(), propertyName));
         }
 
         // case (3) set the slot, do the put, return.
         slot.setExistingProperty(this, offset);
-        putDirectOffset(offset, value);
-        return;
+        putDirectOffset(globalData, offset, value);
+        return true;
     }
 
-    // If we have a specific function, we may have got to this point if there is
-    // already a transition with the correct property name and attributes, but
-    // specialized to a different function.  In this case we just want to give up
-    // and despecialize the transition.
-    // In this case we clear the value of specificFunction which will result
-    // in us adding a non-specific transition, and any subsequent lookup in
-    // Structure::addPropertyTransitionToExistingStructure will just use that.
-    if (specificFunction && m_structure->hasTransition(propertyName, attributes))
-        specificFunction = 0;
+    if (checkReadOnly && !isExtensible())
+        return false;
 
-    RefPtr<Structure> structure = Structure::addPropertyTransition(m_structure, propertyName, attributes, specificFunction, offset);
+    Structure* structure = Structure::addPropertyTransition(globalData, m_structure.get(), propertyName, attributes, specificFunction, offset);
 
     if (currentCapacity != structure->propertyStorageCapacity())
         allocatePropertyStorage(currentCapacity, structure->propertyStorageCapacity());
 
     ASSERT(offset < structure->propertyStorageCapacity());
-    setStructure(structure.release());
-    putDirectOffset(offset, value);
+    setStructure(globalData, structure);
+    putDirectOffset(globalData, offset, value);
     // This is a new property; transitions with specific values are not currently cachable,
     // so leave the slot in an uncachable state.
     if (!specificFunction)
         slot.setNewProperty(this, offset);
+    return true;
 }
 
-inline void TiObject::putDirectInternal(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
+inline bool TiObject::putDirectInternal(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
 {
     ASSERT(value);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
 
-    putDirectInternal(propertyName, value, attributes, checkReadOnly, slot, getTiFunction(globalData, value));
+    return putDirectInternal(globalData, propertyName, value, attributes, checkReadOnly, slot, getTiFunction(globalData, value));
 }
 
 inline void TiObject::putDirectInternal(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes)
 {
     PutPropertySlot slot;
-    putDirectInternal(propertyName, value, attributes, false, slot, getTiFunction(globalData, value));
+    putDirectInternal(globalData, propertyName, value, attributes, false, slot, getTiFunction(globalData, value));
 }
 
-inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
+inline bool TiObject::putDirect(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
 {
     ASSERT(value);
     ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
 
-    putDirectInternal(propertyName, value, attributes, checkReadOnly, slot, 0);
+    return putDirectInternal(globalData, propertyName, value, attributes, checkReadOnly, slot, 0);
 }
 
-inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, unsigned attributes)
+inline void TiObject::putDirect(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes)
 {
     PutPropertySlot slot;
-    putDirectInternal(propertyName, value, attributes, false, slot, 0);
+    putDirectInternal(globalData, propertyName, value, attributes, false, slot, 0);
 }
 
-inline void TiObject::putDirect(const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
+inline bool TiObject::putDirect(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
-    putDirectInternal(propertyName, value, 0, false, slot, 0);
+    return putDirectInternal(globalData, propertyName, value, 0, false, slot, 0);
 }
 
-inline void TiObject::putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
+inline void TiObject::putDirectFunction(TiGlobalData& globalData, const Identifier& propertyName, TiCell* value, unsigned attributes, bool checkReadOnly, PutPropertySlot& slot)
 {
-    putDirectInternal(propertyName, value, attributes, checkReadOnly, slot, value);
+    putDirectInternal(globalData, propertyName, value, attributes, checkReadOnly, slot, value);
 }
 
-inline void TiObject::putDirectFunction(const Identifier& propertyName, TiCell* value, unsigned attr)
+inline void TiObject::putDirectFunction(TiGlobalData& globalData, const Identifier& propertyName, TiCell* value, unsigned attr)
 {
     PutPropertySlot slot;
-    putDirectInternal(propertyName, value, attr, false, slot, value);
+    putDirectInternal(globalData, propertyName, value, attr, false, slot, value);
 }
 
-inline void TiObject::putDirectWithoutTransition(const Identifier& propertyName, TiValue value, unsigned attributes)
+inline void TiObject::putDirectWithoutTransition(TiGlobalData& globalData, const Identifier& propertyName, TiValue value, unsigned attributes)
 {
     size_t currentCapacity = m_structure->propertyStorageCapacity();
-    size_t offset = m_structure->addPropertyWithoutTransition(propertyName, attributes, 0);
+    size_t offset = m_structure->addPropertyWithoutTransition(globalData, propertyName, attributes, 0);
     if (currentCapacity != m_structure->propertyStorageCapacity())
         allocatePropertyStorage(currentCapacity, m_structure->propertyStorageCapacity());
-    putDirectOffset(offset, value);
+    putDirectOffset(globalData, offset, value);
 }
 
-inline void TiObject::putDirectFunctionWithoutTransition(const Identifier& propertyName, TiCell* value, unsigned attributes)
+inline void TiObject::putDirectFunctionWithoutTransition(TiGlobalData& globalData, const Identifier& propertyName, TiCell* value, unsigned attributes)
 {
     size_t currentCapacity = m_structure->propertyStorageCapacity();
-    size_t offset = m_structure->addPropertyWithoutTransition(propertyName, attributes, value);
+    size_t offset = m_structure->addPropertyWithoutTransition(globalData, propertyName, attributes, value);
     if (currentCapacity != m_structure->propertyStorageCapacity())
         allocatePropertyStorage(currentCapacity, m_structure->propertyStorageCapacity());
-    putDirectOffset(offset, value);
+    putDirectOffset(globalData, offset, value);
 }
 
-inline void TiObject::transitionTo(Structure* newStructure)
+inline void TiObject::transitionTo(TiGlobalData& globalData, Structure* newStructure)
 {
     if (m_structure->propertyStorageCapacity() != newStructure->propertyStorageCapacity())
         allocatePropertyStorage(m_structure->propertyStorageCapacity(), newStructure->propertyStorageCapacity());
-    setStructure(newStructure);
+    setStructure(globalData, newStructure);
 }
 
 inline TiValue TiObject::toPrimitive(TiExcState* exec, PreferredPrimitiveType preferredType) const
@@ -685,10 +812,11 @@ inline void TiValue::put(TiExcState* exec, const Identifier& propertyName, TiVal
     asCell()->put(exec, propertyName, value, slot);
 }
 
-inline void TiValue::putDirect(TiExcState*, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
+inline void TiValue::putDirect(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
     ASSERT(isCell() && isObject());
-    asObject(asCell())->putDirect(propertyName, value, slot);
+    if (!asObject(asCell())->putDirect(exec->globalData(), propertyName, value, slot) && slot.isStrictMode())
+        throwTypeError(exec, StrictModeReadonlyPropertyWriteError);
 }
 
 inline void TiValue::put(TiExcState* exec, unsigned propertyName, TiValue value)
@@ -700,35 +828,15 @@ inline void TiValue::put(TiExcState* exec, unsigned propertyName, TiValue value)
     asCell()->put(exec, propertyName, value);
 }
 
-ALWAYS_INLINE void TiObject::allocatePropertyStorageInline(size_t oldSize, size_t newSize)
+ALWAYS_INLINE void TiObject::visitChildrenDirect(SlotVisitor& visitor)
 {
-    ASSERT(newSize > oldSize);
+    TiCell::visitChildren(visitor);
 
-    // It's important that this function not rely on m_structure, since
-    // we might be in the middle of a transition.
-    bool wasInline = (oldSize == TiObject::inlineStorageCapacity);
-
-    PropertyStorage oldPropertyStorage = (wasInline ? m_inlineStorage : m_externalStorage);
-    PropertyStorage newPropertyStorage = new EncodedTiValue[newSize];
-
-    for (unsigned i = 0; i < oldSize; ++i)
-       newPropertyStorage[i] = oldPropertyStorage[i];
-
-    if (!wasInline)
-        delete [] oldPropertyStorage;
-
-    m_externalStorage = newPropertyStorage;
-}
-
-ALWAYS_INLINE void TiObject::markChildrenDirect(MarkStack& markStack)
-{
-    TiCell::markChildren(markStack);
-
-    markStack.append(prototype());
-    
     PropertyStorage storage = propertyStorage();
     size_t storageSize = m_structure->propertyStorageSize();
-    markStack.appendValues(reinterpret_cast<TiValue*>(storage), storageSize);
+    visitor.appendValues(storage, storageSize);
+    if (m_inheritorID)
+        visitor.append(&m_inheritorID);
 }
 
 // --- TiValue inlines ----------------------------
@@ -741,6 +849,27 @@ ALWAYS_INLINE UString TiValue::toThisString(TiExcState* exec) const
 inline TiString* TiValue::toThisTiString(TiExcState* exec) const
 {
     return isString() ? static_cast<TiString*>(asCell()) : jsString(exec, toThisObject(exec)->toString(exec));
+}
+
+inline TiValue TiValue::toStrictThisObject(TiExcState* exec) const
+{
+    if (!isObject())
+        return *this;
+    return asObject(asCell())->toStrictThisObject(exec);
+}
+
+ALWAYS_INLINE TiObject* Register::function() const
+{
+    if (!jsValue())
+        return 0;
+    return asObject(jsValue());
+}
+
+ALWAYS_INLINE Register Register::withCallee(TiObject* callee)
+{
+    Register r;
+    r = TiValue(callee);
+    return r;
 }
 
 } // namespace TI

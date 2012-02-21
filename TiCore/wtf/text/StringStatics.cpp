@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -37,10 +37,11 @@
 #endif
 
 #include "AtomicString.h"
+#include "DynamicAnnotations.h"
 #include "StaticConstructors.h"
 #include "StringImpl.h"
 
-namespace WebCore {
+namespace WTI {
 
 StringImpl* StringImpl::empty()
 {
@@ -53,6 +54,7 @@ StringImpl* StringImpl::empty()
     // PCRE goes away.
     static UChar emptyUCharData = 0;
     DEFINE_STATIC_LOCAL(StringImpl, emptyString, (&emptyUCharData, 0, ConstructStaticString));
+    WTF_ANNOTATE_BENIGN_RACE(&emptyString, "Benign race on StringImpl::emptyString reference counter");
     return &emptyString;
 }
 

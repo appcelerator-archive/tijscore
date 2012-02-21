@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -68,14 +68,10 @@ namespace WTI {
     template<typename T>
     struct VectorTraits : VectorTraitsBase<IsPod<T>::value, T> { };
 
-    struct SimpleClassVectorTraits
+    struct SimpleClassVectorTraits : VectorTraitsBase<false, void>
     {
-        static const bool needsDestruction = true;
-        static const bool needsInitialization = true;
         static const bool canInitializeWithMemset = true;
         static const bool canMoveWithMemcpy = true;
-        static const bool canCopyWithMemcpy = false;
-        static const bool canFillWithMemset = false;
         static const bool canCompareWithMemcmp = true;
     };
 

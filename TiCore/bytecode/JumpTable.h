@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,6 +41,7 @@
 #include "UString.h"
 #include <wtf/HashMap.h>
 #include <wtf/Vector.h>
+#include <wtf/text/StringImpl.h>
 
 namespace TI {
 
@@ -52,13 +53,13 @@ namespace TI {
     };
 
     struct StringJumpTable {
-        typedef HashMap<RefPtr<UString::Rep>, OffsetLocation> StringOffsetTable;
+        typedef HashMap<RefPtr<StringImpl>, OffsetLocation> StringOffsetTable;
         StringOffsetTable offsetTable;
 #if ENABLE(JIT)
         CodeLocationLabel ctiDefault; // FIXME: it should not be necessary to store this.
 #endif
 
-        inline int32_t offsetForValue(UString::Rep* value, int32_t defaultOffset)
+        inline int32_t offsetForValue(StringImpl* value, int32_t defaultOffset)
         {
             StringOffsetTable::const_iterator end = offsetTable.end();
             StringOffsetTable::const_iterator loc = offsetTable.find(value);
@@ -68,7 +69,7 @@ namespace TI {
         }
 
 #if ENABLE(JIT)
-        inline CodeLocationLabel ctiForValue(UString::Rep* value)
+        inline CodeLocationLabel ctiForValue(StringImpl* value)
         {
             StringOffsetTable::const_iterator end = offsetTable.end();
             StringOffsetTable::const_iterator loc = offsetTable.find(value);

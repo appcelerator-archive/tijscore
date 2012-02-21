@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -38,11 +38,6 @@ namespace WTI {
     // Returns a pseudo-random number in the range [0, 1), attempts to be
     // cryptographically secure if possible on the target platform
     double randomNumber();
-
-    // Returns a pseudo-random number in the range [0, 1), attempts to
-    // produce a reasonable "random" number fast.
-    // We only need this because rand_s is so slow on windows.
-    double weakRandomNumber();
 
 }
 

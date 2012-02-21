@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -65,34 +65,27 @@ namespace TI {
         {
         }
 
-        void initGetByIdSelf(Structure* baseObjectStructure)
+        void initGetByIdSelf(TiGlobalData& globalData, TiCell* owner, Structure* baseObjectStructure)
         {
             accessType = access_get_by_id_self;
 
-            u.getByIdSelf.baseObjectStructure = baseObjectStructure;
-            baseObjectStructure->ref();
+            u.getByIdSelf.baseObjectStructure.set(globalData, owner, baseObjectStructure);
         }
 
-        void initGetByIdProto(Structure* baseObjectStructure, Structure* prototypeStructure)
+        void initGetByIdProto(TiGlobalData& globalData, TiCell* owner, Structure* baseObjectStructure, Structure* prototypeStructure)
         {
             accessType = access_get_by_id_proto;
 
-            u.getByIdProto.baseObjectStructure = baseObjectStructure;
-            baseObjectStructure->ref();
-
-            u.getByIdProto.prototypeStructure = prototypeStructure;
-            prototypeStructure->ref();
+            u.getByIdProto.baseObjectStructure.set(globalData, owner, baseObjectStructure);
+            u.getByIdProto.prototypeStructure.set(globalData, owner, prototypeStructure);
         }
 
-        void initGetByIdChain(Structure* baseObjectStructure, StructureChain* chain)
+        void initGetByIdChain(TiGlobalData& globalData, TiCell* owner, Structure* baseObjectStructure, StructureChain* chain)
         {
             accessType = access_get_by_id_chain;
 
-            u.getByIdChain.baseObjectStructure = baseObjectStructure;
-            baseObjectStructure->ref();
-
-            u.getByIdChain.chain = chain;
-            chain->ref();
+            u.getByIdChain.baseObjectStructure.set(globalData, owner, baseObjectStructure);
+            u.getByIdChain.chain.set(globalData, owner, chain);
         }
 
         void initGetByIdSelfList(PolymorphicAccessStructureList* structureList, int listSize)
@@ -113,29 +106,24 @@ namespace TI {
 
         // PutById*
 
-        void initPutByIdTransition(Structure* previousStructure, Structure* structure, StructureChain* chain)
+        void initPutByIdTransition(TiGlobalData& globalData, TiCell* owner, Structure* previousStructure, Structure* structure, StructureChain* chain)
         {
             accessType = access_put_by_id_transition;
 
-            u.putByIdTransition.previousStructure = previousStructure;
-            previousStructure->ref();
-
-            u.putByIdTransition.structure = structure;
-            structure->ref();
-
-            u.putByIdTransition.chain = chain;
-            chain->ref();
+            u.putByIdTransition.previousStructure.set(globalData, owner, previousStructure);
+            u.putByIdTransition.structure.set(globalData, owner, structure);
+            u.putByIdTransition.chain.set(globalData, owner, chain);
         }
 
-        void initPutByIdReplace(Structure* baseObjectStructure)
+        void initPutByIdReplace(TiGlobalData& globalData, TiCell* owner, Structure* baseObjectStructure)
         {
             accessType = access_put_by_id_replace;
     
-            u.putByIdReplace.baseObjectStructure = baseObjectStructure;
-            baseObjectStructure->ref();
+            u.putByIdReplace.baseObjectStructure.set(globalData, owner, baseObjectStructure);
         }
 
         void deref();
+        void visitAggregate(SlotVisitor&);
 
         bool seenOnce()
         {
@@ -152,15 +140,15 @@ namespace TI {
 
         union {
             struct {
-                Structure* baseObjectStructure;
+                WriteBarrierBase<Structure> baseObjectStructure;
             } getByIdSelf;
             struct {
-                Structure* baseObjectStructure;
-                Structure* prototypeStructure;
+                WriteBarrierBase<Structure> baseObjectStructure;
+                WriteBarrierBase<Structure> prototypeStructure;
             } getByIdProto;
             struct {
-                Structure* baseObjectStructure;
-                StructureChain* chain;
+                WriteBarrierBase<Structure> baseObjectStructure;
+                WriteBarrierBase<StructureChain> chain;
             } getByIdChain;
             struct {
                 PolymorphicAccessStructureList* structureList;
@@ -171,12 +159,12 @@ namespace TI {
                 int listSize;
             } getByIdProtoList;
             struct {
-                Structure* previousStructure;
-                Structure* structure;
-                StructureChain* chain;
+                WriteBarrierBase<Structure> previousStructure;
+                WriteBarrierBase<Structure> structure;
+                WriteBarrierBase<StructureChain> chain;
             } putByIdTransition;
             struct {
-                Structure* baseObjectStructure;
+                WriteBarrierBase<Structure> baseObjectStructure;
             } putByIdReplace;
         } u;
 

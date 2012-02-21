@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -126,7 +126,7 @@ QString QScriptSyntaxCheckResult::errorMessage() const
 QScriptSyntaxCheckResultPrivate::~QScriptSyntaxCheckResultPrivate()
 {
     if (m_exception)
-        TiValueUnprotect(m_engine->context(), m_exception);
+        TiValueUnprotect(*m_engine, m_exception);
 }
 
 QString QScriptSyntaxCheckResultPrivate::errorMessage() const
@@ -134,7 +134,7 @@ QString QScriptSyntaxCheckResultPrivate::errorMessage() const
     if (!m_exception)
         return QString();
 
-    TiStringRef tmp = TiValueToStringCopy(m_engine->context(), m_exception, /* exception */ 0);
+    TiStringRef tmp = TiValueToStringCopy(*m_engine, m_exception, /* exception */ 0);
     QString message = QScriptConverter::toString(tmp);
     TiStringRelease(tmp);
     return message;
@@ -146,10 +146,10 @@ int QScriptSyntaxCheckResultPrivate::errorLineNumber() const
         return -1;
     // m_exception is an instance of the Exception so it has "line" attribute.
     TiStringRef lineAttrName = QScriptConverter::toString("line");
-    TiValueRef line = TiObjectGetProperty(m_engine->context(),
+    TiValueRef line = TiObjectGetProperty(*m_engine,
                                           m_exception,
                                           lineAttrName,
                                           /* exceptions */0);
     TiStringRelease(lineAttrName);
-    return TiValueToNumber(m_engine->context(), line, /* exceptions */0);
+    return TiValueToNumber(*m_engine, line, /* exceptions */0);
 }

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,6 +31,7 @@
 
 #include "ArrayPrototype.h"
 #include "Error.h"
+#include "ExceptionHelpers.h"
 #include "TiArray.h"
 #include "TiFunction.h"
 #include "TiString.h"
@@ -41,6 +42,10 @@
 #include "RegExpPrototype.h"
 #include "RegExp.h"
 #include "RegExpCache.h"
+#include "UStringConcatenate.h"
+#include <wtf/PassOwnPtr.h>
+
+#include <wtf/PassOwnPtr.h>
 
 namespace TI {
 
@@ -71,7 +76,7 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(RegExpConstructor);
 
-const ClassInfo RegExpConstructor::info = { "Function", &InternalFunction::info, 0, TiExcState::regExpConstructorTable };
+const ClassInfo RegExpConstructor::s_info = { "Function", &InternalFunction::s_info, 0, TiExcState::regExpConstructorTable };
 
 /* Source for RegExpConstructor.lut.h
 @begin regExpConstructorTable
@@ -99,19 +104,21 @@ const ClassInfo RegExpConstructor::info = { "Function", &InternalFunction::info,
 @end
 */
 
-RegExpConstructor::RegExpConstructor(TiExcState* exec, NonNullPassRefPtr<Structure> structure, RegExpPrototype* regExpPrototype)
-    : InternalFunction(&exec->globalData(), structure, Identifier(exec, "RegExp"))
-    , d(new RegExpConstructorPrivate)
+RegExpConstructor::RegExpConstructor(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure, RegExpPrototype* regExpPrototype)
+    : InternalFunction(&exec->globalData(), globalObject, structure, Identifier(exec, "RegExp"))
+    , d(adoptPtr(new RegExpConstructorPrivate))
 {
+    ASSERT(inherits(&s_info));
+
     // ECMA 15.10.5.1 RegExp.prototype
-    putDirectWithoutTransition(exec->propertyNames().prototype, regExpPrototype, DontEnum | DontDelete | ReadOnly);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().prototype, regExpPrototype, DontEnum | DontDelete | ReadOnly);
 
     // no. of arguments for constructor
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 2), ReadOnly | DontDelete | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(2), ReadOnly | DontDelete | DontEnum);
 }
 
 RegExpMatchesArray::RegExpMatchesArray(TiExcState* exec, RegExpConstructorPrivate* data)
-    : TiArray(exec->lexicalGlobalObject()->regExpMatchesArrayStructure(), data->lastNumSubPatterns + 1)
+    : TiArray(exec->globalData(), exec->lexicalGlobalObject()->regExpMatchesArrayStructure(), data->lastNumSubPatterns + 1, CreateInitialized)
 {
     RegExpConstructorPrivate* d = new RegExpConstructorPrivate;
     d->input = data->lastInput;
@@ -146,7 +153,7 @@ void RegExpMatchesArray::fillArrayInstance(TiExcState* exec)
     }
 
     PutPropertySlot slot;
-    TiArray::put(exec, exec->propertyNames().index, jsNumber(exec, d->lastOvector()[0]), slot);
+    TiArray::put(exec, exec->propertyNames().index, jsNumber(d->lastOvector()[0]), slot);
     TiArray::put(exec, exec->propertyNames().input, jsString(exec, d->input), slot);
 
     delete d;
@@ -190,7 +197,7 @@ TiValue RegExpConstructor::getLeftContext(TiExcState* exec) const
 TiValue RegExpConstructor::getRightContext(TiExcState* exec) const
 {
     if (!d->lastOvector().isEmpty())
-        return jsSubstring(exec, d->lastInput, d->lastOvector()[1], d->lastInput.size() - d->lastOvector()[1]);
+        return jsSubstring(exec, d->lastInput, d->lastOvector()[1], d->lastInput.length() - d->lastOvector()[1]);
     return jsEmptyString(exec);
 }
     
@@ -293,31 +300,42 @@ void setRegExpConstructorMultiline(TiExcState* exec, TiObject* baseObject, TiVal
 {
     asRegExpConstructor(baseObject)->setMultiline(value.toBoolean(exec));
 }
-  
+
 // ECMA 15.10.4
-TiObject* constructRegExp(TiExcState* exec, const ArgList& args)
+TiObject* constructRegExp(TiExcState* exec, TiGlobalObject* globalObject, const ArgList& args)
 {
     TiValue arg0 = args.at(0);
     TiValue arg1 = args.at(1);
 
-    if (arg0.inherits(&RegExpObject::info)) {
+    if (arg0.inherits(&RegExpObject::s_info)) {
         if (!arg1.isUndefined())
-            return throwError(exec, TypeError, "Cannot supply flags when constructing one RegExp from another.");
+            return throwError(exec, createTypeError(exec, "Cannot supply flags when constructing one RegExp from another."));
         return asObject(arg0);
     }
 
     UString pattern = arg0.isUndefined() ? UString("") : arg0.toString(exec);
-    UString flags = arg1.isUndefined() ? UString("") : arg1.toString(exec);
+    if (exec->hadException())
+        return 0;
 
-    RefPtr<RegExp> regExp = exec->globalData().regExpCache()->lookupOrCreate(pattern, flags);
+    RegExpFlags flags = NoFlags;
+    if (!arg1.isUndefined()) {
+        flags = regExpFlags(arg1.toString(exec));
+        if (exec->hadException())
+            return 0;
+        if (flags == InvalidFlags)
+            return throwError(exec, createSyntaxError(exec, "Invalid flags supplied to RegExp constructor."));
+    }
+
+    RegExp* regExp = RegExp::create(&exec->globalData(), pattern, flags);
     if (!regExp->isValid())
-        return throwError(exec, SyntaxError, makeString("Invalid regular expression: ", regExp->errorMessage()));
-    return new (exec) RegExpObject(exec->lexicalGlobalObject()->regExpStructure(), regExp.release());
+        return throwError(exec, createSyntaxError(exec, regExp->errorMessage()));
+    return new (exec) RegExpObject(exec->lexicalGlobalObject(), globalObject->regExpStructure(), regExp);
 }
 
-static TiObject* constructWithRegExpConstructor(TiExcState* exec, TiObject*, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL constructWithRegExpConstructor(TiExcState* exec)
 {
-    return constructRegExp(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructRegExp(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 ConstructType RegExpConstructor::getConstructData(ConstructData& constructData)
@@ -327,9 +345,10 @@ ConstructType RegExpConstructor::getConstructData(ConstructData& constructData)
 }
 
 // ECMA 15.10.3
-static TiValue JSC_HOST_CALL callRegExpConstructor(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+static EncodedTiValue JSC_HOST_CALL callRegExpConstructor(TiExcState* exec)
 {
-    return constructRegExp(exec, args);
+    ArgList args(exec);
+    return TiValue::encode(constructRegExp(exec, asInternalFunction(exec->callee())->globalObject(), args));
 }
 
 CallType RegExpConstructor::getCallData(CallData& callData)

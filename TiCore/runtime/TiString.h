@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,10 +33,10 @@
 #include "CallFrame.h"
 #include "CommonIdentifiers.h"
 #include "Identifier.h"
-#include "JSNumberCell.h"
 #include "PropertyDescriptor.h"
 #include "PropertySlot.h"
 #include "RopeImpl.h"
+#include "Structure.h"
 
 namespace TI {
 
@@ -66,9 +66,6 @@ namespace TI {
     TiString* jsOwnedString(TiGlobalData*, const UString&); 
     TiString* jsOwnedString(TiExcState*, const UString&); 
 
-    typedef void (*TiStringFinalizerCallback)(TiString*, void* context);
-    TiString* jsStringWithFinalizer(TiExcState*, const UString&, TiStringFinalizerCallback callback, void* context);
-
     class JS_EXPORTCLASS TiString : public TiCell {
     public:
         friend class JIT;
@@ -94,13 +91,13 @@ namespace TI {
             void append(const UString& string)
             {
                 ASSERT(m_rope);
-                m_rope->initializeFiber(m_index, string.rep());
+                m_rope->initializeFiber(m_index, string.impl());
             }
             void append(TiString* jsString)
             {
                 if (jsString->isRope()) {
                     for (unsigned i = 0; i < jsString->m_fiberCount; ++i)
-                        append(jsString->m_other.m_fibers[i]);
+                        append(jsString->m_fibers[i]);
                 } else
                     append(jsString->string());
             }
@@ -139,12 +136,12 @@ namespace TI {
                     return *this;
                 }
 
-                UStringImpl* operator*()
+                StringImpl* operator*()
                 {
                     WorkItem& item = m_workQueue.last();
                     RopeImpl::Fiber fiber = item.fibers[item.i];
                     ASSERT(!RopeImpl::isRope(fiber));
-                    return static_cast<UStringImpl*>(fiber);
+                    return static_cast<StringImpl*>(fiber);
                 }
 
                 bool operator!=(const RopeIterator& other) const
@@ -192,26 +189,26 @@ namespace TI {
         };
 
         ALWAYS_INLINE TiString(TiGlobalData* globalData, const UString& value)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(value.size())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(value.length())
             , m_value(value)
             , m_fiberCount(0)
         {
             ASSERT(!m_value.isNull());
-            Heap::heap(this)->reportExtraMemoryCost(value.cost());
+            Heap::heap(this)->reportExtraMemoryCost(value.impl()->cost());
         }
 
         enum HasOtherOwnerType { HasOtherOwner };
         TiString(TiGlobalData* globalData, const UString& value, HasOtherOwnerType)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(value.size())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(value.length())
             , m_value(value)
             , m_fiberCount(0)
         {
             ASSERT(!m_value.isNull());
         }
-        TiString(TiGlobalData* globalData, PassRefPtr<UStringImpl> value, HasOtherOwnerType)
-            : TiCell(globalData->stringStructure.get())
+        TiString(TiGlobalData* globalData, PassRefPtr<StringImpl> value, HasOtherOwnerType)
+            : TiCell(*globalData, globalData->stringStructure.get())
             , m_length(value->length())
             , m_value(value)
             , m_fiberCount(0)
@@ -219,16 +216,16 @@ namespace TI {
             ASSERT(!m_value.isNull());
         }
         TiString(TiGlobalData* globalData, PassRefPtr<RopeImpl> rope)
-            : TiCell(globalData->stringStructure.get())
+            : TiCell(*globalData, globalData->stringStructure.get())
             , m_length(rope->length())
             , m_fiberCount(1)
         {
-            m_other.m_fibers[0] = rope.releaseRef();
+            m_fibers[0] = rope.leakRef();
         }
         // This constructor constructs a new string by concatenating s1 & s2.
         // This should only be called with fiberCount <= 3.
         TiString(TiGlobalData* globalData, unsigned fiberCount, TiString* s1, TiString* s2)
-            : TiCell(globalData->stringStructure.get())
+            : TiCell(*globalData, globalData->stringStructure.get())
             , m_length(s1->length() + s2->length())
             , m_fiberCount(fiberCount)
         {
@@ -241,8 +238,8 @@ namespace TI {
         // This constructor constructs a new string by concatenating s1 & s2.
         // This should only be called with fiberCount <= 3.
         TiString(TiGlobalData* globalData, unsigned fiberCount, TiString* s1, const UString& u2)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(s1->length() + u2.size())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(s1->length() + u2.length())
             , m_fiberCount(fiberCount)
         {
             ASSERT(fiberCount <= s_maxInternalRopeLength);
@@ -254,8 +251,8 @@ namespace TI {
         // This constructor constructs a new string by concatenating s1 & s2.
         // This should only be called with fiberCount <= 3.
         TiString(TiGlobalData* globalData, unsigned fiberCount, const UString& u1, TiString* s2)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(u1.size() + s2->length())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(u1.length() + s2->length())
             , m_fiberCount(fiberCount)
         {
             ASSERT(fiberCount <= s_maxInternalRopeLength);
@@ -269,7 +266,7 @@ namespace TI {
         // value must require a fiberCount of at least one implies that the length
         // for each value must be exactly 1!
         TiString(TiExcState* exec, TiValue v1, TiValue v2, TiValue v3)
-            : TiCell(exec->globalData().stringStructure.get())
+            : TiCell(exec->globalData(), exec->globalData().stringStructure.get())
             , m_length(0)
             , m_fiberCount(s_maxInternalRopeLength)
         {
@@ -282,8 +279,8 @@ namespace TI {
 
         // This constructor constructs a new string by concatenating u1 & u2.
         TiString(TiGlobalData* globalData, const UString& u1, const UString& u2)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(u1.size() + u2.size())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(u1.length() + u2.length())
             , m_fiberCount(2)
         {
             unsigned index = 0;
@@ -294,8 +291,8 @@ namespace TI {
 
         // This constructor constructs a new string by concatenating u1, u2 & u3.
         TiString(TiGlobalData* globalData, const UString& u1, const UString& u2, const UString& u3)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(u1.size() + u2.size() + u3.size())
+            : TiCell(*globalData, globalData->stringStructure.get())
+            , m_length(u1.length() + u2.length() + u3.length())
             , m_fiberCount(s_maxInternalRopeLength)
         {
             unsigned index = 0;
@@ -305,27 +302,11 @@ namespace TI {
             ASSERT(index <= s_maxInternalRopeLength);
         }
 
-        TiString(TiGlobalData* globalData, const UString& value, TiStringFinalizerCallback finalizer, void* context)
-            : TiCell(globalData->stringStructure.get())
-            , m_length(value.size())
-            , m_value(value)
-            , m_fiberCount(0)
-        {
-            ASSERT(!m_value.isNull());
-            // nasty hack because we can't union non-POD types
-            m_other.m_finalizerCallback = finalizer;
-            m_other.m_finalizerContext = context;
-            Heap::heap(this)->reportExtraMemoryCost(value.cost());
-        }
-
         ~TiString()
         {
             ASSERT(vptr() == TiGlobalData::jsStringVPtr);
             for (unsigned i = 0; i < m_fiberCount; ++i)
-                RopeImpl::deref(m_other.m_fibers[i]);
-
-            if (!m_fiberCount && m_other.m_finalizerCallback)
-                m_other.m_finalizerCallback(this, m_other.m_finalizerContext);
+                RopeImpl::deref(m_fibers[i]);
         }
 
         const UString& value(TiExcState* exec) const
@@ -352,33 +333,39 @@ namespace TI {
 
         TiValue replaceCharacter(TiExcState*, UChar, const UString& replacement);
 
-        static PassRefPtr<Structure> createStructure(TiValue proto) { return Structure::create(proto, TypeInfo(StringType, OverridesGetOwnPropertySlot | NeedsThisConversion), AnonymousSlotCount); }
+        static Structure* createStructure(TiGlobalData& globalData, TiValue proto)
+        {
+            return Structure::create(globalData, proto, TypeInfo(StringType, OverridesGetOwnPropertySlot | NeedsThisConversion), AnonymousSlotCount, &s_info);
+        }
+        
+        static const ClassInfo s_info;
 
     private:
-        enum VPtrStealingHackType { VPtrStealingHack };
         TiString(VPtrStealingHackType) 
-            : TiCell(0)
+            : TiCell(VPtrStealingHack)
             , m_fiberCount(0)
         {
         }
 
         void resolveRope(TiExcState*) const;
+        void resolveRopeSlowCase(TiExcState*, UChar*) const;
+        void outOfMemory(TiExcState*) const;
         TiString* substringFromRope(TiExcState*, unsigned offset, unsigned length);
 
         void appendStringInConstruct(unsigned& index, const UString& string)
         {
-            UStringImpl* impl = string.rep();
+            StringImpl* impl = string.impl();
             impl->ref();
-            m_other.m_fibers[index++] = impl;
+            m_fibers[index++] = impl;
         }
 
         void appendStringInConstruct(unsigned& index, TiString* jsString)
         {
             if (jsString->isRope()) {
                 for (unsigned i = 0; i < jsString->m_fiberCount; ++i) {
-                    RopeImpl::Fiber fiber = jsString->m_other.m_fibers[i];
+                    RopeImpl::Fiber fiber = jsString->m_fibers[i];
                     fiber->ref();
-                    m_other.m_fibers[index++] = fiber;
+                    m_fibers[index++] = fiber;
                 }
             } else
                 appendStringInConstruct(index, jsString->string());
@@ -387,17 +374,17 @@ namespace TI {
         void appendValueInConstructAndIncrementLength(TiExcState* exec, unsigned& index, TiValue v)
         {
             if (v.isString()) {
-                ASSERT(asCell(v)->isString());
-                TiString* s = static_cast<TiString*>(asCell(v));
-                ASSERT(s->size() == 1);
+                ASSERT(v.asCell()->isString());
+                TiString* s = static_cast<TiString*>(v.asCell());
+                ASSERT(s->fiberCount() == 1);
                 appendStringInConstruct(index, s);
                 m_length += s->length();
             } else {
                 UString u(v.toString(exec));
-                UStringImpl* impl = u.rep();
+                StringImpl* impl = u.impl();
                 impl->ref();
-                m_other.m_fibers[index++] = impl;
-                m_length += u.size();
+                m_fibers[index++] = impl;
+                m_length += u.length();
             }
         }
 
@@ -405,7 +392,7 @@ namespace TI {
         virtual bool getPrimitiveNumber(TiExcState*, double& number, TiValue& value);
         virtual bool toBoolean(TiExcState*) const;
         virtual double toNumber(TiExcState*) const;
-        virtual TiObject* toObject(TiExcState*) const;
+        virtual TiObject* toObject(TiExcState*, TiGlobalObject*) const;
         virtual UString toString(TiExcState*) const;
 
         virtual TiObject* toThisObject(TiExcState*) const;
@@ -421,28 +408,17 @@ namespace TI {
         unsigned m_length;
         mutable UString m_value;
         mutable unsigned m_fiberCount;
-        // This structure exists to support a temporary workaround for a GC issue.
-        struct TiStringFinalizerStruct {
-            TiStringFinalizerStruct() : m_finalizerCallback(0) {}
-            union {
-                mutable RopeImpl::Fiber m_fibers[s_maxInternalRopeLength];
-                struct {
-                    TiStringFinalizerCallback m_finalizerCallback;
-                    void* m_finalizerContext;
-                };
-            };
-        } m_other;
+        mutable FixedArray<RopeImpl::Fiber, s_maxInternalRopeLength> m_fibers;
 
         bool isRope() const { return m_fiberCount; }
         UString& string() { ASSERT(!isRope()); return m_value; }
-        unsigned size() { return m_fiberCount ? m_fiberCount : 1; }
+        unsigned fiberCount() { return m_fiberCount ? m_fiberCount : 1; }
 
         friend TiValue jsString(TiExcState* exec, TiString* s1, TiString* s2);
         friend TiValue jsString(TiExcState* exec, const UString& u1, TiString* s2);
         friend TiValue jsString(TiExcState* exec, TiString* s1, const UString& u2);
         friend TiValue jsString(TiExcState* exec, Register* strings, unsigned count);
-        friend TiValue jsString(TiExcState* exec, TiValue thisValue, const ArgList& args);
-        friend TiString* jsStringWithFinalizer(TiExcState*, const UString&, TiStringFinalizerCallback callback, void* context);
+        friend TiValue jsString(TiExcState* exec, TiValue thisValue);
         friend TiString* jsSubstring(TiExcState* exec, TiString* s, unsigned offset, unsigned length);
     };
 
@@ -460,8 +436,8 @@ namespace TI {
 
     inline TiString* asString(TiValue value)
     {
-        ASSERT(asCell(value)->isString());
-        return static_cast<TiString*>(asCell(value));
+        ASSERT(value.asCell()->isString());
+        return static_cast<TiString*>(value.asCell());
     }
 
     inline TiString* jsEmptyString(TiGlobalData* globalData)
@@ -471,7 +447,7 @@ namespace TI {
 
     inline TiString* jsSingleCharacterString(TiGlobalData* globalData, UChar c)
     {
-        if (c <= 0xFF)
+        if (c <= maxSingleCharacterString)
             return globalData->smallStrings.singleCharacterString(globalData, c);
         return fixupVPtr(globalData, new (globalData) TiString(globalData, UString(&c, 1)));
     }
@@ -479,11 +455,11 @@ namespace TI {
     inline TiString* jsSingleCharacterSubstring(TiExcState* exec, const UString& s, unsigned offset)
     {
         TiGlobalData* globalData = &exec->globalData();
-        ASSERT(offset < static_cast<unsigned>(s.size()));
-        UChar c = s.data()[offset];
-        if (c <= 0xFF)
+        ASSERT(offset < static_cast<unsigned>(s.length()));
+        UChar c = s.characters()[offset];
+        if (c <= maxSingleCharacterString)
             return globalData->smallStrings.singleCharacterString(globalData, c);
-        return fixupVPtr(globalData, new (globalData) TiString(globalData, UString(UStringImpl::create(s.rep(), offset, 1))));
+        return fixupVPtr(globalData, new (globalData) TiString(globalData, UString(StringImpl::create(s.impl(), offset, 1))));
     }
 
     inline TiString* jsNontrivialString(TiGlobalData* globalData, const char* s)
@@ -496,7 +472,7 @@ namespace TI {
 
     inline TiString* jsNontrivialString(TiGlobalData* globalData, const UString& s)
     {
-        ASSERT(s.size() > 1);
+        ASSERT(s.length() > 1);
         return fixupVPtr(globalData, new (globalData) TiString(globalData, s));
     }
 
@@ -505,30 +481,23 @@ namespace TI {
         ASSERT(canGetIndex(i));
         if (isRope())
             return getIndexSlowCase(exec, i);
-        ASSERT(i < m_value.size());
+        ASSERT(i < m_value.length());
         return jsSingleCharacterSubstring(exec, m_value, i);
     }
 
     inline TiString* jsString(TiGlobalData* globalData, const UString& s)
     {
-        int size = s.size();
+        int size = s.length();
         if (!size)
             return globalData->smallStrings.emptyString(globalData);
         if (size == 1) {
-            UChar c = s.data()[0];
-            if (c <= 0xFF)
+            UChar c = s.characters()[0];
+            if (c <= maxSingleCharacterString)
                 return globalData->smallStrings.singleCharacterString(globalData, c);
         }
         return fixupVPtr(globalData, new (globalData) TiString(globalData, s));
     }
 
-    inline TiString* jsStringWithFinalizer(TiExcState* exec, const UString& s, TiStringFinalizerCallback callback, void* context)
-    {
-        ASSERT(s.size() && (s.size() > 1 || s.data()[0] > 0xFF));
-        TiGlobalData* globalData = &exec->globalData();
-        return fixupVPtr(globalData, new (globalData) TiString(globalData, s, callback, context));
-    }
-    
     inline TiString* jsSubstring(TiExcState* exec, TiString* s, unsigned offset, unsigned length)
     {
         ASSERT(offset <= static_cast<unsigned>(s->length()));
@@ -544,27 +513,27 @@ namespace TI {
 
     inline TiString* jsSubstring(TiGlobalData* globalData, const UString& s, unsigned offset, unsigned length)
     {
-        ASSERT(offset <= static_cast<unsigned>(s.size()));
-        ASSERT(length <= static_cast<unsigned>(s.size()));
-        ASSERT(offset + length <= static_cast<unsigned>(s.size()));
+        ASSERT(offset <= static_cast<unsigned>(s.length()));
+        ASSERT(length <= static_cast<unsigned>(s.length()));
+        ASSERT(offset + length <= static_cast<unsigned>(s.length()));
         if (!length)
             return globalData->smallStrings.emptyString(globalData);
         if (length == 1) {
-            UChar c = s.data()[offset];
-            if (c <= 0xFF)
+            UChar c = s.characters()[offset];
+            if (c <= maxSingleCharacterString)
                 return globalData->smallStrings.singleCharacterString(globalData, c);
         }
-        return fixupVPtr(globalData, new (globalData) TiString(globalData, UString(UStringImpl::create(s.rep(), offset, length)), TiString::HasOtherOwner));
+        return fixupVPtr(globalData, new (globalData) TiString(globalData, UString(StringImpl::create(s.impl(), offset, length)), TiString::HasOtherOwner));
     }
 
     inline TiString* jsOwnedString(TiGlobalData* globalData, const UString& s)
     {
-        int size = s.size();
+        int size = s.length();
         if (!size)
             return globalData->smallStrings.emptyString(globalData);
         if (size == 1) {
-            UChar c = s.data()[0];
-            if (c <= 0xFF)
+            UChar c = s.characters()[0];
+            if (c <= maxSingleCharacterString)
                 return globalData->smallStrings.singleCharacterString(globalData, c);
         }
         return fixupVPtr(globalData, new (globalData) TiString(globalData, s, TiString::HasOtherOwner));
@@ -581,12 +550,12 @@ namespace TI {
     ALWAYS_INLINE bool TiString::getStringPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
     {
         if (propertyName == exec->propertyNames().length) {
-            slot.setValue(jsNumber(exec, m_length));
+            slot.setValue(jsNumber(m_length));
             return true;
         }
 
         bool isStrictUInt32;
-        unsigned i = propertyName.toStrictUInt32(&isStrictUInt32);
+        unsigned i = propertyName.toUInt32(isStrictUInt32);
         if (isStrictUInt32 && i < m_length) {
             slot.setValue(getIndex(exec, i));
             return true;
@@ -631,8 +600,7 @@ namespace TI {
 
     inline UString TiValue::toPrimitiveString(TiExcState* exec) const
     {
-        if (isString())
-            return static_cast<TiString*>(asCell())->value(exec);
+        ASSERT(!isString());
         if (isInt32())
             return exec->globalData().numericStrings.add(asInt32());
         if (isDouble())

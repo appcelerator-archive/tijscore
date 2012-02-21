@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,21 +40,27 @@ namespace WTI {
 
 CString::CString(const char* str)
 {
+    if (!str)
+        return;
+
     init(str, strlen(str));
 }
 
-CString::CString(const char* str, unsigned length)
+CString::CString(const char* str, size_t length)
 {
     init(str, length);
 }
 
-void CString::init(const char* str, unsigned length)
+void CString::init(const char* str, size_t length)
 {
     if (!str)
         return;
 
-    if (length >= numeric_limits<size_t>::max())
-        CRASH();
+    // We need to be sure we can add 1 to length without overflowing.
+    // Since the passed-in length is the length of an actual existing
+    // string, and we know the string doesn't occupy the entire address
+    // space, we can assert here and there's no need for a runtime check.
+    ASSERT(length < numeric_limits<size_t>::max());
 
     m_buffer = CStringBuffer::create(length + 1);
     memcpy(m_buffer->mutableData(), str, length); 

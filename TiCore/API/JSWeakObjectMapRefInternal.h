@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -44,7 +44,7 @@ class TiObject;
 
 typedef void (*JSWeakMapDestroyedCallback)(struct OpaqueJSWeakObjectMap*, void*);
 
-typedef TI::WeakGCMap<void*, TI::TiObject*> WeakMapType;
+typedef TI::WeakGCMap<void*, TI::TiObject> WeakMapType;
 
 struct OpaqueJSWeakObjectMap : public RefCounted<OpaqueJSWeakObjectMap> {
 public:

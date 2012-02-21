@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -29,12 +29,17 @@
 #include "RegExpObject.h"
 
 #include "Error.h"
+#include "ExceptionHelpers.h"
 #include "TiArray.h"
 #include "TiGlobalObject.h"
 #include "TiString.h"
 #include "Lookup.h"
 #include "RegExpConstructor.h"
 #include "RegExpPrototype.h"
+#include "UStringConcatenate.h"
+#include <wtf/PassOwnPtr.h>
+
+#include <wtf/PassOwnPtr.h>
 
 namespace TI {
 
@@ -53,7 +58,7 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(RegExpObject);
 
-const ClassInfo RegExpObject::info = { "RegExp", 0, 0, TiExcState::regExpTable };
+const ClassInfo RegExpObject::s_info = { "RegExp", &TiObjectWithGlobalObject::s_info, 0, TiExcState::regExpTable };
 
 /* Source for RegExpObject.lut.h
 @begin regExpTable
@@ -65,14 +70,27 @@ const ClassInfo RegExpObject::info = { "RegExp", 0, 0, TiExcState::regExpTable }
 @end
 */
 
-RegExpObject::RegExpObject(NonNullPassRefPtr<Structure> structure, NonNullPassRefPtr<RegExp> regExp)
-    : TiObject(structure)
-    , d(new RegExpObjectData(regExp, 0))
+RegExpObject::RegExpObject(TiGlobalObject* globalObject, Structure* structure, RegExp* regExp)
+    : TiObjectWithGlobalObject(globalObject, structure)
+    , d(adoptPtr(new RegExpObjectData(globalObject->globalData(), this, regExp)))
 {
+    ASSERT(inherits(&s_info));
 }
 
 RegExpObject::~RegExpObject()
 {
+}
+
+void RegExpObject::visitChildren(SlotVisitor& visitor)
+{
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    Base::visitChildren(visitor);
+    if (d->regExp)
+        visitor.append(&d->regExp);
+    if (UNLIKELY(!d->lastIndex.get().isInt32()))
+        visitor.append(&d->lastIndex);
 }
 
 bool RegExpObject::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
@@ -105,9 +123,9 @@ TiValue regExpObjectSource(TiExcState* exec, TiValue slotBase, const Identifier&
     return jsString(exec, asRegExpObject(slotBase)->regExp()->pattern());
 }
 
-TiValue regExpObjectLastIndex(TiExcState* exec, TiValue slotBase, const Identifier&)
+TiValue regExpObjectLastIndex(TiExcState*, TiValue slotBase, const Identifier&)
 {
-    return jsNumber(exec, asRegExpObject(slotBase)->lastIndex());
+    return asRegExpObject(slotBase)->getLastIndex();
 }
 
 void RegExpObject::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
@@ -117,64 +135,60 @@ void RegExpObject::put(TiExcState* exec, const Identifier& propertyName, TiValue
 
 void setRegExpObjectLastIndex(TiExcState* exec, TiObject* baseObject, TiValue value)
 {
-    asRegExpObject(baseObject)->setLastIndex(value.toInteger(exec));
+    asRegExpObject(baseObject)->setLastIndex(exec->globalData(), value);
 }
 
-TiValue RegExpObject::test(TiExcState* exec, const ArgList& args)
+TiValue RegExpObject::test(TiExcState* exec)
 {
-    return jsBoolean(match(exec, args));
+    return jsBoolean(match(exec));
 }
 
-TiValue RegExpObject::exec(TiExcState* exec, const ArgList& args)
+TiValue RegExpObject::exec(TiExcState* exec)
 {
-    if (match(exec, args))
+    if (match(exec))
         return exec->lexicalGlobalObject()->regExpConstructor()->arrayOfMatches(exec);
     return jsNull();
 }
 
-static TiValue JSC_HOST_CALL callRegExpObject(TiExcState* exec, TiObject* function, TiValue, const ArgList& args)
-{
-    return asRegExpObject(function)->exec(exec, args);
-}
-
-CallType RegExpObject::getCallData(CallData& callData)
-{
-    callData.native.function = callRegExpObject;
-    return CallTypeHost;
-}
-
 // Shared implementation used by test and exec.
-bool RegExpObject::match(TiExcState* exec, const ArgList& args)
+bool RegExpObject::match(TiExcState* exec)
 {
     RegExpConstructor* regExpConstructor = exec->lexicalGlobalObject()->regExpConstructor();
-
-    UString input = args.isEmpty() ? regExpConstructor->input() : args.at(0).toString(exec);
-    if (input.isNull()) {
-        throwError(exec, GeneralError, makeString("No input to ", toString(exec), "."));
-        return false;
-    }
-
+    UString input = exec->argument(0).toString(exec);
+    TiGlobalData* globalData = &exec->globalData();
     if (!regExp()->global()) {
         int position;
         int length;
-        regExpConstructor->performMatch(d->regExp.get(), input, 0, position, length);
+        regExpConstructor->performMatch(*globalData, d->regExp.get(), input, 0, position, length);
         return position >= 0;
     }
 
-    if (d->lastIndex < 0 || d->lastIndex > input.size()) {
-        d->lastIndex = 0;
-        return false;
+    TiValue jsLastIndex = getLastIndex();
+    unsigned lastIndex;
+    if (LIKELY(jsLastIndex.isUInt32())) {
+        lastIndex = jsLastIndex.asUInt32();
+        if (lastIndex > input.length()) {
+            setLastIndex(0);
+            return false;
+        }
+    } else {
+        double doubleLastIndex = jsLastIndex.toInteger(exec);
+        if (doubleLastIndex < 0 || doubleLastIndex > input.length()) {
+            setLastIndex(0);
+            return false;
+        }
+        lastIndex = static_cast<unsigned>(doubleLastIndex);
     }
 
     int position;
     int length = 0;
-    regExpConstructor->performMatch(d->regExp.get(), input, static_cast<int>(d->lastIndex), position, length);
+    regExpConstructor->performMatch(*globalData, d->regExp.get(), input, lastIndex, position, length);
     if (position < 0) {
-        d->lastIndex = 0;
+        setLastIndex(0);
         return false;
     }
 
-    d->lastIndex = position + length;
+    setLastIndex(position + length);
     return true;
 }
 

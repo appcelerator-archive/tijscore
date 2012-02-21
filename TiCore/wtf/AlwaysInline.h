@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -48,7 +48,7 @@
 #endif
 
 #ifndef UNLIKELY
-#if COMPILER(GCC)
+#if COMPILER(GCC) || (RVCT_VERSION_AT_LEAST(3, 0, 0, 0) && defined(__GNUC__))
 #define UNLIKELY(x) __builtin_expect((x), 0)
 #else
 #define UNLIKELY(x) (x)
@@ -56,7 +56,7 @@
 #endif
 
 #ifndef LIKELY
-#if COMPILER(GCC)
+#if COMPILER(GCC) || (RVCT_VERSION_AT_LEAST(3, 0, 0, 0) && defined(__GNUC__))
 #define LIKELY(x) __builtin_expect((x), 1)
 #else
 #define LIKELY(x) (x)

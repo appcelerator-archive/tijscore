@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,6 +40,7 @@
 #define AVL_TREE_H_
 
 #include "Assertions.h"
+#include <wtf/FixedArray.h>
 
 namespace WTI {
 
@@ -77,7 +78,7 @@ public:
     void reset() { for (unsigned i = 0; i < maxDepth; ++i) m_data[i] = false; }
 
 private:
-    bool m_data[maxDepth];
+    FixedArray<bool, maxDepth> m_data;
 };
 
 // How to determine maxDepth:

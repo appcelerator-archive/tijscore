@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -26,6 +26,8 @@
 #include "config.h"
 #include "GRefPtr.h"
 
+#if ENABLE(GLIB_SUPPORT)
+
 #include <glib.h>
 
 namespace WTI {
@@ -42,4 +44,50 @@ template <> void derefGPtr(GHashTable* ptr)
     g_hash_table_unref(ptr);
 }
 
+#if GLIB_CHECK_VERSION(2, 24, 0)
+template <> GVariant* refGPtr(GVariant* ptr)
+{
+    if (ptr)
+        g_variant_ref(ptr);
+    return ptr;
+}
+
+template <> void derefGPtr(GVariant* ptr)
+{
+    g_variant_unref(ptr);
+}
+
+#else
+
+// We do this so that we can avoid including the glib.h header in GRefPtr.h.
+typedef struct _GVariant {
+    bool fake;
+} GVariant; 
+
+template <> GVariant* refGPtr(GVariant* ptr)
+{
+    return ptr;
+}
+
+template <> void derefGPtr(GVariant* ptr)
+{
+}
+
+#endif
+
+template <> GSource* refGPtr(GSource* ptr)
+{
+    if (ptr)
+        g_source_ref(ptr);
+    return ptr;
+}
+
+template <> void derefGPtr(GSource* ptr)
+{
+    if (ptr)
+        g_source_unref(ptr);
+}
+
 } // namespace WTI
+
+#endif // ENABLE(GLIB_SUPPORT)

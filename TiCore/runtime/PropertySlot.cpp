@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,11 +41,7 @@ TiValue PropertySlot::functionGetter(TiExcState* exec) const
 
     CallData callData;
     CallType callType = m_data.getterFunc->getCallData(callData);
-    if (callType == CallTypeHost)
-        return callData.native.function(exec, m_data.getterFunc, thisValue(), exec->emptyList());
-    ASSERT(callType == CallTypeJS);
-    // FIXME: Can this be done more efficiently using the callData?
-    return asFunction(m_data.getterFunc)->call(exec, thisValue(), exec->emptyList());
+    return call(exec, m_data.getterFunc, callType, callData, thisValue(), exec->emptyList());
 }
 
 } // namespace TI

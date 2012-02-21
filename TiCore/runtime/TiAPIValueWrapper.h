@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,31 +32,33 @@
 
 #include "TiCell.h"
 #include "CallFrame.h"
+#include "Structure.h"
 
 namespace TI {
 
     class TiAPIValueWrapper : public TiCell {
         friend TiValue jsAPIValueWrapper(TiExcState*, TiValue);
     public:
-        TiValue value() const { return m_value; }
+        TiValue value() const { return m_value.get(); }
 
         virtual bool isAPIValueWrapper() const { return true; }
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren | OverridesGetPropertyNames), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(CompoundType, OverridesVisitChildren | OverridesGetPropertyNames), AnonymousSlotCount, &s_info);
         }
-
         
+        static const ClassInfo s_info;
+
     private:
         TiAPIValueWrapper(TiExcState* exec, TiValue value)
-            : TiCell(exec->globalData().apiWrapperStructure.get())
-            , m_value(value)
+            : TiCell(exec->globalData(), exec->globalData().apiWrapperStructure.get())
         {
+            m_value.set(exec->globalData(), this, value);
             ASSERT(!value.isCell());
         }
 
-        TiValue m_value;
+        WriteBarrier<Unknown> m_value;
     };
 
     inline TiValue jsAPIValueWrapper(TiExcState* exec, TiValue value)

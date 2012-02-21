@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -118,8 +118,8 @@ inline TiValueRef toRef(TI::TiExcState* exec, TI::TiValue v)
     if (!v)
         return 0;
     if (!v.isCell())
-        return reinterpret_cast<TiValueRef>(asCell(TI::jsAPIValueWrapper(exec, v)));
-    return reinterpret_cast<TiValueRef>(asCell(v));
+        return reinterpret_cast<TiValueRef>(TI::jsAPIValueWrapper(exec, v).asCell());
+    return reinterpret_cast<TiValueRef>(v.asCell());
 #else
     UNUSED_PARAM(exec);
     return reinterpret_cast<TiValueRef>(TI::TiValue::encode(v));

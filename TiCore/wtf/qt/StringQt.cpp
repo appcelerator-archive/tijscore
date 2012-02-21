@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,25 +32,26 @@
 
 #include "config.h"
 
+#include <wtf/StdLibExtras.h>
 #include <wtf/text/WTFString.h>
 
 #include <QString>
 
-namespace WebCore {
+namespace WTI {
 
 // String conversions
 String::String(const QString& qstr)
 {
     if (qstr.isNull())
         return;
-    m_impl = StringImpl::create(reinterpret_cast<const UChar*>(qstr.constData()), qstr.length());
+    m_impl = StringImpl::create(reinterpret_cast_ptr<const UChar*>(qstr.constData()), qstr.length());
 }
 
 String::String(const QStringRef& ref)
 {
     if (!ref.string())
         return;
-    m_impl = StringImpl::create(reinterpret_cast<const UChar*>(ref.unicode()), ref.length());
+    m_impl = StringImpl::create(reinterpret_cast_ptr<const UChar*>(ref.unicode()), ref.length());
 }
 
 String::operator QString() const

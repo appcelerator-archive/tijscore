@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -32,12 +32,12 @@
 #include "BytecodeGenerator.h"
 #include "Completion.h"
 #include "CurrentTime.h"
+#include "ExceptionHelpers.h"
 #include "InitializeThreading.h"
 #include "TiArray.h"
 #include "TiFunction.h"
 #include "TiLock.h"
 #include "TiString.h"
-#include "PrototypeFunction.h"
 #include "SamplingTool.h"
 #include <math.h>
 #include <stdio.h>
@@ -78,19 +78,22 @@ using namespace WTI;
 static void cleanupGlobalData(TiGlobalData*);
 static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer);
 
-static TiValue JSC_HOST_CALL functionPrint(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionDebug(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionGC(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionVersion(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionRun(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionLoad(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionCheckSyntax(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionReadline(TiExcState*, TiObject*, TiValue, const ArgList&);
-static NO_RETURN_WITH_VALUE TiValue JSC_HOST_CALL functionQuit(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL functionPrint(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionDebug(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionGC(TiExcState*);
+#ifndef NDEBUG
+static EncodedTiValue JSC_HOST_CALL functionReleaseExecutableMemory(TiExcState*);
+#endif
+static EncodedTiValue JSC_HOST_CALL functionVersion(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionRun(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionLoad(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionCheckSyntax(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionReadline(TiExcState*);
+static NO_RETURN_WITH_VALUE EncodedTiValue JSC_HOST_CALL functionQuit(TiExcState*);
 
 #if ENABLE(SAMPLING_FLAGS)
-static TiValue JSC_HOST_CALL functionSetSamplingFlags(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionClearSamplingFlags(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL functionSetSamplingFlags(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionClearSamplingFlags(TiExcState*);
 #endif
 
 struct Script {
@@ -148,142 +151,155 @@ long StopWatch::getElapsedMS()
 
 class GlobalObject : public TiGlobalObject {
 public:
-    GlobalObject(const Vector<UString>& arguments);
+    GlobalObject(TiGlobalData&, Structure*, const Vector<UString>& arguments);
     virtual UString className() const { return "global"; }
 };
 COMPILE_ASSERT(!IsInteger<GlobalObject>::value, WTF_IsInteger_GlobalObject_false);
 ASSERT_CLASS_FITS_IN_CELL(GlobalObject);
 
-GlobalObject::GlobalObject(const Vector<UString>& arguments)
-    : TiGlobalObject()
+GlobalObject::GlobalObject(TiGlobalData& globalData, Structure* structure, const Vector<UString>& arguments)
+    : TiGlobalObject(globalData, structure)
 {
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "debug"), functionDebug));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "print"), functionPrint));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 0, Identifier(globalExec(), "quit"), functionQuit));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 0, Identifier(globalExec(), "gc"), functionGC));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "version"), functionVersion));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "run"), functionRun));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "load"), functionLoad));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "checkSyntax"), functionCheckSyntax));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 0, Identifier(globalExec(), "readline"), functionReadline));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "debug"), functionDebug));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "print"), functionPrint));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 0, Identifier(globalExec(), "quit"), functionQuit));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 0, Identifier(globalExec(), "gc"), functionGC));
+#ifndef NDEBUG
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 0, Identifier(globalExec(), "releaseExecutableMemory"), functionReleaseExecutableMemory));
+#endif
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "version"), functionVersion));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "run"), functionRun));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "load"), functionLoad));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "checkSyntax"), functionCheckSyntax));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 0, Identifier(globalExec(), "readline"), functionReadline));
 
 #if ENABLE(SAMPLING_FLAGS)
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "setSamplingFlags"), functionSetSamplingFlags));
-    putDirectFunction(globalExec(), new (globalExec()) NativeFunctionWrapper(globalExec(), prototypeFunctionStructure(), 1, Identifier(globalExec(), "clearSamplingFlags"), functionClearSamplingFlags));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "setSamplingFlags"), functionSetSamplingFlags));
+    putDirectFunction(globalExec(), new (globalExec()) TiFunction(globalExec(), this, functionStructure(), 1, Identifier(globalExec(), "clearSamplingFlags"), functionClearSamplingFlags));
 #endif
 
     TiObject* array = constructEmptyArray(globalExec());
     for (size_t i = 0; i < arguments.size(); ++i)
         array->put(globalExec(), i, jsString(globalExec(), arguments[i]));
-    putDirect(Identifier(globalExec(), "arguments"), array);
+    putDirect(globalExec()->globalData(), Identifier(globalExec(), "arguments"), array);
 }
 
-TiValue JSC_HOST_CALL functionPrint(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionPrint(TiExcState* exec)
 {
-    for (unsigned i = 0; i < args.size(); ++i) {
+    for (unsigned i = 0; i < exec->argumentCount(); ++i) {
         if (i)
             putchar(' ');
 
-        printf("%s", args.at(i).toString(exec).UTF8String().data());
+        printf("%s", exec->argument(i).toString(exec).utf8().data());
     }
 
     putchar('\n');
     fflush(stdout);
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL functionDebug(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionDebug(TiExcState* exec)
 {
-    fprintf(stderr, "--> %s\n", args.at(0).toString(exec).UTF8String().data());
-    return jsUndefined();
+    fprintf(stderr, "--> %s\n", exec->argument(0).toString(exec).utf8().data());
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL functionGC(TiExcState* exec, TiObject*, TiValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL functionGC(TiExcState* exec)
 {
     TiLock lock(SilenceAssertionsOnly);
     exec->heap()->collectAllGarbage();
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL functionVersion(TiExcState*, TiObject*, TiValue, const ArgList&)
+#ifndef NDEBUG
+EncodedTiValue JSC_HOST_CALL functionReleaseExecutableMemory(TiExcState* exec)
+{
+    TiLock lock(SilenceAssertionsOnly);
+    exec->globalData().releaseExecutableMemory();
+    return TiValue::encode(jsUndefined());
+}
+#endif
+
+EncodedTiValue JSC_HOST_CALL functionVersion(TiExcState*)
 {
     // We need this function for compatibility with the Mozilla JS tests but for now
     // we don't actually do any version-specific handling
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL functionRun(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionRun(TiExcState* exec)
 {
-    StopWatch stopWatch;
-    UString fileName = args.at(0).toString(exec);
+    UString fileName = exec->argument(0).toString(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
-        return throwError(exec, GeneralError, "Could not open file.");
+        return TiValue::encode(throwError(exec, createError(exec, "Could not open file.")));
 
-    TiGlobalObject* globalObject = exec->lexicalGlobalObject();
+    GlobalObject* globalObject = new (&exec->globalData()) GlobalObject(exec->globalData(), GlobalObject::createStructure(exec->globalData(), jsNull()), Vector<UString>());
 
+    StopWatch stopWatch;
     stopWatch.start();
     evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), makeSource(script.data(), fileName));
     stopWatch.stop();
 
-    return jsNumber(globalObject->globalExec(), stopWatch.getElapsedMS());
+    return TiValue::encode(jsNumber(stopWatch.getElapsedMS()));
 }
 
-TiValue JSC_HOST_CALL functionLoad(TiExcState* exec, TiObject* o, TiValue v, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionLoad(TiExcState* exec)
 {
-    UNUSED_PARAM(o);
-    UNUSED_PARAM(v);
-    UString fileName = args.at(0).toString(exec);
+    UString fileName = exec->argument(0).toString(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
-        return throwError(exec, GeneralError, "Could not open file.");
+        return TiValue::encode(throwError(exec, createError(exec, "Could not open file.")));
 
     TiGlobalObject* globalObject = exec->lexicalGlobalObject();
     Completion result = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), makeSource(script.data(), fileName));
     if (result.complType() == Throw)
-        exec->setException(result.value());
-    return result.value();
+        throwError(exec, result.value());
+    return TiValue::encode(result.value());
 }
 
-TiValue JSC_HOST_CALL functionCheckSyntax(TiExcState* exec, TiObject* o, TiValue v, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionCheckSyntax(TiExcState* exec)
 {
-    UNUSED_PARAM(o);
-    UNUSED_PARAM(v);
-    UString fileName = args.at(0).toString(exec);
+    UString fileName = exec->argument(0).toString(exec);
     Vector<char> script;
     if (!fillBufferWithContentsOfFile(fileName, script))
-        return throwError(exec, GeneralError, "Could not open file.");
+        return TiValue::encode(throwError(exec, createError(exec, "Could not open file.")));
 
     TiGlobalObject* globalObject = exec->lexicalGlobalObject();
+
+    StopWatch stopWatch;
+    stopWatch.start();
     Completion result = checkSyntax(globalObject->globalExec(), makeSource(script.data(), fileName));
+    stopWatch.stop();
+
     if (result.complType() == Throw)
-        exec->setException(result.value());
-    return result.value();
+        throwError(exec, result.value());
+    return TiValue::encode(jsNumber(stopWatch.getElapsedMS()));
 }
 
 #if ENABLE(SAMPLING_FLAGS)
-TiValue JSC_HOST_CALL functionSetSamplingFlags(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionSetSamplingFlags(TiExcState* exec)
 {
-    for (unsigned i = 0; i < args.size(); ++i) {
-        unsigned flag = static_cast<unsigned>(args.at(i).toNumber(exec));
+    for (unsigned i = 0; i < exec->argumentCount(); ++i) {
+        unsigned flag = static_cast<unsigned>(exec->argument(i).toNumber(exec));
         if ((flag >= 1) && (flag <= 32))
             SamplingFlags::setFlag(flag);
     }
-    return jsNull();
+    return TiValue::encode(jsNull());
 }
 
-TiValue JSC_HOST_CALL functionClearSamplingFlags(TiExcState* exec, TiObject*, TiValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionClearSamplingFlags(TiExcState* exec)
 {
-    for (unsigned i = 0; i < args.size(); ++i) {
-        unsigned flag = static_cast<unsigned>(args.at(i).toNumber(exec));
+    for (unsigned i = 0; i < exec->argumentCount(); ++i) {
+        unsigned flag = static_cast<unsigned>(exec->argument(i).toNumber(exec));
         if ((flag >= 1) && (flag <= 32))
             SamplingFlags::clearFlag(flag);
     }
-    return jsNull();
+    return TiValue::encode(jsNull());
 }
 #endif
 
-TiValue JSC_HOST_CALL functionReadline(TiExcState* exec, TiObject*, TiValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL functionReadline(TiExcState* exec)
 {
     Vector<char, 256> line;
     int c;
@@ -294,10 +310,10 @@ TiValue JSC_HOST_CALL functionReadline(TiExcState* exec, TiObject*, TiValue, con
         line.append(c);
     }
     line.append('\0');
-    return jsString(exec, line.data());
+    return TiValue::encode(jsString(exec, line.data()));
 }
 
-TiValue JSC_HOST_CALL functionQuit(TiExcState* exec, TiObject*, TiValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL functionQuit(TiExcState* exec)
 {
     // Technically, destroying the heap in the middle of JS execution is a no-no,
     // but we want to maintain compatibility with the Mozilla test suite, so
@@ -309,7 +325,7 @@ TiValue JSC_HOST_CALL functionQuit(TiExcState* exec, TiObject*, TiValue, const A
 
 #if COMPILER(MSVC) && OS(WINCE)
     // Without this, Visual Studio will complain that this method does not return a value.
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 #endif
 }
 
@@ -318,7 +334,7 @@ TiValue JSC_HOST_CALL functionQuit(TiExcState* exec, TiObject*, TiValue, const A
 // be in a separate main function because the jscmain function requires object
 // unwinding.
 
-#if COMPILER(MSVC) && !defined(_DEBUG)
+#if COMPILER(MSVC) && !defined(_DEBUG) && !OS(WINCE)
 #define TRY       __try {
 #define EXCEPT(x) } __except (EXCEPTION_EXECUTE_HANDLER) { x; }
 #else
@@ -330,7 +346,15 @@ int jscmain(int argc, char** argv, TiGlobalData*);
 
 int main(int argc, char** argv)
 {
-#if defined(_DEBUG) && OS(WINDOWS)
+#if OS(WINDOWS)
+#if !OS(WINCE)
+    // Cygwin calls ::SetErrorMode(SEM_FAILCRITICALERRORS), which we will inherit. This is bad for
+    // testing/debugging, as it causes the post-mortem debugger not to be invoked. We reset the
+    // error mode here to work around Cygwin's behavior. See <http://webkit.org/b/55222>.
+    ::SetErrorMode(0);
+#endif
+
+#if defined(_DEBUG)
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
@@ -339,7 +363,6 @@ int main(int argc, char** argv)
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
 #endif
 
-#if COMPILER(MSVC) && !OS(WINCE)
     timeBeginPeriod(1);
 #endif
 
@@ -353,7 +376,7 @@ int main(int argc, char** argv)
     // We can't use destructors in the following code because it uses Windows
     // Structured Exception Handling
     int res = 0;
-    TiGlobalData* globalData = TiGlobalData::create(ThreadStackTypeLarge).releaseRef();
+    TiGlobalData* globalData = TiGlobalData::create(ThreadStackTypeLarge).leakRef();
     TRY
         res = jscmain(argc, argv, globalData);
     EXCEPT(res = 3)
@@ -365,6 +388,7 @@ int main(int argc, char** argv)
 static void cleanupGlobalData(TiGlobalData* globalData)
 {
     TiLock lock(SilenceAssertionsOnly);
+    globalData->clearBuiltinStructures();
     globalData->heap.destroy();
     globalData->deref();
 }
@@ -378,7 +402,7 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
     if (dump)
         BytecodeGenerator::setDumpsGeneratedCode(true);
 
-    TiGlobalData* globalData = globalObject->globalData();
+    TiGlobalData& globalData = globalObject->globalData();
 
 #if ENABLE(SAMPLING_FLAGS)
     SamplingFlags::start();
@@ -396,27 +420,30 @@ static bool runWithScripts(GlobalObject* globalObject, const Vector<Script>& scr
             fileName = "[Command Line]";
         }
 
-        globalData->startSampling();
+        globalData.startSampling();
 
         Completion completion = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), makeSource(script, fileName));
         success = success && completion.complType() != Throw;
         if (dump) {
             if (completion.complType() == Throw)
-                printf("Exception: %s\n", completion.value().toString(globalObject->globalExec()).ascii());
+                printf("Exception: %s\n", completion.value().toString(globalObject->globalExec()).utf8().data());
             else
-                printf("End: %s\n", completion.value().toString(globalObject->globalExec()).ascii());
+                printf("End: %s\n", completion.value().toString(globalObject->globalExec()).utf8().data());
         }
 
-        globalData->stopSampling();
+        globalData.stopSampling();
         globalObject->globalExec()->clearException();
     }
 
 #if ENABLE(SAMPLING_FLAGS)
     SamplingFlags::stop();
 #endif
-    globalData->dumpSampleData(globalObject->globalExec());
+    globalData.dumpSampleData(globalObject->globalExec());
 #if ENABLE(SAMPLING_COUNTERS)
     AbstractSamplingCounter::dump();
+#endif
+#if ENABLE(REGEXP_TRACING)
+    globalData.dumpRegExpTrace();
 #endif
     return success;
 }
@@ -450,9 +477,9 @@ static void runInteractive(GlobalObject* globalObject)
         Completion completion = evaluate(globalObject->globalExec(), globalObject->globalScopeChain(), makeSource(line.data(), interpreterName));
 #endif
         if (completion.complType() == Throw)
-            printf("Exception: %s\n", completion.value().toString(globalObject->globalExec()).ascii());
+            printf("Exception: %s\n", completion.value().toString(globalObject->globalExec()).utf8().data());
         else
-            printf("%s\n", completion.value().toString(globalObject->globalExec()).UTF8String().data());
+            printf("%s\n", completion.value().toString(globalObject->globalExec()).utf8().data());
 
         globalObject->globalExec()->clearException();
     }
@@ -532,7 +559,7 @@ int jscmain(int argc, char** argv, TiGlobalData* globalData)
     Options options;
     parseArguments(argc, argv, options, globalData);
 
-    GlobalObject* globalObject = new (globalData) GlobalObject(options.arguments);
+    GlobalObject* globalObject = new (globalData) GlobalObject(*globalData, GlobalObject::createStructure(*globalData, jsNull()), options.arguments);
     bool success = runWithScripts(globalObject, options.scripts, options.dump);
     if (options.interactive && success)
         runInteractive(globalObject);
@@ -542,9 +569,9 @@ int jscmain(int argc, char** argv, TiGlobalData* globalData)
 
 static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& buffer)
 {
-    FILE* f = fopen(fileName.UTF8String().data(), "r");
+    FILE* f = fopen(fileName.utf8().data(), "r");
     if (!f) {
-        fprintf(stderr, "Could not open file: %s\n", fileName.UTF8String().data());
+        fprintf(stderr, "Could not open file: %s\n", fileName.utf8().data());
         return false;
     }
 
@@ -562,6 +589,9 @@ static bool fillBufferWithContentsOfFile(const UString& fileName, Vector<char>& 
     }
     fclose(f);
     buffer[bufferSize] = '\0';
+
+    if (buffer[0] == '#' && buffer[1] == '!')
+        buffer[0] = buffer[1] = '/';
 
     return true;
 }

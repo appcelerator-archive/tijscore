@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,25 +33,22 @@
 #ifndef JSONObject_h
 #define JSONObject_h
 
-#include "TiObject.h"
+#include "TiObjectWithGlobalObject.h"
 
 namespace TI {
 
     class Stringifier;
 
-    class JSONObject : public TiObject {
+    class JSONObject : public TiObjectWithGlobalObject {
     public:
-        JSONObject(NonNullPassRefPtr<Structure> structure)
-            : TiObject(structure)
-        {
-        }
+        JSONObject(TiGlobalObject*, Structure*);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
-
-        static void markStringifiers(MarkStack&, Stringifier*);
+        
+        static const ClassInfo s_info;
 
     protected:
         static const unsigned StructureFlags = OverridesGetOwnPropertySlot | TiObject::StructureFlags;
@@ -60,8 +57,6 @@ namespace TI {
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier&, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
     };
 
     UString JSONStringify(TiExcState* exec, TiValue value, unsigned indent);

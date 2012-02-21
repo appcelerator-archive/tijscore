@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -133,7 +133,7 @@ namespace WTI {
     public:
         HashTableConstIterator()
         {
-            addIterator(0, this);
+            addIterator(static_cast<const HashTableType*>(0), this);
         }
 
         // default copy, assignment and destructor are OK if CHECK_HASHTABLE_ITERATORS is 0
@@ -266,19 +266,21 @@ namespace WTI {
 
     using std::swap;
 
-#if !COMPILER(MSVC)
-    // Visual C++ has a swap for pairs defined.
+    // Work around MSVC's standard library, whose swap for pairs does not swap by component.
+    template<typename T> inline void hashTableSwap(T& a, T& b)
+    {
+        swap(a, b);
+    }
 
-    // swap pairs by component, in case of pair members that specialize swap
-    template<typename T, typename U> inline void swap(pair<T, U>& a, pair<T, U>& b)
+    // Swap pairs by component, in case of pair members that specialize swap.
+    template<typename T, typename U> inline void hashTableSwap(pair<T, U>& a, pair<T, U>& b)
     {
         swap(a.first, b.first);
         swap(a.second, b.second);
     }
-#endif
 
     template<typename T, bool useSwap> struct Mover;
-    template<typename T> struct Mover<T, true> { static void move(T& from, T& to) { swap(from, to); } };
+    template<typename T> struct Mover<T, true> { static void move(T& from, T& to) { hashTableSwap(from, to); } };
     template<typename T> struct Mover<T, false> { static void move(T& from, T& to) { to = from; } };
 
     template<typename Key, typename Value, typename HashFunctions> class IdentityHashTranslator {
@@ -340,6 +342,7 @@ namespace WTI {
         void remove(const KeyType&);
         void remove(iterator);
         void removeWithoutEntryConsistencyCheck(iterator);
+        void removeWithoutEntryConsistencyCheck(const_iterator);
         void clear();
 
         static bool isEmptyBucket(const ValueType& value) { return Extractor::extract(value) == KeyTraits::emptyValue(); }
@@ -861,6 +864,15 @@ namespace WTI {
     }
 
     template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
+    inline void HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::removeWithoutEntryConsistencyCheck(const_iterator it)
+    {
+        if (it == end())
+            return;
+
+        removeAndInvalidateWithoutEntryConsistencyCheck(const_cast<ValueType*>(it.m_position));
+    }
+
+    template<typename Key, typename Value, typename Extractor, typename HashFunctions, typename Traits, typename KeyTraits>
     inline void HashTable<Key, Value, Extractor, HashFunctions, Traits, KeyTraits>::remove(const KeyType& key)
     {
         remove(find(key));
@@ -1115,6 +1127,7 @@ namespace WTI {
     // iterator adapters
 
     template<typename HashTableType, typename ValueType> struct HashTableConstIteratorAdapter {
+        HashTableConstIteratorAdapter() {}
         HashTableConstIteratorAdapter(const typename HashTableType::const_iterator& impl) : m_impl(impl) {}
 
         const ValueType* get() const { return (const ValueType*)m_impl.get(); }
@@ -1128,6 +1141,7 @@ namespace WTI {
     };
 
     template<typename HashTableType, typename ValueType> struct HashTableIteratorAdapter {
+        HashTableIteratorAdapter() {}
         HashTableIteratorAdapter(const typename HashTableType::iterator& impl) : m_impl(impl) {}
 
         ValueType* get() const { return (ValueType*)m_impl.get(); }

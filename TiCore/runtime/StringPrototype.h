@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,13 +36,23 @@ namespace TI {
 
     class StringPrototype : public StringObject {
     public:
-        StringPrototype(TiExcState*, NonNullPassRefPtr<Structure>);
+        StringPrototype(TiExcState*, TiGlobalObject*, Structure*);
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertyDescriptor(TiExcState*, const Identifier&, PropertyDescriptor&);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const ClassInfo info;
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
+        {
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
+        }
+
+        static const ClassInfo s_info;
+        
+    protected:
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | StringObject::StructureFlags;
+
+        COMPILE_ASSERT(!StringObject::AnonymousSlotCount, StringPrototype_stomps_on_your_anonymous_slot);
+        static const unsigned AnonymousSlotCount = 1;
     };
 
 } // namespace TI

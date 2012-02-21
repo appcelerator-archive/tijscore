@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -27,7 +27,9 @@
 #ifndef qscriptconverter_p_h
 #define qscriptconverter_p_h
 
+#include "qscriptvalue.h"
 #include <TiCore/Ti.h>
+#include <QtCore/qglobal.h>
 #include <QtCore/qnumeric.h>
 #include <QtCore/qstring.h>
 #include <QtCore/qvarlengtharray.h>
@@ -133,6 +135,18 @@ public:
         free(result);
         buf.append(0);
         return QString::fromLatin1(buf.constData());
+    }
+
+    static TiPropertyAttributes toPropertyFlags(const QFlags<QScriptValue::PropertyFlag>& flags)
+    {
+        TiPropertyAttributes attr = 0;
+        if (flags.testFlag(QScriptValue::ReadOnly))
+            attr |= kTiPropertyAttributeReadOnly;
+        if (flags.testFlag(QScriptValue::Undeletable))
+            attr |= kTiPropertyAttributeDontDelete;
+        if (flags.testFlag(QScriptValue::SkipInEnumeration))
+            attr |= kTiPropertyAttributeDontEnum;
+        return attr;
     }
 };
 

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,6 +31,8 @@
  */
 
 #include "config.h"
+
+#if ENABLE(JIT)
 #include "JIT.h"
 
 // This probably does not belong here; adding here for now as a quick Windows build fix.
@@ -39,9 +41,8 @@
 TI::MacroAssemblerX86Common::SSE2CheckState TI::MacroAssemblerX86Common::s_sse2CheckState = NotCheckedSSE2;
 #endif
 
-#if ENABLE(JIT)
-
 #include "CodeBlock.h"
+#include "CryptographicallyRandomNumber.h"
 #include "Interpreter.h"
 #include "JITInlineMethods.h"
 #include "JITStubCall.h"
@@ -51,10 +52,7 @@ TI::MacroAssemblerX86Common::SSE2CheckState TI::MacroAssemblerX86Common::s_sse2C
 #include "RepatchBuffer.h"
 #include "ResultType.h"
 #include "SamplingTool.h"
-
-#ifndef NDEBUG
-#include <stdio.h>
-#endif
+#include "dfg/DFGNode.h" // for DFG_SUCCESS_STATS
 
 using namespace std;
 
@@ -78,17 +76,17 @@ void ctiPatchCallByReturnAddress(CodeBlock* codeblock, ReturnAddressPtr returnAd
     repatchBuffer.relinkCallerToFunction(returnAddress, newCalleeFunction);
 }
 
-JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock, void* linkerOffset)
+JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock)
     : m_interpreter(globalData->interpreter)
     , m_globalData(globalData)
     , m_codeBlock(codeBlock)
     , m_labels(codeBlock ? codeBlock->instructions().size() : 0)
     , m_propertyAccessCompilationInfo(codeBlock ? codeBlock->numberOfStructureStubInfos() : 0)
     , m_callStructureStubCompilationInfo(codeBlock ? codeBlock->numberOfCallLinkInfos() : 0)
-    , m_bytecodeIndex((unsigned)-1)
+    , m_bytecodeOffset((unsigned)-1)
 #if USE(JSVALUE32_64)
     , m_jumpTargetIndex(0)
-    , m_mappedBytecodeIndex((unsigned)-1)
+    , m_mappedBytecodeOffset((unsigned)-1)
     , m_mappedVirtualRegisterIndex((unsigned)-1)
     , m_mappedTag((RegisterID)-1)
     , m_mappedPayload((RegisterID)-1)
@@ -96,14 +94,18 @@ JIT::JIT(TiGlobalData* globalData, CodeBlock* codeBlock, void* linkerOffset)
     , m_lastResultBytecodeRegister(std::numeric_limits<int>::max())
     , m_jumpTargetsPosition(0)
 #endif
-    , m_linkerOffset(linkerOffset)
+#if USE(OS_RANDOMNESS)
+    , m_randomGenerator(cryptographicallyRandomNumber())
+#else
+    , m_randomGenerator(static_cast<unsigned>(randomNumber() * 0xFFFFFFF))
+#endif
 {
 }
 
 #if USE(JSVALUE32_64)
 void JIT::emitTimeoutCheck()
 {
-    Jump skipTimeout = branchSub32(NonZero, Imm32(1), timeoutCheckRegister);
+    Jump skipTimeout = branchSub32(NonZero, TrustedImm32(1), timeoutCheckRegister);
     JITStubCall stubCall(this, cti_timeout_check);
     stubCall.addArgument(regT1, regT0); // save last result registers.
     stubCall.call(timeoutCheckRegister);
@@ -113,7 +115,7 @@ void JIT::emitTimeoutCheck()
 #else
 void JIT::emitTimeoutCheck()
 {
-    Jump skipTimeout = branchSub32(NonZero, Imm32(1), timeoutCheckRegister);
+    Jump skipTimeout = branchSub32(NonZero, TrustedImm32(1), timeoutCheckRegister);
     JITStubCall(this, cti_timeout_check).call(timeoutCheckRegister);
     skipTimeout.link(this);
 
@@ -122,7 +124,7 @@ void JIT::emitTimeoutCheck()
 #endif
 
 #define NEXT_OPCODE(name) \
-    m_bytecodeIndex += OPCODE_LENGTH(name); \
+    m_bytecodeOffset += OPCODE_LENGTH(name); \
     break;
 
 #if USE(JSVALUE32_64)
@@ -184,27 +186,24 @@ void JIT::privateCompileMainPass()
     m_globalResolveInfoIndex = 0;
     m_callLinkInfoIndex = 0;
 
-    for (m_bytecodeIndex = 0; m_bytecodeIndex < instructionCount; ) {
-        Instruction* currentInstruction = instructionsBegin + m_bytecodeIndex;
-        ASSERT_WITH_MESSAGE(m_interpreter->isOpcode(currentInstruction->u.opcode), "privateCompileMainPass gone bad @ %d", m_bytecodeIndex);
+    for (m_bytecodeOffset = 0; m_bytecodeOffset < instructionCount; ) {
+        Instruction* currentInstruction = instructionsBegin + m_bytecodeOffset;
+        ASSERT_WITH_MESSAGE(m_interpreter->isOpcode(currentInstruction->u.opcode), "privateCompileMainPass gone bad @ %d", m_bytecodeOffset);
 
 #if ENABLE(OPCODE_SAMPLING)
-        if (m_bytecodeIndex > 0) // Avoid the overhead of sampling op_enter twice.
+        if (m_bytecodeOffset > 0) // Avoid the overhead of sampling op_enter twice.
             sampleInstruction(currentInstruction);
 #endif
 
-#if !USE(JSVALUE32_64)
-        if (m_labels[m_bytecodeIndex].isUsed())
+#if USE(JSVALUE64)
+        if (atJumpTarget())
             killLastResultRegister();
 #endif
 
-        m_labels[m_bytecodeIndex] = label();
+        m_labels[m_bytecodeOffset] = label();
 
         switch (m_interpreter->getOpcodeID(currentInstruction->u.opcode)) {
         DEFINE_BINARY_OP(op_del_by_val)
-#if USE(JSVALUE32)
-        DEFINE_BINARY_OP(op_div)
-#endif
         DEFINE_BINARY_OP(op_in)
         DEFINE_BINARY_OP(op_less)
         DEFINE_BINARY_OP(op_lesseq)
@@ -214,7 +213,7 @@ void JIT::privateCompileMainPass()
         DEFINE_UNARY_OP(op_is_object)
         DEFINE_UNARY_OP(op_is_string)
         DEFINE_UNARY_OP(op_is_undefined)
-#if !USE(JSVALUE32_64)
+#if USE(JSVALUE64)
         DEFINE_UNARY_OP(op_negate)
 #endif
         DEFINE_UNARY_OP(op_typeof)
@@ -229,26 +228,29 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_call_varargs)
         DEFINE_OP(op_catch)
         DEFINE_OP(op_construct)
-        DEFINE_OP(op_construct_verify)
+        DEFINE_OP(op_get_callee)
+        DEFINE_OP(op_create_this)
         DEFINE_OP(op_convert_this)
-        DEFINE_OP(op_init_arguments)
+        DEFINE_OP(op_convert_this_strict)
+        DEFINE_OP(op_init_lazy_reg)
         DEFINE_OP(op_create_arguments)
         DEFINE_OP(op_debug)
         DEFINE_OP(op_del_by_id)
-#if !USE(JSVALUE32)
         DEFINE_OP(op_div)
-#endif
         DEFINE_OP(op_end)
         DEFINE_OP(op_enter)
-        DEFINE_OP(op_enter_with_activation)
+        DEFINE_OP(op_create_activation)
         DEFINE_OP(op_eq)
         DEFINE_OP(op_eq_null)
         DEFINE_OP(op_get_by_id)
+        DEFINE_OP(op_get_arguments_length)
         DEFINE_OP(op_get_by_val)
+        DEFINE_OP(op_get_argument_by_val)
         DEFINE_OP(op_get_by_pname)
         DEFINE_OP(op_get_global_var)
         DEFINE_OP(op_get_pnames)
         DEFINE_OP(op_get_scoped_var)
+        DEFINE_OP(op_check_has_instance)
         DEFINE_OP(op_instanceof)
         DEFINE_OP(op_jeq_null)
         DEFINE_OP(op_jfalse)
@@ -279,7 +281,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_neq)
         DEFINE_OP(op_neq_null)
         DEFINE_OP(op_new_array)
-        DEFINE_OP(op_new_error)
+        DEFINE_OP(op_new_array_buffer)
         DEFINE_OP(op_new_func)
         DEFINE_OP(op_new_func_exp)
         DEFINE_OP(op_new_object)
@@ -305,11 +307,14 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_put_setter)
         DEFINE_OP(op_resolve)
         DEFINE_OP(op_resolve_base)
+        DEFINE_OP(op_ensure_property_exists)
         DEFINE_OP(op_resolve_global)
         DEFINE_OP(op_resolve_global_dynamic)
         DEFINE_OP(op_resolve_skip)
         DEFINE_OP(op_resolve_with_base)
         DEFINE_OP(op_ret)
+        DEFINE_OP(op_call_put_result)
+        DEFINE_OP(op_ret_object_or_this)
         DEFINE_OP(op_rshift)
         DEFINE_OP(op_urshift)
         DEFINE_OP(op_sret)
@@ -322,6 +327,7 @@ void JIT::privateCompileMainPass()
         DEFINE_OP(op_tear_off_activation)
         DEFINE_OP(op_tear_off_arguments)
         DEFINE_OP(op_throw)
+        DEFINE_OP(op_throw_reference_error)
         DEFINE_OP(op_to_jsnumber)
         DEFINE_OP(op_to_primitive)
 
@@ -355,7 +361,7 @@ void JIT::privateCompileMainPass()
 
 #ifndef NDEBUG
     // Reset this, in order to guard its use with ASSERTs.
-    m_bytecodeIndex = (unsigned)-1;
+    m_bytecodeOffset = (unsigned)-1;
 #endif
 }
 
@@ -364,7 +370,7 @@ void JIT::privateCompileLinkPass()
 {
     unsigned jmpTableCount = m_jmpTable.size();
     for (unsigned i = 0; i < jmpTableCount; ++i)
-        m_jmpTable[i].from.linkTo(m_labels[m_jmpTable[i].toBytecodeIndex], this);
+        m_jmpTable[i].from.linkTo(m_labels[m_jmpTable[i].toBytecodeOffset], this);
     m_jmpTable.clear();
 }
 
@@ -377,15 +383,15 @@ void JIT::privateCompileSlowCases()
     m_callLinkInfoIndex = 0;
 
     for (Vector<SlowCaseEntry>::iterator iter = m_slowCases.begin(); iter != m_slowCases.end();) {
-#if !USE(JSVALUE32_64)
+#if USE(JSVALUE64)
         killLastResultRegister();
 #endif
 
-        m_bytecodeIndex = iter->to;
+        m_bytecodeOffset = iter->to;
 #ifndef NDEBUG
-        unsigned firstTo = m_bytecodeIndex;
+        unsigned firstTo = m_bytecodeOffset;
 #endif
-        Instruction* currentInstruction = instructionsBegin + m_bytecodeIndex;
+        Instruction* currentInstruction = instructionsBegin + m_bytecodeOffset;
 
         switch (m_interpreter->getOpcodeID(currentInstruction->u.opcode)) {
         DEFINE_SLOWCASE_OP(op_add)
@@ -397,15 +403,16 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_call_eval)
         DEFINE_SLOWCASE_OP(op_call_varargs)
         DEFINE_SLOWCASE_OP(op_construct)
-        DEFINE_SLOWCASE_OP(op_construct_verify)
         DEFINE_SLOWCASE_OP(op_convert_this)
-#if !USE(JSVALUE32)
+        DEFINE_SLOWCASE_OP(op_convert_this_strict)
         DEFINE_SLOWCASE_OP(op_div)
-#endif
         DEFINE_SLOWCASE_OP(op_eq)
         DEFINE_SLOWCASE_OP(op_get_by_id)
+        DEFINE_SLOWCASE_OP(op_get_arguments_length)
         DEFINE_SLOWCASE_OP(op_get_by_val)
+        DEFINE_SLOWCASE_OP(op_get_argument_by_val)
         DEFINE_SLOWCASE_OP(op_get_by_pname)
+        DEFINE_SLOWCASE_OP(op_check_has_instance)
         DEFINE_SLOWCASE_OP(op_instanceof)
         DEFINE_SLOWCASE_OP(op_jfalse)
         DEFINE_SLOWCASE_OP(op_jnless)
@@ -413,6 +420,7 @@ void JIT::privateCompileSlowCases()
         DEFINE_SLOWCASE_OP(op_jlesseq)
         DEFINE_SLOWCASE_OP(op_jnlesseq)
         DEFINE_SLOWCASE_OP(op_jtrue)
+        DEFINE_SLOWCASE_OP(op_load_varargs)
         DEFINE_SLOWCASE_OP(op_loop_if_less)
         DEFINE_SLOWCASE_OP(op_loop_if_lesseq)
         DEFINE_SLOWCASE_OP(op_loop_if_true)
@@ -458,79 +466,96 @@ void JIT::privateCompileSlowCases()
 
 #ifndef NDEBUG
     // Reset this, in order to guard its use with ASSERTs.
-    m_bytecodeIndex = (unsigned)-1;
+    m_bytecodeOffset = (unsigned)-1;
 #endif
 }
 
-JITCode JIT::privateCompile()
+JITCode JIT::privateCompile(CodePtr* functionEntryArityCheck)
 {
-    sampleCodeBlock(m_codeBlock);
-#if ENABLE(OPCODE_SAMPLING)
-    sampleInstruction(m_codeBlock->instructions().begin());
-#endif
+    // Just add a little bit of randomness to the codegen
+    if (m_randomGenerator.getUint32() & 1)
+        nop();
 
     // Could use a pop_m, but would need to offset the following instruction if so.
     preserveReturnAddressAfterCall(regT2);
     emitPutToCallFrameHeader(regT2, RegisterFile::ReturnPC);
 
-    Jump slowRegisterFileCheck;
-    Label afterRegisterFileCheck;
+    Label beginLabel(this);
+
+    sampleCodeBlock(m_codeBlock);
+#if ENABLE(OPCODE_SAMPLING)
+    sampleInstruction(m_codeBlock->instructions().begin());
+#endif
+
+    Jump registerFileCheck;
     if (m_codeBlock->codeType() == FunctionCode) {
+#if DFG_SUCCESS_STATS
+        static SamplingCounter counter("orignalJIT");
+        emitCount(counter);
+#endif
+
         // In the case of a fast linked call, we do not set this up in the caller.
         emitPutImmediateToCallFrameHeader(m_codeBlock, RegisterFile::CodeBlock);
 
-        peek(regT0, OBJECT_OFFSETOF(JITStackFrame, registerFile) / sizeof (void*));
         addPtr(Imm32(m_codeBlock->m_numCalleeRegisters * sizeof(Register)), callFrameRegister, regT1);
-
-        slowRegisterFileCheck = branchPtr(Above, regT1, Address(regT0, OBJECT_OFFSETOF(RegisterFile, m_end)));
-        afterRegisterFileCheck = label();
+        registerFileCheck = branchPtr(Below, AbsoluteAddress(m_globalData->interpreter->registerFile().addressOfEnd()), regT1);
     }
+
+    Label functionBody = label();
 
     privateCompileMainPass();
     privateCompileLinkPass();
     privateCompileSlowCases();
 
+    Label arityCheck;
     if (m_codeBlock->codeType() == FunctionCode) {
-        slowRegisterFileCheck.link(this);
-        m_bytecodeIndex = 0;
+        registerFileCheck.link(this);
+        m_bytecodeOffset = 0;
         JITStubCall(this, cti_register_file_check).call();
 #ifndef NDEBUG
-        m_bytecodeIndex = (unsigned)-1; // Reset this, in order to guard its use with ASSERTs.
+        m_bytecodeOffset = (unsigned)-1; // Reset this, in order to guard its use with ASSERTs.
 #endif
-        jump(afterRegisterFileCheck);
+        jump(functionBody);
+
+        arityCheck = label();
+        preserveReturnAddressAfterCall(regT2);
+        emitPutToCallFrameHeader(regT2, RegisterFile::ReturnPC);
+        branch32(Equal, regT1, TrustedImm32(m_codeBlock->m_numParameters)).linkTo(beginLabel, this);
+        restoreArgumentReference();
+
+        JITStubCall(this, m_codeBlock->m_isConstructor ? cti_op_construct_arityCheck : cti_op_call_arityCheck).call(callFrameRegister);
+
+        jump(beginLabel);
     }
 
     ASSERT(m_jmpTable.isEmpty());
 
-    RefPtr<ExecutablePool> executablePool = m_globalData->executableAllocator.poolForSize(m_assembler.size());
-    if (!executablePool)
-        return JITCode();
-    LinkBuffer patchBuffer(this, executablePool.release(), m_linkerOffset);
+    LinkBuffer patchBuffer(*m_globalData, this, m_globalData->executableAllocator);
 
     // Translate vPC offsets into addresses in JIT generated code, for switch tables.
     for (unsigned i = 0; i < m_switches.size(); ++i) {
         SwitchRecord record = m_switches[i];
-        unsigned bytecodeIndex = record.bytecodeIndex;
+        unsigned bytecodeOffset = record.bytecodeOffset;
 
         if (record.type != SwitchRecord::String) {
             ASSERT(record.type == SwitchRecord::Immediate || record.type == SwitchRecord::Character); 
             ASSERT(record.jumpTable.simpleJumpTable->branchOffsets.size() == record.jumpTable.simpleJumpTable->ctiOffsets.size());
 
-            record.jumpTable.simpleJumpTable->ctiDefault = patchBuffer.locationOf(m_labels[bytecodeIndex + record.defaultOffset]);
+            record.jumpTable.simpleJumpTable->ctiDefault = patchBuffer.locationOf(m_labels[bytecodeOffset + record.defaultOffset]);
 
             for (unsigned j = 0; j < record.jumpTable.simpleJumpTable->branchOffsets.size(); ++j) {
                 unsigned offset = record.jumpTable.simpleJumpTable->branchOffsets[j];
-                record.jumpTable.simpleJumpTable->ctiOffsets[j] = offset ? patchBuffer.locationOf(m_labels[bytecodeIndex + offset]) : record.jumpTable.simpleJumpTable->ctiDefault;
+                record.jumpTable.simpleJumpTable->ctiOffsets[j] = offset ? patchBuffer.locationOf(m_labels[bytecodeOffset + offset]) : record.jumpTable.simpleJumpTable->ctiDefault;
             }
         } else {
             ASSERT(record.type == SwitchRecord::String);
 
-            record.jumpTable.stringJumpTable->ctiDefault = patchBuffer.locationOf(m_labels[bytecodeIndex + record.defaultOffset]);
+            record.jumpTable.stringJumpTable->ctiDefault = patchBuffer.locationOf(m_labels[bytecodeOffset + record.defaultOffset]);
 
             StringJumpTable::StringOffsetTable::iterator end = record.jumpTable.stringJumpTable->offsetTable.end();            
             for (StringJumpTable::StringOffsetTable::iterator it = record.jumpTable.stringJumpTable->offsetTable.begin(); it != end; ++it) {
                 unsigned offset = it->second.branchOffset;
-                it->second.ctiOffset = offset ? patchBuffer.locationOf(m_labels[bytecodeIndex + offset]) : record.jumpTable.stringJumpTable->ctiDefault;
+                it->second.ctiOffset = offset ? patchBuffer.locationOf(m_labels[bytecodeOffset + offset]) : record.jumpTable.stringJumpTable->ctiDefault;
             }
         }
     }
@@ -545,10 +570,10 @@ JITCode JIT::privateCompile()
             patchBuffer.link(iter->from, FunctionPtr(iter->to));
     }
 
-    if (m_codeBlock->hasExceptionInfo()) {
+    if (m_codeBlock->needsCallReturnIndices()) {
         m_codeBlock->callReturnIndexVector().reserveCapacity(m_calls.size());
         for (Vector<CallRecord>::iterator iter = m_calls.begin(); iter != m_calls.end(); ++iter)
-            m_codeBlock->callReturnIndexVector().append(CallReturnOffsetToBytecodeIndex(patchBuffer.returnAddressOffset(iter->from), iter->bytecodeIndex));
+            m_codeBlock->callReturnIndexVector().append(CallReturnOffsetToBytecodeOffset(patchBuffer.returnAddressOffset(iter->from), iter->bytecodeOffset));
     }
 
     // Link absolute addresses for jsr
@@ -565,7 +590,7 @@ JITCode JIT::privateCompile()
 #if ENABLE(JIT_OPTIMIZE_CALL)
     for (unsigned i = 0; i < m_codeBlock->numberOfCallLinkInfos(); ++i) {
         CallLinkInfo& info = m_codeBlock->callLinkInfo(i);
-        info.ownerCodeBlock = m_codeBlock;
+        info.isCall = m_callStructureStubCompilationInfo[i].isCall;
         info.callReturnLocation = patchBuffer.locationOfNearCall(m_callStructureStubCompilationInfo[i].callReturnLocation);
         info.hotPathBegin = patchBuffer.locationOf(m_callStructureStubCompilationInfo[i].hotPathBegin);
         info.hotPathOther = patchBuffer.locationOfNearCall(m_callStructureStubCompilationInfo[i].hotPathOther);
@@ -575,44 +600,19 @@ JITCode JIT::privateCompile()
     m_codeBlock->addMethodCallLinkInfos(methodCallCount);
     for (unsigned i = 0; i < methodCallCount; ++i) {
         MethodCallLinkInfo& info = m_codeBlock->methodCallLinkInfo(i);
-        info.structureLabel = patchBuffer.locationOf(m_methodCallCompilationInfo[i].structureToCompare);
+        info.cachedStructure.setLocation(patchBuffer.locationOf(m_methodCallCompilationInfo[i].structureToCompare));
         info.callReturnLocation = m_codeBlock->structureStubInfo(m_methodCallCompilationInfo[i].propertyAccessIndex).callReturnLocation;
     }
+
+    if (m_codeBlock->codeType() == FunctionCode && functionEntryArityCheck)
+        *functionEntryArityCheck = patchBuffer.locationOf(arityCheck);
 
     return patchBuffer.finalizeCode();
 }
 
-#if !USE(JSVALUE32_64)
-void JIT::emitGetVariableObjectRegister(RegisterID variableObject, int index, RegisterID dst)
-{
-    loadPtr(Address(variableObject, OBJECT_OFFSETOF(JSVariableObject, d)), dst);
-    loadPtr(Address(dst, OBJECT_OFFSETOF(JSVariableObject::JSVariableObjectData, registers)), dst);
-    loadPtr(Address(dst, index * sizeof(Register)), dst);
-}
-
-void JIT::emitPutVariableObjectRegister(RegisterID src, RegisterID variableObject, int index)
-{
-    loadPtr(Address(variableObject, OBJECT_OFFSETOF(JSVariableObject, d)), variableObject);
-    loadPtr(Address(variableObject, OBJECT_OFFSETOF(JSVariableObject::JSVariableObjectData, registers)), variableObject);
-    storePtr(src, Address(variableObject, index * sizeof(Register)));
-}
-#endif
-
 #if ENABLE(JIT_OPTIMIZE_CALL)
-void JIT::unlinkCall(CallLinkInfo* callLinkInfo)
-{
-    // When the TiFunction is deleted the pointer embedded in the instruction stream will no longer be valid
-    // (and, if a new TiFunction happened to be constructed at the same location, we could get a false positive
-    // match).  Reset the check so it no longer matches.
-    RepatchBuffer repatchBuffer(callLinkInfo->ownerCodeBlock);
-#if USE(JSVALUE32_64)
-    repatchBuffer.repatch(callLinkInfo->hotPathBegin, 0);
-#else
-    repatchBuffer.repatch(callLinkInfo->hotPathBegin, TiValue::encode(TiValue()));
-#endif
-}
 
-void JIT::linkCall(TiFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, JITCode& code, CallLinkInfo* callLinkInfo, int callerArgCount, TiGlobalData* globalData)
+void JIT::linkCall(TiFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, JIT::CodePtr code, CallLinkInfo* callLinkInfo, int callerArgCount, TiGlobalData* globalData)
 {
     RepatchBuffer repatchBuffer(callerCodeBlock);
 
@@ -620,16 +620,28 @@ void JIT::linkCall(TiFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* ca
     // If this is a native call calleeCodeBlock is null so the number of parameters is unimportant
     if (!calleeCodeBlock || (callerArgCount == calleeCodeBlock->m_numParameters)) {
         ASSERT(!callLinkInfo->isLinked());
-    
-        if (calleeCodeBlock)
-            calleeCodeBlock->addCaller(callLinkInfo);
-    
-        repatchBuffer.repatch(callLinkInfo->hotPathBegin, callee);
-        repatchBuffer.relink(callLinkInfo->hotPathOther, code.addressForCall());
+        callLinkInfo->callee.set(*globalData, callLinkInfo->hotPathBegin, callerCodeBlock->ownerExecutable(), callee);
+        repatchBuffer.relink(callLinkInfo->hotPathOther, code);
     }
 
     // patch the call so we do not continue to try to link.
     repatchBuffer.relink(callLinkInfo->callReturnLocation, globalData->jitStubs->ctiVirtualCall());
+}
+
+void JIT::linkConstruct(TiFunction* callee, CodeBlock* callerCodeBlock, CodeBlock* calleeCodeBlock, JIT::CodePtr code, CallLinkInfo* callLinkInfo, int callerArgCount, TiGlobalData* globalData)
+{
+    RepatchBuffer repatchBuffer(callerCodeBlock);
+
+    // Currently we only link calls with the exact number of arguments.
+    // If this is a native call calleeCodeBlock is null so the number of parameters is unimportant
+    if (!calleeCodeBlock || (callerArgCount == calleeCodeBlock->m_numParameters)) {
+        ASSERT(!callLinkInfo->isLinked());
+        callLinkInfo->callee.set(*globalData, callLinkInfo->hotPathBegin, callerCodeBlock->ownerExecutable(), callee);
+        repatchBuffer.relink(callLinkInfo->hotPathOther, code);
+    }
+
+    // patch the call so we do not continue to try to link.
+    repatchBuffer.relink(callLinkInfo->callReturnLocation, globalData->jitStubs->ctiVirtualConstruct());
 }
 #endif // ENABLE(JIT_OPTIMIZE_CALL)
 

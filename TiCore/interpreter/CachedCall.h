@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,23 +39,23 @@
 #include "Interpreter.h"
 
 namespace TI {
-    class CachedCall : public Noncopyable {
+    class CachedCall {
+        WTF_MAKE_NONCOPYABLE(CachedCall); WTF_MAKE_FAST_ALLOCATED;
     public:
-        CachedCall(CallFrame* callFrame, TiFunction* function, int argCount, TiValue* exception)
+        CachedCall(CallFrame* callFrame, TiFunction* function, int argCount)
             : m_valid(false)
             , m_interpreter(callFrame->interpreter())
-            , m_exception(exception)
-            , m_globalObjectScope(callFrame, function->scope().globalObject())
+            , m_globalObjectScope(callFrame->globalData(), function->scope()->globalObject.get())
         {
             ASSERT(!function->isHostFunction());
-            m_closure = m_interpreter->prepareForRepeatCall(function->jsExecutable(), callFrame, function, argCount, function->scope().node(), exception);
-            m_valid = !*exception;
+            m_closure = m_interpreter->prepareForRepeatCall(function->jsExecutable(), callFrame, function, argCount, function->scope());
+            m_valid = !callFrame->hadException();
         }
         
         TiValue call()
         { 
             ASSERT(m_valid);
-            return m_interpreter->execute(m_closure, m_exception);
+            return m_interpreter->execute(m_closure);
         }
         void setThis(TiValue v) { m_closure.setArgument(0, v); }
         void setArgument(int n, TiValue v) { m_closure.setArgument(n + 1, v); }
@@ -76,7 +76,6 @@ namespace TI {
     private:
         bool m_valid;
         Interpreter* m_interpreter;
-        TiValue* m_exception;
         DynamicGlobalObjectScope m_globalObjectScope;
         CallFrameClosure m_closure;
     };

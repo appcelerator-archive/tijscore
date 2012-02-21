@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -33,6 +33,7 @@
 #ifndef LiteralParser_h
 #define LiteralParser_h
 
+#include "Identifier.h"
 #include "TiGlobalObjectFunctions.h"
 #include "TiValue.h"
 #include "UString.h"
@@ -41,10 +42,10 @@ namespace TI {
 
     class LiteralParser {
     public:
-        typedef enum { StrictJSON, NonStrictJSON } ParserMode;
-        LiteralParser(TiExcState* exec, const UString& s, ParserMode mode)
+        typedef enum { StrictJSON, NonStrictJSON, JSONP } ParserMode;
+        LiteralParser(TiExcState* exec, const UChar* characters, unsigned length, ParserMode mode)
             : m_exec(exec)
-            , m_lexer(s, mode)
+            , m_lexer(characters, length, mode)
             , m_mode(mode)
         {
         }
@@ -53,10 +54,33 @@ namespace TI {
         {
             m_lexer.next();
             TiValue result = parse(m_mode == StrictJSON ? StartParseExpression : StartParseStatement);
+            if (m_lexer.currentToken().type == TokSemi)
+                m_lexer.next();
             if (m_lexer.currentToken().type != TokEnd)
                 return TiValue();
             return result;
         }
+        
+        enum JSONPPathEntryType {
+            JSONPPathEntryTypeDeclare, // var pathEntryName = JSON
+            JSONPPathEntryTypeDot, // <prior entries>.pathEntryName = JSON
+            JSONPPathEntryTypeLookup, // <prior entries>[pathIndex] = JSON
+            JSONPPathEntryTypeCall // <prior entries>(JSON)
+        };
+
+        struct JSONPPathEntry {
+            JSONPPathEntryType m_type;
+            Identifier m_pathEntryName;
+            int m_pathIndex;
+        };
+
+        struct JSONPData {
+            Vector<JSONPPathEntry> m_path;
+            Strong<Unknown> m_value;
+        };
+
+        bool tryJSONPParse(Vector<JSONPData>&, bool needsFullSourceInfo);
+
     private:
         enum ParserState { StartParseObject, StartParseArray, StartParseExpression, 
                            StartParseStatement, StartParseStatementEndStatement, 
@@ -65,29 +89,31 @@ namespace TI {
         enum TokenType { TokLBracket, TokRBracket, TokLBrace, TokRBrace, 
                          TokString, TokIdentifier, TokNumber, TokColon, 
                          TokLParen, TokRParen, TokComma, TokTrue, TokFalse,
-                         TokNull, TokEnd, TokError };
-
+                         TokNull, TokEnd, TokDot, TokAssign, TokSemi, TokError };
+        
         class Lexer {
         public:
             struct LiteralParserToken {
                 TokenType type;
                 const UChar* start;
                 const UChar* end;
-                UString stringToken;
-                double numberToken;
+                UString stringBuffer;
+                union {
+                    double numberToken;
+                    struct {
+                        const UChar* stringToken;
+                        int stringLength;
+                    };
+                };
             };
-            Lexer(const UString& s, ParserMode mode)
-                : m_string(s)
-                , m_mode(mode)
-                , m_ptr(s.data())
-                , m_end(s.data() + s.size())
+            Lexer(const UChar* characters, unsigned length, ParserMode mode)
+                : m_mode(mode)
+                , m_ptr(characters)
+                , m_end(characters + length)
             {
             }
             
-            TokenType next()
-            {
-                return lex(m_currentToken);
-            }
+            TokenType next();
             
             const LiteralParserToken& currentToken()
             {
@@ -95,9 +121,9 @@ namespace TI {
             }
             
         private:
-            TokenType lex(LiteralParserToken&);
-            template <ParserMode mode> TokenType lexString(LiteralParserToken&);
-            TokenType lexNumber(LiteralParserToken&);
+            template <ParserMode mode> TokenType lex(LiteralParserToken&);
+            template <ParserMode mode, UChar terminator> ALWAYS_INLINE TokenType lexString(LiteralParserToken&);
+            ALWAYS_INLINE TokenType lexNumber(LiteralParserToken&);
             LiteralParserToken m_currentToken;
             UString m_string;
             ParserMode m_mode;
@@ -111,7 +137,12 @@ namespace TI {
         TiExcState* m_exec;
         LiteralParser::Lexer m_lexer;
         ParserMode m_mode;
+        static unsigned const MaximumCachableCharacter = 128;
+        FixedArray<Identifier, MaximumCachableCharacter> m_shortIdentifiers;
+        FixedArray<Identifier, MaximumCachableCharacter> m_recentIdentifiers;
+        ALWAYS_INLINE const Identifier makeIdentifier(const UChar* characters, size_t length);
     };
+
 }
 
 #endif

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -51,9 +51,12 @@
 #include "DateConversion.h"
 
 #include "CallFrame.h"
+#include "TiObject.h"
+#include "ScopeChain.h"
 #include "UString.h"
 #include <wtf/DateMath.h>
 #include <wtf/StringExtras.h>
+#include <wtf/text/CString.h>
 
 using namespace WTI;
 
@@ -63,7 +66,9 @@ double parseDate(TiExcState* exec, const UString &date)
 {
     if (date == exec->globalData().cachedDateString)
         return exec->globalData().cachedDateStringValue;
-    double value = parseDateFromNullTerminatedCharacters(exec, date.UTF8String().data());
+    double value = parseES5DateFromNullTerminatedCharacters(date.utf8().data());
+    if (isnan(value))
+        value = parseDateFromNullTerminatedCharacters(exec, date.utf8().data());
     exec->globalData().cachedDateString = date;
     exec->globalData().cachedDateStringValue = value;
     return value;

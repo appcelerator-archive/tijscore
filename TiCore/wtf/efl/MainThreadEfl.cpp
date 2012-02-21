@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -49,7 +49,7 @@ void initializeMainThreadPlatform()
 {
 }
 
-static int timeoutFired(void*)
+static Eina_Bool timeoutFired(void*)
 {
     dispatchFunctionsFromMainThread();
     return ECORE_CALLBACK_CANCEL;

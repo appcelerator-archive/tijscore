@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,41 +40,24 @@
 
 namespace TI {
 
-    class JSNotAnObjectErrorStub : public TiObject {
-    public:
-        JSNotAnObjectErrorStub(TiExcState* exec, bool isNull)
-            : TiObject(exec->globalData().notAnObjectErrorStubStructure)
-            , m_isNull(isNull)
-        {
-        }
-
-        bool isNull() const { return m_isNull; }
-
-    private:
-        virtual bool isNotAnObjectErrorStub() const { return true; }
-
-        bool m_isNull;
-    };
-    
     // This unholy class is used to allow us to avoid multiple exception checks
     // in certain SquirrelFish bytecodes -- effectively it just silently consumes
     // any operations performed on the result of a failed toObject call.
-    class JSNotAnObject : public TiObject {
+    class JSNotAnObject : public JSNonFinalObject {
     public:
-        JSNotAnObject(TiExcState* exec, JSNotAnObjectErrorStub* exception)
-            : TiObject(exec->globalData().notAnObjectStructure)
-            , m_exception(exception)
+        JSNotAnObject(TiExcState* exec)
+            : JSNonFinalObject(exec->globalData(), exec->globalData().notAnObjectStructure.get())
         {
         }
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
      private:
         
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | OverridesGetPropertyNames | TiObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | TiObject::StructureFlags;
 
         // TiValue methods
         virtual TiValue toPrimitive(TiExcState*, PreferredPrimitiveType) const;
@@ -82,10 +65,7 @@ namespace TI {
         virtual bool toBoolean(TiExcState*) const;
         virtual double toNumber(TiExcState*) const;
         virtual UString toString(TiExcState*) const;
-        virtual TiObject* toObject(TiExcState*) const;
-
-        // Marking
-        virtual void markChildren(MarkStack&);
+        virtual TiObject* toObject(TiExcState*, TiGlobalObject*) const;
 
         // TiObject methods
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
@@ -99,8 +79,6 @@ namespace TI {
         virtual bool deleteProperty(TiExcState*, unsigned propertyName);
 
         virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
-
-        JSNotAnObjectErrorStub* m_exception;
     };
 
 } // namespace TI

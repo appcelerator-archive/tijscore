@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -123,21 +123,19 @@ bool TiValueIsString(TiContextRef ctx, TiValueRef value)
 bool TiValueIsArray(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
     
     TiValue jsValue = toJS(exec, value);
-    return jsValue.inherits(&TiArray::info);
+    return jsValue.inherits(&TiArray::s_info);
 }
 
 bool TiValueIsDate(TiContextRef ctx, TiValueRef value)
 {
     TiExcState* exec = toJS(ctx);
-    exec->globalData().heap.registerThread();
-    TiLock lock(exec);
+    APIEntryShim entryShim(exec);
     
     TiValue jsValue = toJS(exec, value);
-    return jsValue.inherits(&DateInstance::info);
+    return jsValue.inherits(&DateInstance::s_info);
 }
 
 bool TiValueIsObject(TiContextRef ctx, TiValueRef value)
@@ -157,10 +155,10 @@ bool TiValueIsObjectOfClass(TiContextRef ctx, TiValueRef value, TiClassRef jsCla
     TiValue jsValue = toJS(exec, value);
     
     if (TiObject* o = jsValue.getObject()) {
-        if (o->inherits(&TiCallbackObject<TiGlobalObject>::info))
+        if (o->inherits(&TiCallbackObject<TiGlobalObject>::s_info))
             return static_cast<TiCallbackObject<TiGlobalObject>*>(o)->inherits(jsClass);
-        else if (o->inherits(&TiCallbackObject<TiObject>::info))
-            return static_cast<TiCallbackObject<TiObject>*>(o)->inherits(jsClass);
+        if (o->inherits(&TiCallbackObject<TiObjectWithGlobalObject>::s_info))
+            return static_cast<TiCallbackObject<TiObjectWithGlobalObject>*>(o)->inherits(jsClass);
     }
     return false;
 }
@@ -247,7 +245,7 @@ TiValueRef TiValueMakeNumber(TiContextRef ctx, double value)
     if (isnan(value))
         value = NaN;
 
-    return toRef(exec, jsNumber(exec, value));
+    return toRef(exec, jsNumber(value));
 }
 
 TiValueRef TiValueMakeString(TiContextRef ctx, TiStringRef string)
@@ -262,7 +260,8 @@ TiValueRef TiValueMakeFromJSONString(TiContextRef ctx, TiStringRef string)
 {
     TiExcState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
-    LiteralParser parser(exec, string->ustring(), LiteralParser::StrictJSON);
+    UString str = string->ustring();
+    LiteralParser parser(exec, str.characters(), str.length(), LiteralParser::StrictJSON);
     return toRef(exec, parser.tryLiteralParse());
 }
 
@@ -280,7 +279,7 @@ TiStringRef TiValueCreateJSONString(TiContextRef ctx, TiValueRef apiValue, unsig
         exec->clearException();
         return 0;
     }
-    return OpaqueTiString::create(result).releaseRef();
+    return OpaqueTiString::create(result).leakRef();
 }
 
 bool TiValueToBoolean(TiContextRef ctx, TiValueRef value)
@@ -323,7 +322,7 @@ TiStringRef TiValueToStringCopy(TiContextRef ctx, TiValueRef value, TiValueRef* 
         exec->clearException();
         stringRef.clear();
     }
-    return stringRef.release().releaseRef();
+    return stringRef.release().leakRef();
 }
 
 TiObjectRef TiValueToObject(TiContextRef ctx, TiValueRef value, TiValueRef* exception)

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -36,15 +36,17 @@ namespace TI {
 
     class FunctionConstructor : public InternalFunction {
     public:
-        FunctionConstructor(TiExcState*, NonNullPassRefPtr<Structure>, FunctionPrototype*);
+        FunctionConstructor(TiExcState*, TiGlobalObject*, Structure*, FunctionPrototype*);
 
     private:
         virtual ConstructType getConstructData(ConstructData&);
         virtual CallType getCallData(CallData&);
     };
 
-    TiObject* constructFunction(TiExcState*, const ArgList&, const Identifier& functionName, const UString& sourceURL, int lineNumber);
-    TiObject* constructFunction(TiExcState*, const ArgList&);
+    TiObject* constructFunction(TiExcState*, TiGlobalObject*, const ArgList&, const Identifier& functionName, const UString& sourceURL, int lineNumber);
+    TiObject* constructFunction(TiExcState*, TiGlobalObject*, const ArgList&);
+
+    TiObject* constructFunctionSkippingEvalEnabledCheck(TiExcState*, TiGlobalObject*, const ArgList&, const Identifier&, const UString&, int lineNumber);
 
 } // namespace TI
 

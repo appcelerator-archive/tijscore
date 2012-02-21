@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -49,12 +49,12 @@ TiStringRef TiStringCreateWithCFString(CFStringRef string)
     // it can hold.  (<rdar://problem/6806478>)
     size_t length = CFStringGetLength(string);
     if (length) {
-        OwnArrayPtr<UniChar> buffer(new UniChar[length]);
+        OwnArrayPtr<UniChar> buffer = adoptArrayPtr(new UniChar[length]);
         CFStringGetCharacters(string, CFRangeMake(0, length), buffer.get());
         COMPILE_ASSERT(sizeof(UniChar) == sizeof(UChar), unichar_and_uchar_must_be_same_size);
-        return OpaqueTiString::create(reinterpret_cast<UChar*>(buffer.get()), length).releaseRef();
+        return OpaqueTiString::create(reinterpret_cast<UChar*>(buffer.get()), length).leakRef();
     } else {
-        return OpaqueTiString::create(0, 0).releaseRef();
+        return OpaqueTiString::create(0, 0).leakRef();
     }
 }
 

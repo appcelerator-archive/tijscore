@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,8 +39,7 @@ namespace TI {
     class TiExcState;
     class TiObject;
 
-#define JSC_VALUE_SLOT_MARKER 0
-#define JSC_REGISTER_SLOT_MARKER reinterpret_cast<GetValueFunc>(1)
+#define JSC_VALUE_MARKER 0
 #define INDEX_GETTER_MARKER reinterpret_cast<GetValueFunc>(2)
 #define GETTER_FUNCTION_MARKER reinterpret_cast<GetValueFunc>(3)
 
@@ -74,10 +73,8 @@ namespace TI {
 
         TiValue getValue(TiExcState* exec, const Identifier& propertyName) const
         {
-            if (m_getValue == JSC_VALUE_SLOT_MARKER)
-                return *m_data.valueSlot;
-            if (m_getValue == JSC_REGISTER_SLOT_MARKER)
-                return (*m_data.registerSlot).jsValue();
+            if (m_getValue == JSC_VALUE_MARKER)
+                return m_value;
             if (m_getValue == INDEX_GETTER_MARKER)
                 return m_getIndexValue(exec, slotBase(), index());
             if (m_getValue == GETTER_FUNCTION_MARKER)
@@ -87,10 +84,8 @@ namespace TI {
 
         TiValue getValue(TiExcState* exec, unsigned propertyName) const
         {
-            if (m_getValue == JSC_VALUE_SLOT_MARKER)
-                return *m_data.valueSlot;
-            if (m_getValue == JSC_REGISTER_SLOT_MARKER)
-                return (*m_data.registerSlot).jsValue();
+            if (m_getValue == JSC_VALUE_MARKER)
+                return m_value;
             if (m_getValue == INDEX_GETTER_MARKER)
                 return m_getIndexValue(exec, m_slotBase, m_data.index);
             if (m_getValue == GETTER_FUNCTION_MARKER)
@@ -107,50 +102,32 @@ namespace TI {
             return m_offset;
         }
 
-        void setValueSlot(TiValue* valueSlot) 
+        void setValue(TiValue slotBase, TiValue value)
         {
-            ASSERT(valueSlot);
-            clearBase();
+            ASSERT(value);
             clearOffset();
-            m_getValue = JSC_VALUE_SLOT_MARKER;
-            m_data.valueSlot = valueSlot;
+            m_getValue = JSC_VALUE_MARKER;
+            m_slotBase = slotBase;
+            m_value = value;
         }
         
-        void setValueSlot(TiValue slotBase, TiValue* valueSlot)
+        void setValue(TiValue slotBase, TiValue value, size_t offset)
         {
-            ASSERT(valueSlot);
-            m_getValue = JSC_VALUE_SLOT_MARKER;
+            ASSERT(value);
+            m_getValue = JSC_VALUE_MARKER;
             m_slotBase = slotBase;
-            m_data.valueSlot = valueSlot;
-        }
-        
-        void setValueSlot(TiValue slotBase, TiValue* valueSlot, size_t offset)
-        {
-            ASSERT(valueSlot);
-            m_getValue = JSC_VALUE_SLOT_MARKER;
-            m_slotBase = slotBase;
-            m_data.valueSlot = valueSlot;
+            m_value = value;
             m_offset = offset;
             m_cachedPropertyType = Value;
         }
-        
+
         void setValue(TiValue value)
         {
             ASSERT(value);
             clearBase();
             clearOffset();
-            m_getValue = JSC_VALUE_SLOT_MARKER;
+            m_getValue = JSC_VALUE_MARKER;
             m_value = value;
-            m_data.valueSlot = &m_value;
-        }
-
-        void setRegisterSlot(Register* registerSlot)
-        {
-            ASSERT(registerSlot);
-            clearBase();
-            clearOffset();
-            m_getValue = JSC_REGISTER_SLOT_MARKER;
-            m_data.registerSlot = registerSlot;
         }
 
         void setCustom(TiValue slotBase, GetValueFunc getValue)
@@ -258,8 +235,6 @@ namespace TI {
         TiValue m_slotBase;
         union {
             TiObject* getterFunc;
-            TiValue* valueSlot;
-            Register* registerSlot;
             unsigned index;
         } m_data;
 

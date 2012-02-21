@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -28,27 +28,31 @@
 #ifndef WTF_dtoa_h
 #define WTF_dtoa_h
 
-namespace WTI {
-    class Mutex;
-}
+#include <wtf/unicode/Unicode.h>
 
 namespace WTI {
+class Mutex;
 
-    extern WTI::Mutex* s_dtoaP5Mutex;
+extern WTI::Mutex* s_dtoaP5Mutex;
 
-    double strtod(const char* s00, char** se);
+// s00: input string. Must not be 0 and must be terminated by 0.
+// se: *se will have the last consumed character position + 1.
+double strtod(const char* s00, char** se);
 
-    typedef char DtoaBuffer[80];
-    void dtoa(DtoaBuffer result, double d, int ndigits, int* decpt, int* sign, char** rve);
+typedef char DtoaBuffer[80];
 
-    // dtoa() for ECMA-262 'ToString Applied to the Number Type.'
-    // The *resultLength will have the length of the resultant string in bufer.
-    // The resultant string isn't terminated by 0.
-    void doubleToStringInTiFormat(double, DtoaBuffer, unsigned* resultLength);
+void dtoa(DtoaBuffer result, double dd, bool& sign, int& exponent, unsigned& precision);
+void dtoaRoundSF(DtoaBuffer result, double dd, int ndigits, bool& sign, int& exponent, unsigned& precision);
+void dtoaRoundDP(DtoaBuffer result, double dd, int ndigits, bool& sign, int& exponent, unsigned& precision);
+
+// Size = 80 for sizeof(DtoaBuffer) + some sign bits, decimal point, 'e', exponent digits.
+const unsigned NumberToStringBufferLength = 96;
+typedef UChar NumberToStringBuffer[NumberToStringBufferLength];
+unsigned numberToString(double, NumberToStringBuffer);
 
 } // namespace WTI
 
-using WTI::DtoaBuffer;
-using WTI::doubleToStringInTiFormat;
+using WTI::NumberToStringBuffer;
+using WTI::numberToString;
 
 #endif // WTF_dtoa_h

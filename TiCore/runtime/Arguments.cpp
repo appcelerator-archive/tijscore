@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -42,7 +42,7 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(Arguments);
 
-const ClassInfo Arguments::info = { "Arguments", 0, 0, 0 };
+const ClassInfo Arguments::s_info = { "Arguments", &JSNonFinalObject::s_info, 0, 0 };
 
 Arguments::~Arguments()
 {
@@ -50,22 +50,25 @@ Arguments::~Arguments()
         delete [] d->extraArguments;
 }
 
-void Arguments::markChildren(MarkStack& markStack)
+void Arguments::visitChildren(SlotVisitor& visitor)
 {
-    TiObject::markChildren(markStack);
+    ASSERT_GC_OBJECT_INHERITS(this, &s_info);
+    COMPILE_ASSERT(StructureFlags & OverridesVisitChildren, OverridesVisitChildrenWithoutSettingFlag);
+    ASSERT(structure()->typeInfo().overridesVisitChildren());
+    TiObject::visitChildren(visitor);
 
     if (d->registerArray)
-        markStack.appendValues(reinterpret_cast<TiValue*>(d->registerArray.get()), d->numParameters);
+        visitor.appendValues(d->registerArray.get(), d->numParameters);
 
     if (d->extraArguments) {
         unsigned numExtraArguments = d->numArguments - d->numParameters;
-        markStack.appendValues(reinterpret_cast<TiValue*>(d->extraArguments), numExtraArguments);
+        visitor.appendValues(d->extraArguments, numExtraArguments);
     }
 
-    markStack.append(d->callee);
+    visitor.append(&d->callee);
 
     if (d->activation)
-        markStack.append(d->activation);
+        visitor.append(&d->activation);
 }
 
 void Arguments::copyToRegisters(TiExcState* exec, Register* buffer, uint32_t maxSize)
@@ -81,9 +84,9 @@ void Arguments::copyToRegisters(TiExcState* exec, Register* buffer, uint32_t max
         unsigned parametersLength = min(min(d->numParameters, d->numArguments), maxSize);
         unsigned i = 0;
         for (; i < parametersLength; ++i)
-            buffer[i] = d->registers[d->firstParameterIndex + i].jsValue();
+            buffer[i] = d->registers[d->firstParameterIndex + i].get();
         for (; i < d->numArguments; ++i)
-            buffer[i] = d->extraArguments[i - d->numParameters].jsValue();
+            buffer[i] = d->extraArguments[i - d->numParameters].get();
         return;
     }
     
@@ -91,13 +94,13 @@ void Arguments::copyToRegisters(TiExcState* exec, Register* buffer, uint32_t max
     unsigned i = 0;
     for (; i < parametersLength; ++i) {
         if (!d->deletedArguments[i])
-            buffer[i] = d->registers[d->firstParameterIndex + i].jsValue();
+            buffer[i] = d->registers[d->firstParameterIndex + i].get();
         else
             buffer[i] = get(exec, i);
     }
     for (; i < d->numArguments; ++i) {
         if (!d->deletedArguments[i])
-            buffer[i] = d->extraArguments[i - d->numParameters].jsValue();
+            buffer[i] = d->extraArguments[i - d->numParameters].get();
         else
             buffer[i] = get(exec, i);
     }
@@ -126,9 +129,9 @@ void Arguments::fillArgList(TiExcState* exec, MarkedArgumentBuffer& args)
         unsigned parametersLength = min(d->numParameters, d->numArguments);
         unsigned i = 0;
         for (; i < parametersLength; ++i)
-            args.append(d->registers[d->firstParameterIndex + i].jsValue());
+            args.append(d->registers[d->firstParameterIndex + i].get());
         for (; i < d->numArguments; ++i)
-            args.append(d->extraArguments[i - d->numParameters].jsValue());
+            args.append(d->extraArguments[i - d->numParameters].get());
         return;
     }
 
@@ -136,13 +139,13 @@ void Arguments::fillArgList(TiExcState* exec, MarkedArgumentBuffer& args)
     unsigned i = 0;
     for (; i < parametersLength; ++i) {
         if (!d->deletedArguments[i])
-            args.append(d->registers[d->firstParameterIndex + i].jsValue());
+            args.append(d->registers[d->firstParameterIndex + i].get());
         else
             args.append(get(exec, i));
     }
     for (; i < d->numArguments; ++i) {
         if (!d->deletedArguments[i])
-            args.append(d->extraArguments[i - d->numParameters].jsValue());
+            args.append(d->extraArguments[i - d->numParameters].get());
         else
             args.append(get(exec, i));
     }
@@ -152,36 +155,66 @@ bool Arguments::getOwnPropertySlot(TiExcState* exec, unsigned i, PropertySlot& s
 {
     if (i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
         if (i < d->numParameters) {
-            slot.setRegisterSlot(&d->registers[d->firstParameterIndex + i]);
+            slot.setValue(d->registers[d->firstParameterIndex + i].get());
         } else
-            slot.setValue(d->extraArguments[i - d->numParameters].jsValue());
+            slot.setValue(d->extraArguments[i - d->numParameters].get());
         return true;
     }
 
-    return TiObject::getOwnPropertySlot(exec, Identifier(exec, UString::from(i)), slot);
+    return TiObject::getOwnPropertySlot(exec, Identifier(exec, UString::number(i)), slot);
+}
+    
+void Arguments::createStrictModeCallerIfNecessary(TiExcState* exec)
+{
+    if (d->overrodeCaller)
+        return;
+
+    d->overrodeCaller = true;
+    PropertyDescriptor descriptor;
+    TiValue thrower = createTypeErrorFunction(exec, "Unable to access caller of strict mode function");
+    descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
+    defineOwnProperty(exec, exec->propertyNames().caller, descriptor, false);
+}
+
+void Arguments::createStrictModeCalleeIfNecessary(TiExcState* exec)
+{
+    if (d->overrodeCallee)
+        return;
+    
+    d->overrodeCallee = true;
+    PropertyDescriptor descriptor;
+    TiValue thrower = createTypeErrorFunction(exec, "Unable to access callee of strict mode function");
+    descriptor.setAccessorDescriptor(thrower, thrower, DontEnum | DontDelete | Getter | Setter);
+    defineOwnProperty(exec, exec->propertyNames().callee, descriptor, false);
 }
 
 bool Arguments::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
     bool isArrayIndex;
-    unsigned i = propertyName.toArrayIndex(&isArrayIndex);
+    unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
         if (i < d->numParameters) {
-            slot.setRegisterSlot(&d->registers[d->firstParameterIndex + i]);
+            slot.setValue(d->registers[d->firstParameterIndex + i].get());
         } else
-            slot.setValue(d->extraArguments[i - d->numParameters].jsValue());
+            slot.setValue(d->extraArguments[i - d->numParameters].get());
         return true;
     }
 
     if (propertyName == exec->propertyNames().length && LIKELY(!d->overrodeLength)) {
-        slot.setValue(jsNumber(exec, d->numArguments));
+        slot.setValue(jsNumber(d->numArguments));
         return true;
     }
 
     if (propertyName == exec->propertyNames().callee && LIKELY(!d->overrodeCallee)) {
-        slot.setValue(d->callee);
-        return true;
+        if (!d->isStrictMode) {
+            slot.setValue(d->callee.get());
+            return true;
+        }
+        createStrictModeCalleeIfNecessary(exec);
     }
+
+    if (propertyName == exec->propertyNames().caller && d->isStrictMode)
+        createStrictModeCallerIfNecessary(exec);
 
     return TiObject::getOwnPropertySlot(exec, propertyName, slot);
 }
@@ -189,24 +222,30 @@ bool Arguments::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyN
 bool Arguments::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
     bool isArrayIndex;
-    unsigned i = propertyName.toArrayIndex(&isArrayIndex);
+    unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
         if (i < d->numParameters) {
-            descriptor.setDescriptor(d->registers[d->firstParameterIndex + i].jsValue(), DontEnum);
+            descriptor.setDescriptor(d->registers[d->firstParameterIndex + i].get(), DontEnum);
         } else
-            descriptor.setDescriptor(d->extraArguments[i - d->numParameters].jsValue(), DontEnum);
+            descriptor.setDescriptor(d->extraArguments[i - d->numParameters].get(), DontEnum);
         return true;
     }
     
     if (propertyName == exec->propertyNames().length && LIKELY(!d->overrodeLength)) {
-        descriptor.setDescriptor(jsNumber(exec, d->numArguments), DontEnum);
+        descriptor.setDescriptor(jsNumber(d->numArguments), DontEnum);
         return true;
     }
     
     if (propertyName == exec->propertyNames().callee && LIKELY(!d->overrodeCallee)) {
-        descriptor.setDescriptor(d->callee, DontEnum);
-        return true;
+        if (!d->isStrictMode) {
+            descriptor.setDescriptor(d->callee.get(), DontEnum);
+            return true;
+        }
+        createStrictModeCalleeIfNecessary(exec);
     }
+
+    if (propertyName == exec->propertyNames().caller && d->isStrictMode)
+        createStrictModeCallerIfNecessary(exec);
     
     return TiObject::getOwnPropertyDescriptor(exec, propertyName, descriptor);
 }
@@ -216,7 +255,7 @@ void Arguments::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propert
     if (mode == IncludeDontEnumProperties) {
         for (unsigned i = 0; i < d->numArguments; ++i) {
             if (!d->deletedArguments || !d->deletedArguments[i])
-                propertyNames.add(Identifier(exec, UString::from(i)));
+                propertyNames.add(Identifier(exec, UString::number(i)));
         }
         propertyNames.add(exec->propertyNames().callee);
         propertyNames.add(exec->propertyNames().length);
@@ -224,42 +263,49 @@ void Arguments::getOwnPropertyNames(TiExcState* exec, PropertyNameArray& propert
     TiObject::getOwnPropertyNames(exec, propertyNames, mode);
 }
 
-void Arguments::put(TiExcState* exec, unsigned i, TiValue value, PutPropertySlot& slot)
+void Arguments::put(TiExcState* exec, unsigned i, TiValue value)
 {
     if (i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
         if (i < d->numParameters)
-            d->registers[d->firstParameterIndex + i] = TiValue(value);
+            d->registers[d->firstParameterIndex + i].set(exec->globalData(), d->activation ? static_cast<TiCell*>(d->activation.get()) : static_cast<TiCell*>(this), value);
         else
-            d->extraArguments[i - d->numParameters] = TiValue(value);
+            d->extraArguments[i - d->numParameters].set(exec->globalData(), this, value);
         return;
     }
 
-    TiObject::put(exec, Identifier(exec, UString::from(i)), value, slot);
+    PutPropertySlot slot;
+    TiObject::put(exec, Identifier(exec, UString::number(i)), value, slot);
 }
 
 void Arguments::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
     bool isArrayIndex;
-    unsigned i = propertyName.toArrayIndex(&isArrayIndex);
+    unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < d->numArguments && (!d->deletedArguments || !d->deletedArguments[i])) {
         if (i < d->numParameters)
-            d->registers[d->firstParameterIndex + i] = TiValue(value);
+            d->registers[d->firstParameterIndex + i].set(exec->globalData(), d->activation ? static_cast<TiCell*>(d->activation.get()) : static_cast<TiCell*>(this), value);
         else
-            d->extraArguments[i - d->numParameters] = TiValue(value);
+            d->extraArguments[i - d->numParameters].set(exec->globalData(), this, value);
         return;
     }
 
     if (propertyName == exec->propertyNames().length && !d->overrodeLength) {
         d->overrodeLength = true;
-        putDirect(propertyName, value, DontEnum);
+        putDirect(exec->globalData(), propertyName, value, DontEnum);
         return;
     }
 
     if (propertyName == exec->propertyNames().callee && !d->overrodeCallee) {
-        d->overrodeCallee = true;
-        putDirect(propertyName, value, DontEnum);
-        return;
+        if (!d->isStrictMode) {
+            d->overrodeCallee = true;
+            putDirect(exec->globalData(), propertyName, value, DontEnum);
+            return;
+        }
+        createStrictModeCalleeIfNecessary(exec);
     }
+
+    if (propertyName == exec->propertyNames().caller && d->isStrictMode)
+        createStrictModeCallerIfNecessary(exec);
 
     TiObject::put(exec, propertyName, value, slot);
 }
@@ -268,7 +314,7 @@ bool Arguments::deleteProperty(TiExcState* exec, unsigned i)
 {
     if (i < d->numArguments) {
         if (!d->deletedArguments) {
-            d->deletedArguments.set(new bool[d->numArguments]);
+            d->deletedArguments = adoptArrayPtr(new bool[d->numArguments]);
             memset(d->deletedArguments.get(), 0, sizeof(bool) * d->numArguments);
         }
         if (!d->deletedArguments[i]) {
@@ -277,16 +323,16 @@ bool Arguments::deleteProperty(TiExcState* exec, unsigned i)
         }
     }
 
-    return TiObject::deleteProperty(exec, Identifier(exec, UString::from(i)));
+    return TiObject::deleteProperty(exec, Identifier(exec, UString::number(i)));
 }
 
 bool Arguments::deleteProperty(TiExcState* exec, const Identifier& propertyName) 
 {
     bool isArrayIndex;
-    unsigned i = propertyName.toArrayIndex(&isArrayIndex);
+    unsigned i = propertyName.toArrayIndex(isArrayIndex);
     if (isArrayIndex && i < d->numArguments) {
         if (!d->deletedArguments) {
-            d->deletedArguments.set(new bool[d->numArguments]);
+            d->deletedArguments = adoptArrayPtr(new bool[d->numArguments]);
             memset(d->deletedArguments.get(), 0, sizeof(bool) * d->numArguments);
         }
         if (!d->deletedArguments[i]) {
@@ -301,9 +347,15 @@ bool Arguments::deleteProperty(TiExcState* exec, const Identifier& propertyName)
     }
 
     if (propertyName == exec->propertyNames().callee && !d->overrodeCallee) {
-        d->overrodeCallee = true;
-        return true;
+        if (!d->isStrictMode) {
+            d->overrodeCallee = true;
+            return true;
+        }
+        createStrictModeCalleeIfNecessary(exec);
     }
+    
+    if (propertyName == exec->propertyNames().caller && !d->isStrictMode)
+        createStrictModeCallerIfNecessary(exec);
 
     return TiObject::deleteProperty(exec, propertyName);
 }

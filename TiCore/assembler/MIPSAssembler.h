@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -155,7 +155,7 @@ class MIPSAssembler {
 public:
     typedef MIPSRegisters::RegisterID RegisterID;
     typedef MIPSRegisters::FPRegisterID FPRegisterID;
-    typedef SegmentedVector<int, 64> Jumps;
+    typedef SegmentedVector<AssemblerLabel, 64> Jumps;
 
     MIPSAssembler()
     {
@@ -171,46 +171,6 @@ public:
         OP_SH_FD = 6,
         OP_SH_FS = 11,
         OP_SH_FT = 16
-    };
-
-    class JmpSrc {
-        friend class MIPSAssembler;
-    public:
-        JmpSrc()
-            : m_offset(-1)
-        {
-        }
-
-    private:
-        JmpSrc(int offset)
-            : m_offset(offset)
-        {
-        }
-
-        int m_offset;
-    };
-
-    class JmpDst {
-        friend class MIPSAssembler;
-    public:
-        JmpDst()
-            : m_offset(-1)
-            , m_used(false)
-        {
-        }
-
-        bool isUsed() const { return m_used; }
-        void used() { m_used = true; }
-    private:
-        JmpDst(int offset)
-            : m_offset(offset)
-            , m_used(false)
-        {
-            ASSERT(m_offset == offset);
-        }
-
-        int m_offset : 31;
-        int m_used : 1;
     };
 
     void emitInst(MIPSWord op)
@@ -292,6 +252,11 @@ public:
     void mult(RegisterID rs, RegisterID rt)
     {
         emitInst(0x00000018 | (rs << OP_SH_RS) | (rt << OP_SH_RT));
+    }
+
+    void div(RegisterID rs, RegisterID rt)
+    {
+        emitInst(0x0000001a | (rs << OP_SH_RS) | (rt << OP_SH_RT));
     }
 
     void mfhi(RegisterID rd)
@@ -399,6 +364,18 @@ public:
                  | (rs << OP_SH_RS));
     }
 
+    void srl(RegisterID rd, RegisterID rt, int shamt)
+    {
+        emitInst(0x00000002 | (rd << OP_SH_RD) | (rt << OP_SH_RT)
+                 | ((shamt & 0x1f) << OP_SH_SHAMT));
+    }
+
+    void srlv(RegisterID rd, RegisterID rt, RegisterID rs)
+    {
+        emitInst(0x00000006 | (rd << OP_SH_RD) | (rt << OP_SH_RT)
+                 | (rs << OP_SH_RS));
+    }
+
     void lbu(RegisterID rt, RegisterID rs, int offset)
     {
         emitInst(0x90000000 | (rt << OP_SH_RT) | (rs << OP_SH_RS)
@@ -491,14 +468,9 @@ public:
         emitInst(0x45000000);
     }
 
-    JmpSrc newJmpSrc()
-    {
-        return JmpSrc(m_buffer.size());
-    }
-
     void appendJump()
     {
-        m_jumps.append(m_buffer.size());
+        m_jumps.append(m_buffer.label());
     }
 
     void addd(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
@@ -516,6 +488,12 @@ public:
     void muld(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
     {
         emitInst(0x46200002 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
+                 | (ft << OP_SH_FT));
+    }
+
+    void divd(FPRegisterID fd, FPRegisterID fs, FPRegisterID ft)
+    {
+        emitInst(0x46200003 | (fd << OP_SH_FD) | (fs << OP_SH_FS)
                  | (ft << OP_SH_FT));
     }
 
@@ -550,10 +528,21 @@ public:
         copDelayNop();
     }
 
+    void mthc1(RegisterID rt, FPRegisterID fs)
+    {
+        emitInst(0x44e00000 | (fs << OP_SH_FS) | (rt << OP_SH_RT));
+        copDelayNop();
+    }
+
     void mfc1(RegisterID rt, FPRegisterID fs)
     {
         emitInst(0x44000000 | (fs << OP_SH_FS) | (rt << OP_SH_RT));
         copDelayNop();
+    }
+
+    void sqrtd(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46200004 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
     void truncwd(FPRegisterID fd, FPRegisterID fs)
@@ -564,6 +553,11 @@ public:
     void cvtdw(FPRegisterID fd, FPRegisterID fs)
     {
         emitInst(0x46800021 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
+    }
+
+    void cvtwd(FPRegisterID fd, FPRegisterID fs)
+    {
+        emitInst(0x46200024 | (fd << OP_SH_FD) | (fs << OP_SH_FS));
     }
 
     void ceqd(FPRegisterID fs, FPRegisterID ft)
@@ -628,12 +622,12 @@ public:
 
     // General helpers
 
-    JmpDst label()
+    AssemblerLabel label()
     {
-        return JmpDst(m_buffer.size());
+        return m_buffer.label();
     }
 
-    JmpDst align(int alignment)
+    AssemblerLabel align(int alignment)
     {
         while (!m_buffer.isAligned(alignment))
             bkpt();
@@ -641,44 +635,26 @@ public:
         return label();
     }
 
-    static void* getRelocatedAddress(void* code, JmpSrc jump)
+    static void* getRelocatedAddress(void* code, AssemblerLabel label)
     {
-        ASSERT(jump.m_offset != -1);
-        void* b = reinterpret_cast<void*>((reinterpret_cast<intptr_t>(code)) + jump.m_offset);
-        return b;
+        return reinterpret_cast<void*>(reinterpret_cast<char*>(code) + label.m_offset);
     }
 
-    static void* getRelocatedAddress(void* code, JmpDst label)
+    static int getDifferenceBetweenLabels(AssemblerLabel a, AssemblerLabel b)
     {
-        void* b = reinterpret_cast<void*>((reinterpret_cast<intptr_t>(code)) + label.m_offset);
-        return b;
-    }
-
-    static int getDifferenceBetweenLabels(JmpDst from, JmpDst to)
-    {
-        return to.m_offset - from.m_offset;
-    }
-
-    static int getDifferenceBetweenLabels(JmpDst from, JmpSrc to)
-    {
-        return to.m_offset - from.m_offset;
-    }
-
-    static int getDifferenceBetweenLabels(JmpSrc from, JmpDst to)
-    {
-        return to.m_offset - from.m_offset;
+        return b.m_offset - a.m_offset;
     }
 
     // Assembler admin methods:
 
-    size_t size() const
+    size_t codeSize() const
     {
-        return m_buffer.size();
+        return m_buffer.codeSize();
     }
 
-    void* executableCopy(ExecutablePool* allocator)
+    void* executableCopy(TiGlobalData& globalData, ExecutablePool* allocator)
     {
-        void *result = m_buffer.executableCopy(allocator);
+        void *result = m_buffer.executableCopy(globalData, allocator);
         if (!result)
             return 0;
 
@@ -686,7 +662,11 @@ public:
         return result;
     }
 
-    static unsigned getCallReturnOffset(JmpSrc call)
+#ifndef NDEBUG
+    unsigned debugOffset() { return m_buffer.debugOffset(); }
+#endif
+
+    static unsigned getCallReturnOffset(AssemblerLabel call)
     {
         // The return address is after a call and a delay slot instruction
         return call.m_offset;
@@ -700,10 +680,10 @@ public:
     // writable region of memory; to modify the code in an execute-only execuable
     // pool the 'repatch' and 'relink' methods should be used.
 
-    void linkJump(JmpSrc from, JmpDst to)
+    void linkJump(AssemblerLabel from, AssemblerLabel to)
     {
-        ASSERT(to.m_offset != -1);
-        ASSERT(from.m_offset != -1);
+        ASSERT(to.isSet());
+        ASSERT(from.isSet());
         MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(m_buffer.data()) + from.m_offset);
         MIPSWord* toPos = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(m_buffer.data()) + to.m_offset);
 
@@ -712,9 +692,9 @@ public:
         linkWithOffset(insn, toPos);
     }
 
-    static void linkJump(void* code, JmpSrc from, void* to)
+    static void linkJump(void* code, AssemblerLabel from, void* to)
     {
-        ASSERT(from.m_offset != -1);
+        ASSERT(from.isSet());
         MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(code) + from.m_offset);
 
         ASSERT(!(*(insn - 1)) && !(*(insn - 2)) && !(*(insn - 3)) && !(*(insn - 5)));
@@ -722,13 +702,13 @@ public:
         linkWithOffset(insn, to);
     }
 
-    static void linkCall(void* code, JmpSrc from, void* to)
+    static void linkCall(void* code, AssemblerLabel from, void* to)
     {
         MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(code) + from.m_offset);
         linkCallInternal(insn, to);
     }
 
-    static void linkPointer(void* code, JmpDst from, void* to)
+    static void linkPointer(void* code, AssemblerLabel from, void* to)
     {
         MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(code) + from.m_offset);
         ASSERT((*insn & 0xffe00000) == 0x3c000000); // lui
@@ -773,34 +753,42 @@ public:
         ExecutableAllocator::cacheFlush(insn, 2 * sizeof(MIPSWord));
     }
 
+    static int32_t readInt32(void* from)
+    {
+        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
+        ASSERT((*insn & 0xffe00000) == 0x3c000000); // lui
+        int32_t result = (*insn & 0x0000ffff) << 16;
+        insn++;
+        ASSERT((*insn & 0xfc000000) == 0x34000000); // ori
+        result |= *insn & 0x0000ffff
+    }
+    
+    static void repatchCompact(void* where, int32_t value)
+    {
+        repatchInt32(where, value);
+    }
+
     static void repatchPointer(void* from, void* to)
     {
         repatchInt32(from, reinterpret_cast<int32_t>(to));
     }
 
-    static void repatchLoadPtrToLEA(void* from)
+    static void* readPointer(void* from)
     {
-        MIPSWord* insn = reinterpret_cast<MIPSWord*>(from);
-        insn = insn + 3;
-        ASSERT((*insn & 0xfc000000) == 0x8c000000); // lw
-        /* lw -> addiu */
-        *insn = 0x24000000 | (*insn & 0x03ffffff);
-
-        ExecutableAllocator::cacheFlush(insn, sizeof(MIPSWord));
+        return static_cast<void*>(readInt32(from));
     }
 
 private:
-
     /* Update each jump in the buffer of newBase.  */
     void relocateJumps(void* oldBase, void* newBase)
     {
         // Check each jump
         for (Jumps::Iterator iter = m_jumps.begin(); iter != m_jumps.end(); ++iter) {
-            int pos = *iter;
+            int pos = iter->m_offset;
             MIPSWord* insn = reinterpret_cast<MIPSWord*>(reinterpret_cast<intptr_t>(newBase) + pos);
             insn = insn + 2;
             // Need to make sure we have 5 valid instructions after pos
-            if ((unsigned int)pos >= m_buffer.size() - 5 * sizeof(MIPSWord))
+            if ((unsigned int)pos >= m_buffer.codeSize() - 5 * sizeof(MIPSWord))
                 continue;
 
             if ((*insn & 0xfc000000) == 0x08000000) { // j

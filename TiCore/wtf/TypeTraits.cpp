@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
  /*
@@ -53,6 +53,11 @@ COMPILE_ASSERT(!IsInteger<const char*>::value, WTF_IsInteger_const_char_pointer_
 COMPILE_ASSERT(!IsInteger<volatile char*>::value, WTF_IsInteger_volatile_char_pointer_false);
 COMPILE_ASSERT(!IsInteger<double>::value, WTF_IsInteger_double_false);
 COMPILE_ASSERT(!IsInteger<float>::value, WTF_IsInteger_float_false);
+
+COMPILE_ASSERT(IsFloatingPoint<float>::value, WTF_IsFloatingPoint_float_true);
+COMPILE_ASSERT(IsFloatingPoint<double>::value, WTF_IsFloatingPoint_double_true);
+COMPILE_ASSERT(IsFloatingPoint<long double>::value, WTF_IsFloatingPoint_long_double_true);
+COMPILE_ASSERT(!IsFloatingPoint<int>::value, WTF_IsFloatingPoint_int_false);
 
 COMPILE_ASSERT(IsPod<bool>::value, WTF_IsPod_bool_true);
 COMPILE_ASSERT(IsPod<char>::value, WTF_IsPod_char_true);
@@ -137,5 +142,8 @@ COMPILE_ASSERT((IsSameType<bool, RemoveConstVolatile<const volatile bool>::Type>
 COMPILE_ASSERT((IsSameType<int, RemovePointer<int>::Type>::value), WTF_Test_RemovePointer_int);
 COMPILE_ASSERT((IsSameType<int, RemovePointer<int*>::Type>::value), WTF_Test_RemovePointer_int_pointer);
 COMPILE_ASSERT((!IsSameType<int, RemovePointer<int**>::Type>::value), WTF_Test_RemovePointer_int_pointer_pointer);
+
+COMPILE_ASSERT((IsSameType<int, RemoveReference<int>::Type>::value), WTF_Test_RemoveReference_int);
+COMPILE_ASSERT((IsSameType<int, RemoveReference<int&>::Type>::value), WTF_Test_RemoveReference_int_reference);
 
 } // namespace WTI

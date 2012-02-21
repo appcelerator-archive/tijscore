@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -41,6 +41,7 @@
 
 #include <wtf/Assertions.h>
 #include <wtf/PassOwnPtr.h>
+#include <wtf/RefPtr.h>
 
 namespace WTI {
 
@@ -56,8 +57,21 @@ static inline PassOwnPtr<T> createInstance(AEECLSID cls)
     return instance;
 }
 
+template <typename T>
+static inline RefPtr<T> createRefPtrInstance(AEECLSID cls)
+{
+    T* instance = 0;
+
+    IShell* shell = reinterpret_cast<AEEApplet*>(GETAPPINSTANCE())->m_pIShell;
+    ISHELL_CreateInstance(shell, cls, reinterpret_cast<void**>(&instance));
+    ASSERT(instance);
+
+    return adoptRef(instance);
+}
+
 } // namespace WTI
 
 using WTI::createInstance;
+using WTI::createRefPtrInstance;
 
 #endif // ShellBrew_h

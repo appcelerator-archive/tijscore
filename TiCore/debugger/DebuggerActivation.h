@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -39,11 +39,11 @@ namespace TI {
 
     class JSActivation;
 
-    class DebuggerActivation : public TiObject {
+    class DebuggerActivation : public JSNonFinalObject {
     public:
-        DebuggerActivation(TiObject*);
+        DebuggerActivation(TiGlobalData&, TiObject*);
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
         virtual UString className() const;
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
@@ -56,16 +56,16 @@ namespace TI {
         virtual TiValue lookupGetter(TiExcState*, const Identifier& propertyName);
         virtual TiValue lookupSetter(TiExcState*, const Identifier& propertyName);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype) 
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype) 
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount); 
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info); 
         }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | TiObject::StructureFlags;
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesVisitChildren | TiObject::StructureFlags;
 
     private:
-        JSActivation* m_activation;
+        WriteBarrier<JSActivation> m_activation;
     };
 
 } // namespace TI

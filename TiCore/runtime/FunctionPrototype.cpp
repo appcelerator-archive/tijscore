@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,34 +35,33 @@
 #include "TiStringBuilder.h"
 #include "Interpreter.h"
 #include "Lexer.h"
-#include "PrototypeFunction.h"
 
 namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(FunctionPrototype);
 
-static TiValue JSC_HOST_CALL functionProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionProtoFuncApply(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL functionProtoFuncCall(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL functionProtoFuncToString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionProtoFuncApply(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL functionProtoFuncCall(TiExcState*);
 
-FunctionPrototype::FunctionPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> structure)
-    : InternalFunction(&exec->globalData(), structure, exec->propertyNames().nullIdentifier)
+FunctionPrototype::FunctionPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* structure)
+    : InternalFunction(&exec->globalData(), globalObject, structure, exec->propertyNames().nullIdentifier)
 {
-    putDirectWithoutTransition(exec->propertyNames().length, jsNumber(exec, 0), DontDelete | ReadOnly | DontEnum);
+    putDirectWithoutTransition(exec->globalData(), exec->propertyNames().length, jsNumber(0), DontDelete | ReadOnly | DontEnum);
 }
 
-void FunctionPrototype::addFunctionProperties(TiExcState* exec, Structure* prototypeFunctionStructure, NativeFunctionWrapper** callFunction, NativeFunctionWrapper** applyFunction)
+void FunctionPrototype::addFunctionProperties(TiExcState* exec, TiGlobalObject* globalObject, Structure* functionStructure, TiFunction** callFunction, TiFunction** applyFunction)
 {
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toString, functionProtoFuncToString), DontEnum);
-    *applyFunction = new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().apply, functionProtoFuncApply);
+    putDirectFunctionWithoutTransition(exec, new (exec) TiFunction(exec, globalObject, functionStructure, 0, exec->propertyNames().toString, functionProtoFuncToString), DontEnum);
+    *applyFunction = new (exec) TiFunction(exec, globalObject, functionStructure, 2, exec->propertyNames().apply, functionProtoFuncApply);
     putDirectFunctionWithoutTransition(exec, *applyFunction, DontEnum);
-    *callFunction = new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().call, functionProtoFuncCall);
+    *callFunction = new (exec) TiFunction(exec, globalObject, functionStructure, 1, exec->propertyNames().call, functionProtoFuncCall);
     putDirectFunctionWithoutTransition(exec, *callFunction, DontEnum);
 }
 
-static TiValue JSC_HOST_CALL callFunctionPrototype(TiExcState*, TiObject*, TiValue, const ArgList&)
+static EncodedTiValue JSC_HOST_CALL callFunctionPrototype(TiExcState*)
 {
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
 // ECMA 15.3.4
@@ -78,76 +77,80 @@ CallType FunctionPrototype::getCallData(CallData& callData)
 static inline void insertSemicolonIfNeeded(UString& functionBody)
 {
     ASSERT(functionBody[0] == '{');
-    ASSERT(functionBody[functionBody.size() - 1] == '}');
+    ASSERT(functionBody[functionBody.length() - 1] == '}');
 
-    for (size_t i = functionBody.size() - 2; i > 0; --i) {
+    for (size_t i = functionBody.length() - 2; i > 0; --i) {
         UChar ch = functionBody[i];
         if (!Lexer::isWhiteSpace(ch) && !Lexer::isLineTerminator(ch)) {
             if (ch != ';' && ch != '}')
-                functionBody = makeString(functionBody.substr(0, i + 1), ";", functionBody.substr(i + 1, functionBody.size() - (i + 1)));
+                functionBody = makeUString(functionBody.substringSharingImpl(0, i + 1), ";", functionBody.substringSharingImpl(i + 1, functionBody.length() - (i + 1)));
             return;
         }
     }
 }
 
-TiValue JSC_HOST_CALL functionProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL functionProtoFuncToString(TiExcState* exec)
 {
-    if (thisValue.inherits(&TiFunction::info)) {
+    TiValue thisValue = exec->hostThisValue();
+    if (thisValue.inherits(&TiFunction::s_info)) {
         TiFunction* function = asFunction(thisValue);
-        if (!function->isHostFunction()) {
-            FunctionExecutable* executable = function->jsExecutable();
-            UString sourceString = executable->source().toString();
-            insertSemicolonIfNeeded(sourceString);
-            return jsMakeNontrivialString(exec, "function ", function->name(exec), "(", executable->paramString(), ") ", sourceString);
-        }
+        if (function->isHostFunction())
+            return TiValue::encode(jsMakeNontrivialString(exec, "function ", function->name(exec), "() {\n    [native code]\n}"));
+        FunctionExecutable* executable = function->jsExecutable();
+        UString sourceString = executable->source().toString();
+        insertSemicolonIfNeeded(sourceString);
+        return TiValue::encode(jsMakeNontrivialString(exec, "function ", function->name(exec), "(", executable->paramString(), ") ", sourceString));
     }
 
-    if (thisValue.inherits(&InternalFunction::info)) {
+    if (thisValue.inherits(&InternalFunction::s_info)) {
         InternalFunction* function = asInternalFunction(thisValue);
-        return jsMakeNontrivialString(exec, "function ", function->name(exec), "() {\n    [native code]\n}");
+        return TiValue::encode(jsMakeNontrivialString(exec, "function ", function->name(exec), "() {\n    [native code]\n}"));
     }
 
-    return throwError(exec, TypeError);
+    return throwVMTypeError(exec);
 }
 
-TiValue JSC_HOST_CALL functionProtoFuncApply(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionProtoFuncApply(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     CallData callData;
-    CallType callType = thisValue.getCallData(callData);
+    CallType callType = getCallData(thisValue, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    TiValue array = args.at(1);
+    TiValue array = exec->argument(1);
 
     MarkedArgumentBuffer applyArgs;
     if (!array.isUndefinedOrNull()) {
         if (!array.isObject())
-            return throwError(exec, TypeError);
-        if (asObject(array)->classInfo() == &Arguments::info)
+            return throwVMTypeError(exec);
+        if (asObject(array)->classInfo() == &Arguments::s_info)
             asArguments(array)->fillArgList(exec, applyArgs);
         else if (isTiArray(&exec->globalData(), array))
             asArray(array)->fillArgList(exec, applyArgs);
-        else if (asObject(array)->inherits(&TiArray::info)) {
+        else if (asObject(array)->inherits(&TiArray::s_info)) {
             unsigned length = asArray(array)->get(exec, exec->propertyNames().length).toUInt32(exec);
             for (unsigned i = 0; i < length; ++i)
                 applyArgs.append(asArray(array)->get(exec, i));
         } else
-            return throwError(exec, TypeError);
+            return throwVMTypeError(exec);
     }
 
-    return call(exec, thisValue, callType, callData, args.at(0), applyArgs);
+    return TiValue::encode(call(exec, thisValue, callType, callData, exec->argument(0), applyArgs));
 }
 
-TiValue JSC_HOST_CALL functionProtoFuncCall(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL functionProtoFuncCall(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     CallData callData;
-    CallType callType = thisValue.getCallData(callData);
+    CallType callType = getCallData(thisValue, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
+    ArgList args(exec);
     ArgList callArgs;
     args.getSlice(1, callArgs);
-    return call(exec, thisValue, callType, callData, args.at(0), callArgs);
+    return TiValue::encode(call(exec, thisValue, callType, callData, exec->argument(0), callArgs));
 }
 
 } // namespace TI

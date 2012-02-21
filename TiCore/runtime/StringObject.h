@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,10 +35,10 @@ namespace TI {
 
     class StringObject : public JSWrapperObject {
     public:
-        StringObject(TiExcState*, NonNullPassRefPtr<Structure>);
-        StringObject(TiExcState*, NonNullPassRefPtr<Structure>, const UString&);
+        StringObject(TiExcState*, Structure*);
+        StringObject(TiExcState*, Structure*, const UString&);
 
-        static StringObject* create(TiExcState*, TiString*);
+        static StringObject* create(TiExcState*, TiGlobalObject*, TiString*);
 
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, unsigned propertyName, PropertySlot&);
@@ -48,26 +48,25 @@ namespace TI {
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
         virtual void getOwnPropertyNames(TiExcState*, PropertyNameArray&, EnumerationMode mode = ExcludeDontEnumProperties);
 
-        virtual const ClassInfo* classInfo() const { return &info; }
-        static const JS_EXPORTDATA ClassInfo info;
+        static const JS_EXPORTDATA ClassInfo s_info;
 
         TiString* internalValue() const { return asString(JSWrapperObject::internalValue());}
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
     protected:
-        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesMarkChildren | OverridesGetPropertyNames | JSWrapperObject::StructureFlags;
-        StringObject(NonNullPassRefPtr<Structure>, TiString*);
-  };
+        static const unsigned StructureFlags = OverridesGetOwnPropertySlot | OverridesGetPropertyNames | JSWrapperObject::StructureFlags;
+        StringObject(TiGlobalData&, Structure*, TiString*);
+    };
 
     StringObject* asStringObject(TiValue);
 
     inline StringObject* asStringObject(TiValue value)
     {
-        ASSERT(asObject(value)->inherits(&StringObject::info));
+        ASSERT(asObject(value)->inherits(&StringObject::s_info));
         return static_cast<StringObject*>(asObject(value));
     }
 

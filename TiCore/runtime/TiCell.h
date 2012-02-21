@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -30,20 +30,42 @@
 #ifndef TiCell_h
 #define TiCell_h
 
-#include "Collector.h"
-#include "JSImmediate.h"
-#include "TiValue.h"
+#include "CallData.h"
+#include "CallFrame.h"
+#include "ConstructData.h"
+#include "Heap.h"
+#include "TiLock.h"
+#include "TiValueInlineMethods.h"
 #include "MarkStack.h"
-#include "Structure.h"
+#include "WriteBarrier.h"
 #include <wtf/Noncopyable.h>
 
 namespace TI {
 
-    class TiCell : public NoncopyableCustomAllocated {
+    class TiGlobalObject;
+    class Structure;
+
+#if COMPILER(MSVC)
+    // If WTF_MAKE_NONCOPYABLE is applied to TiCell we end up with a bunch of
+    // undefined references to the TiCell copy constructor and assignment operator
+    // when linking TiCore.
+    class MSVCBugWorkaround {
+        WTF_MAKE_NONCOPYABLE(MSVCBugWorkaround);
+
+    protected:
+        MSVCBugWorkaround() { }
+        ~MSVCBugWorkaround() { }
+    };
+
+    class TiCell : MSVCBugWorkaround {
+#else
+    class TiCell {
+        WTF_MAKE_NONCOPYABLE(TiCell);
+#endif
+
+        friend class ExecutableBase;
         friend class GetterSetter;
         friend class Heap;
-        friend class JIT;
-        friend class JSNumberCell;
         friend class TiObject;
         friend class TiPropertyNameIterator;
         friend class TiString;
@@ -51,21 +73,28 @@ namespace TI {
         friend class TiAPIValueWrapper;
         friend class JSZombie;
         friend class TiGlobalData;
+        friend class MarkedSpace;
+        friend class MarkedBlock;
+        friend class ScopeChainNode;
+        friend class Structure;
+        friend class StructureChain;
+        friend class RegExp;
+        enum CreatingEarlyCellTag { CreatingEarlyCell };
+
+    protected:
+        enum VPtrStealingHackType { VPtrStealingHack };
 
     private:
-        explicit TiCell(Structure*);
+        explicit TiCell(VPtrStealingHackType) { }
+        TiCell(TiGlobalData&, Structure*);
+        TiCell(TiGlobalData&, Structure*, CreatingEarlyCellTag);
         virtual ~TiCell();
+        static const ClassInfo s_dummyCellInfo;
 
     public:
-        static PassRefPtr<Structure> createDummyStructure()
-        {
-            return Structure::create(jsNull(), TypeInfo(UnspecifiedType), AnonymousSlotCount);
-        }
+        static Structure* createDummyStructure(TiGlobalData&);
 
         // Querying the type.
-#if USE(JSVALUE32)
-        bool isNumber() const;
-#endif
         bool isString() const;
         bool isObject() const;
         virtual bool isGetterSetter() const;
@@ -94,20 +123,20 @@ namespace TI {
         virtual bool toBoolean(TiExcState*) const;
         virtual double toNumber(TiExcState*) const;
         virtual UString toString(TiExcState*) const;
-        virtual TiObject* toObject(TiExcState*) const;
+        virtual TiObject* toObject(TiExcState*, TiGlobalObject*) const;
 
         // Garbage collection.
         void* operator new(size_t, TiExcState*);
         void* operator new(size_t, TiGlobalData*);
         void* operator new(size_t, void* placementNewDestination) { return placementNewDestination; }
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 #if ENABLE(JSC_ZOMBIES)
         virtual bool isZombie() const { return false; }
 #endif
 
         // Object operations, with the toObject operation included.
-        virtual const ClassInfo* classInfo() const;
+        const ClassInfo* classInfo() const;
         virtual void put(TiExcState*, const Identifier& propertyName, TiValue, PutPropertySlot&);
         virtual void put(TiExcState*, unsigned propertyName, TiValue);
         virtual bool deleteProperty(TiExcState*, const Identifier& propertyName);
@@ -124,6 +153,15 @@ namespace TI {
         // property names, we want a similar interface with appropriate optimizations.)
         bool fastGetOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
 
+        static ptrdiff_t structureOffset()
+        {
+            return OBJECT_OFFSETOF(TiCell, m_structure);
+        }
+
+#if ENABLE(GC_VALIDATION)
+        Structure* unvalidatedStructure() { return m_structure.unvalidatedGet(); }
+#endif
+        
     protected:
         static const unsigned AnonymousSlotCount = 0;
 
@@ -132,52 +170,40 @@ namespace TI {
         virtual bool getOwnPropertySlot(TiExcState*, const Identifier& propertyName, PropertySlot&);
         virtual bool getOwnPropertySlot(TiExcState*, unsigned propertyName, PropertySlot&);
         
-        Structure* m_structure;
+        WriteBarrier<Structure> m_structure;
     };
 
-    inline TiCell::TiCell(Structure* structure)
-        : m_structure(structure)
+    inline TiCell::TiCell(TiGlobalData& globalData, Structure* structure)
+        : m_structure(globalData, this, structure)
     {
+        ASSERT(m_structure);
+    }
+
+    inline TiCell::TiCell(TiGlobalData& globalData, Structure* structure, CreatingEarlyCellTag)
+    {
+#if ENABLE(GC_VALIDATION)
+        if (structure)
+#endif
+            m_structure.setEarlyValue(globalData, this, structure);
+        // Very first set of allocations won't have a real structure.
+        ASSERT(m_structure || !globalData.dummyMarkableCellStructure);
     }
 
     inline TiCell::~TiCell()
     {
-    }
-
-#if USE(JSVALUE32)
-    inline bool TiCell::isNumber() const
-    {
-        return m_structure->typeInfo().type() == NumberType;
-    }
+#if ENABLE(GC_VALIDATION)
+        m_structure.clear();
 #endif
-
-    inline bool TiCell::isObject() const
-    {
-        return m_structure->typeInfo().type() == ObjectType;
-    }
-
-    inline bool TiCell::isString() const
-    {
-        return m_structure->typeInfo().type() == StringType;
     }
 
     inline Structure* TiCell::structure() const
     {
-        return m_structure;
+        return m_structure.get();
     }
 
-    inline void TiCell::markChildren(MarkStack&)
+    inline void TiCell::visitChildren(SlotVisitor& visitor)
     {
-    }
-
-    inline void* TiCell::operator new(size_t size, TiGlobalData* globalData)
-    {
-        return globalData->heap.allocate(size);
-    }
-
-    inline void* TiCell::operator new(size_t size, TiExcState* exec)
-    {
-        return exec->heap()->allocate(size);
+        visitor.append(&m_structure);
     }
 
     // --- TiValue inlines ----------------------------
@@ -207,19 +233,28 @@ namespace TI {
         return isCell() ? asCell()->getString(exec) : UString();
     }
 
+    template <typename Base> UString HandleConverter<Base, Unknown>::getString(TiExcState* exec) const
+    {
+        return jsValue().getString(exec);
+    }
+
     inline TiObject* TiValue::getObject() const
     {
         return isCell() ? asCell()->getObject() : 0;
     }
 
-    inline CallType TiValue::getCallData(CallData& callData)
+    inline CallType getCallData(TiValue value, CallData& callData)
     {
-        return isCell() ? asCell()->getCallData(callData) : CallTypeNone;
+        CallType result = value.isCell() ? value.asCell()->getCallData(callData) : CallTypeNone;
+        ASSERT(result == CallTypeNone || value.isValidCallee());
+        return result;
     }
 
-    inline ConstructType TiValue::getConstructData(ConstructData& constructData)
+    inline ConstructType getConstructData(TiValue value, ConstructData& constructData)
     {
-        return isCell() ? asCell()->getConstructData(constructData) : ConstructTypeNone;
+        ConstructType result = value.isCell() ? value.asCell()->getConstructData(constructData) : ConstructTypeNone;
+        ASSERT(result == ConstructTypeNone || value.isValidCallee());
+        return result;
     }
 
     ALWAYS_INLINE bool TiValue::getUInt32(uint32_t& v) const
@@ -236,14 +271,6 @@ namespace TI {
         }
         return false;
     }
-
-#if !USE(JSVALUE32_64)
-    ALWAYS_INLINE TiCell* TiValue::asCell() const
-    {
-        ASSERT(isCell());
-        return m_ptr;
-    }
-#endif // !USE(JSVALUE32_64)
 
     inline TiValue TiValue::toPrimitive(TiExcState* exec, PreferredPrimitiveType preferredType) const
     {
@@ -304,13 +331,6 @@ namespace TI {
         return isUndefined() ? nonInlineNaN() : 0; // null and false both convert to 0.
     }
 
-    inline bool TiValue::needsThisConversion() const
-    {
-        if (UNLIKELY(!isCell()))
-            return true;
-        return asCell()->structure()->typeInfo().needsThisConversion();
-    }
-
     inline TiValue TiValue::getJSNumber()
     {
         if (isInt32() || isDouble())
@@ -322,30 +342,17 @@ namespace TI {
 
     inline TiObject* TiValue::toObject(TiExcState* exec) const
     {
-        return isCell() ? asCell()->toObject(exec) : toObjectSlowCase(exec);
+        return isCell() ? asCell()->toObject(exec, exec->lexicalGlobalObject()) : toObjectSlowCase(exec, exec->lexicalGlobalObject());
+    }
+
+    inline TiObject* TiValue::toObject(TiExcState* exec, TiGlobalObject* globalObject) const
+    {
+        return isCell() ? asCell()->toObject(exec, globalObject) : toObjectSlowCase(exec, globalObject);
     }
 
     inline TiObject* TiValue::toThisObject(TiExcState* exec) const
     {
         return isCell() ? asCell()->toThisObject(exec) : toThisObjectSlowCase(exec);
-    }
-
-    ALWAYS_INLINE void MarkStack::append(TiCell* cell)
-    {
-        ASSERT(!m_isCheckingForDefaultMarkViolation);
-        ASSERT(cell);
-        if (Heap::isCellMarked(cell))
-            return;
-        Heap::markCell(cell);
-        if (cell->structure()->typeInfo().type() >= CompoundType)
-            m_values.append(cell);
-    }
-
-    ALWAYS_INLINE void MarkStack::append(TiValue value)
-    {
-        ASSERT(value);
-        if (value.isCell())
-            append(value.asCell());
     }
 
     inline Heap* Heap::heap(TiValue v)
@@ -357,15 +364,76 @@ namespace TI {
 
     inline Heap* Heap::heap(TiCell* c)
     {
-        return cellBlock(c)->heap;
+        return MarkedSpace::heap(c);
     }
     
 #if ENABLE(JSC_ZOMBIES)
     inline bool TiValue::isZombie() const
     {
-        return isCell() && asCell() && asCell()->isZombie();
+        return isCell() && asCell() > (TiCell*)0x1ffffffffL && asCell()->isZombie();
     }
 #endif
+
+    inline void* MarkedBlock::allocate()
+    {
+        while (m_nextAtom < m_endAtom) {
+            if (!m_marks.testAndSet(m_nextAtom)) {
+                TiCell* cell = reinterpret_cast<TiCell*>(&atoms()[m_nextAtom]);
+                m_nextAtom += m_atomsPerCell;
+                cell->~TiCell();
+                return cell;
+            }
+            m_nextAtom += m_atomsPerCell;
+        }
+
+        return 0;
+    }
+    
+    inline MarkedSpace::SizeClass& MarkedSpace::sizeClassFor(size_t bytes)
+    {
+        ASSERT(bytes && bytes < maxCellSize);
+        if (bytes < preciseCutoff)
+            return m_preciseSizeClasses[(bytes - 1) / preciseStep];
+        return m_impreciseSizeClasses[(bytes - 1) / impreciseStep];
+    }
+
+    inline void* MarkedSpace::allocate(size_t bytes)
+    {
+        SizeClass& sizeClass = sizeClassFor(bytes);
+        return allocateFromSizeClass(sizeClass);
+    }
+    
+    inline void* Heap::allocate(size_t bytes)
+    {
+        ASSERT(globalData()->identifierTable == wtfThreadData().currentIdentifierTable());
+        ASSERT(TiLock::lockCount() > 0);
+        ASSERT(TiLock::currentThreadIsHoldingLock());
+        ASSERT(bytes <= MarkedSpace::maxCellSize);
+        ASSERT(m_operationInProgress == NoOperation);
+
+        m_operationInProgress = Allocation;
+        void* result = m_markedSpace.allocate(bytes);
+        m_operationInProgress = NoOperation;
+        if (result)
+            return result;
+
+        return allocateSlowCase(bytes);
+    }
+
+    inline void* TiCell::operator new(size_t size, TiGlobalData* globalData)
+    {
+        TiCell* result = static_cast<TiCell*>(globalData->heap.allocate(size));
+        result->m_structure.clear();
+        return result;
+    }
+
+    inline void* TiCell::operator new(size_t size, TiExcState* exec)
+    {
+        TiCell* result = static_cast<TiCell*>(exec->heap()->allocate(size));
+        result->m_structure.clear();
+        return result;
+    }
+
 } // namespace TI
 
 #endif // TiCell_h

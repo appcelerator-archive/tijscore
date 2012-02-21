@@ -2,12 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2008 Apple Inc. All rights reserved.
+ *  Copyright (C) 2008, 2011 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Lesser General Public
@@ -32,47 +32,59 @@
 #include "TiFunction.h"
 #include "TiString.h"
 #include "TiStringBuilder.h"
-#include "PrototypeFunction.h"
 
 namespace TI {
 
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncValueOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncHasOwnProperty(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncIsPrototypeOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncDefineGetter(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncDefineSetter(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncLookupGetter(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncLookupSetter(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL objectProtoFuncToLocaleString(TiExcState*);
+
+}
+
+#include "ObjectPrototype.lut.h"
+
+namespace TI {
+
+const ClassInfo ObjectPrototype::s_info = { "Object", &JSNonFinalObject::s_info, 0, TiExcState::objectPrototypeTable };
+
+/* Source for ObjectPrototype.lut.h
+@begin objectPrototypeTable
+  toString              objectProtoFuncToString                 DontEnum|Function 0
+  toLocaleString        objectProtoFuncToLocaleString           DontEnum|Function 0
+  valueOf               objectProtoFuncValueOf                  DontEnum|Function 0
+  hasOwnProperty        objectProtoFuncHasOwnProperty           DontEnum|Function 1
+  propertyIsEnumerable  objectProtoFuncPropertyIsEnumerable     DontEnum|Function 1
+  isPrototypeOf         objectProtoFuncIsPrototypeOf            DontEnum|Function 1
+  __defineGetter__      objectProtoFuncDefineGetter             DontEnum|Function 2
+  __defineSetter__      objectProtoFuncDefineSetter             DontEnum|Function 2
+  __lookupGetter__      objectProtoFuncLookupGetter             DontEnum|Function 1
+  __lookupSetter__      objectProtoFuncLookupSetter             DontEnum|Function 1
+@end
+*/
+
 ASSERT_CLASS_FITS_IN_CELL(ObjectPrototype);
 
-static TiValue JSC_HOST_CALL objectProtoFuncValueOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncHasOwnProperty(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncIsPrototypeOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncDefineGetter(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncDefineSetter(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncLookupGetter(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncLookupSetter(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL objectProtoFuncToLocaleString(TiExcState*, TiObject*, TiValue, const ArgList&);
-
-ObjectPrototype::ObjectPrototype(TiExcState* exec, NonNullPassRefPtr<Structure> stucture, Structure* prototypeFunctionStructure)
-    : TiObject(stucture)
+ObjectPrototype::ObjectPrototype(TiExcState* exec, TiGlobalObject* globalObject, Structure* stucture)
+    : JSNonFinalObject(exec->globalData(), stucture)
     , m_hasNoPropertiesWithUInt32Names(true)
 {
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toString, objectProtoFuncToString), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().toLocaleString, objectProtoFuncToLocaleString), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 0, exec->propertyNames().valueOf, objectProtoFuncValueOf), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().hasOwnProperty, objectProtoFuncHasOwnProperty), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().propertyIsEnumerable, objectProtoFuncPropertyIsEnumerable), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().isPrototypeOf, objectProtoFuncIsPrototypeOf), DontEnum);
-
-    // Mozilla extensions
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().__defineGetter__, objectProtoFuncDefineGetter), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 2, exec->propertyNames().__defineSetter__, objectProtoFuncDefineSetter), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().__lookupGetter__, objectProtoFuncLookupGetter), DontEnum);
-    putDirectFunctionWithoutTransition(exec, new (exec) NativeFunctionWrapper(exec, prototypeFunctionStructure, 1, exec->propertyNames().__lookupSetter__, objectProtoFuncLookupSetter), DontEnum);
+    ASSERT(inherits(&s_info));
+    putAnonymousValue(globalObject->globalData(), 0, globalObject);
 }
 
 void ObjectPrototype::put(TiExcState* exec, const Identifier& propertyName, TiValue value, PutPropertySlot& slot)
 {
-    TiObject::put(exec, propertyName, value, slot);
+    JSNonFinalObject::put(exec, propertyName, value, slot);
 
     if (m_hasNoPropertiesWithUInt32Names) {
         bool isUInt32;
-        propertyName.toStrictUInt32(&isUInt32);
+        propertyName.toUInt32(isUInt32);
         m_hasNoPropertiesWithUInt32Names = !isUInt32;
     }
 }
@@ -81,82 +93,100 @@ bool ObjectPrototype::getOwnPropertySlot(TiExcState* exec, unsigned propertyName
 {
     if (m_hasNoPropertiesWithUInt32Names)
         return false;
-    return TiObject::getOwnPropertySlot(exec, propertyName, slot);
+    return JSNonFinalObject::getOwnPropertySlot(exec, propertyName, slot);
+}
+
+bool ObjectPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot &slot)
+{
+    return getStaticFunctionSlot<JSNonFinalObject>(exec, TiExcState::objectPrototypeTable(exec), this, propertyName, slot);
+}
+
+bool ObjectPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
+{
+    return getStaticFunctionDescriptor<JSNonFinalObject>(exec, TiExcState::objectPrototypeTable(exec), this, propertyName, descriptor);
 }
 
 // ------------------------------ Functions --------------------------------
 
-// ECMA 15.2.4.2, 15.2.4.4, 15.2.4.5, 15.2.4.7
-
-TiValue JSC_HOST_CALL objectProtoFuncValueOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncValueOf(TiExcState* exec)
 {
-    return thisValue.toThisObject(exec);
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(thisValue.toThisObject(exec));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncHasOwnProperty(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncHasOwnProperty(TiExcState* exec)
 {
-    return jsBoolean(thisValue.toThisObject(exec)->hasOwnProperty(exec, Identifier(exec, args.at(0).toString(exec))));
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(jsBoolean(thisValue.toThisObject(exec)->hasOwnProperty(exec, Identifier(exec, exec->argument(0).toString(exec)))));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncIsPrototypeOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncIsPrototypeOf(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     TiObject* thisObj = thisValue.toThisObject(exec);
 
-    if (!args.at(0).isObject())
-        return jsBoolean(false);
+    if (!exec->argument(0).isObject())
+        return TiValue::encode(jsBoolean(false));
 
-    TiValue v = asObject(args.at(0))->prototype();
+    TiValue v = asObject(exec->argument(0))->prototype();
 
     while (true) {
         if (!v.isObject())
-            return jsBoolean(false);
-        if (v == thisObj)
-            return jsBoolean(true);
+            return TiValue::encode(jsBoolean(false));
+        if (v == thisObj)
+            return TiValue::encode(jsBoolean(true));
         v = asObject(v)->prototype();
     }
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncDefineGetter(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncDefineGetter(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     CallData callData;
-    if (args.at(1).getCallData(callData) == CallTypeNone)
-        return throwError(exec, SyntaxError, "invalid getter usage");
-    thisValue.toThisObject(exec)->defineGetter(exec, Identifier(exec, args.at(0).toString(exec)), asObject(args.at(1)));
-    return jsUndefined();
+    if (getCallData(exec->argument(1), callData) == CallTypeNone)
+        return throwVMError(exec, createSyntaxError(exec, "invalid getter usage"));
+    thisValue.toThisObject(exec)->defineGetter(exec, Identifier(exec, exec->argument(0).toString(exec)), asObject(exec->argument(1)));
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncDefineSetter(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncDefineSetter(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     CallData callData;
-    if (args.at(1).getCallData(callData) == CallTypeNone)
-        return throwError(exec, SyntaxError, "invalid setter usage");
-    thisValue.toThisObject(exec)->defineSetter(exec, Identifier(exec, args.at(0).toString(exec)), asObject(args.at(1)));
-    return jsUndefined();
+    if (getCallData(exec->argument(1), callData) == CallTypeNone)
+        return throwVMError(exec, createSyntaxError(exec, "invalid setter usage"));
+    thisValue.toThisObject(exec)->defineSetter(exec, Identifier(exec, exec->argument(0).toString(exec)), asObject(exec->argument(1)));
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncLookupGetter(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncLookupGetter(TiExcState* exec)
 {
-    return thisValue.toThisObject(exec)->lookupGetter(exec, Identifier(exec, args.at(0).toString(exec)));
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(thisValue.toThisObject(exec)->lookupGetter(exec, Identifier(exec, exec->argument(0).toString(exec))));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncLookupSetter(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncLookupSetter(TiExcState* exec)
 {
-    return thisValue.toThisObject(exec)->lookupSetter(exec, Identifier(exec, args.at(0).toString(exec)));
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(thisValue.toThisObject(exec)->lookupSetter(exec, Identifier(exec, exec->argument(0).toString(exec))));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncPropertyIsEnumerable(TiExcState* exec)
 {
-    return jsBoolean(thisValue.toThisObject(exec)->propertyIsEnumerable(exec, Identifier(exec, args.at(0).toString(exec))));
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(jsBoolean(thisValue.toThisObject(exec)->propertyIsEnumerable(exec, Identifier(exec, exec->argument(0).toString(exec)))));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncToLocaleString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncToLocaleString(TiExcState* exec)
 {
-    return thisValue.toThisTiString(exec);
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(thisValue.toThisTiString(exec));
 }
 
-TiValue JSC_HOST_CALL objectProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL objectProtoFuncToString(TiExcState* exec)
 {
-    return jsMakeNontrivialString(exec, "[object ", thisValue.toThisObject(exec)->className(), "]");
+    TiValue thisValue = exec->hostThisValue();
+    return TiValue::encode(jsMakeNontrivialString(exec, "[object ", thisValue.toThisObject(exec)->className(), "]"));
 }
 
 } // namespace TI

@@ -2,12 +2,12 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
- *  Copyright (C) 2003, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2007, 2008, 2009, 2011 Apple Inc. All rights reserved.
  *  Copyright (C) 2003 Peter Kelly (pmk@post.com)
  *  Copyright (C) 2006 Alexey Proskuryakov (ap@nypop.com)
  *
@@ -39,6 +39,7 @@
 #include "Lookup.h"
 #include "ObjectPrototype.h"
 #include "Operations.h"
+#include "StringRecursionChecker.h"
 #include <algorithm>
 #include <wtf/Assertions.h>
 #include <wtf/HashSet.h>
@@ -47,27 +48,27 @@ namespace TI {
 
 ASSERT_CLASS_FITS_IN_CELL(ArrayPrototype);
 
-static TiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncConcat(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncJoin(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncPop(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncPush(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncReverse(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncShift(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncSlice(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncSort(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncSplice(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncUnShift(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncEvery(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncForEach(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncSome(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncIndexOf(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncFilter(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState*, TiObject*, TiValue, const ArgList&);
-static TiValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(TiExcState*, TiObject*, TiValue, const ArgList&);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncConcat(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncJoin(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncPop(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncPush(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncReverse(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncShift(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncSlice(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncSort(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncSplice(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncUnShift(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncEvery(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncForEach(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncSome(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncIndexOf(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncFilter(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState*);
+static EncodedTiValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(TiExcState*);
 
 }
 
@@ -80,32 +81,21 @@ static inline bool isNumericCompareFunction(TiExcState* exec, CallType callType,
     if (callType != CallTypeJS)
         return false;
 
-#if ENABLE(JIT)
-    // If the JIT is enabled then we need to preserve the invariant that every
-    // function with a CodeBlock also has JIT code.
-    CodeBlock* codeBlock = 0;
-#if ENABLE(INTERPRETER)
-    if (!exec->globalData().canUseJIT())
-        codeBlock = &callData.js.functionExecutable->bytecode(exec, callData.js.scopeChain);
-    else
-#endif
-    {
-        callData.js.functionExecutable->jitCode(exec, callData.js.scopeChain);
-        codeBlock = &callData.js.functionExecutable->generatedBytecode();
-    }
-#else
-    CodeBlock* codeBlock = &callData.js.functionExecutable->bytecode(exec, callData.js.scopeChain);
-#endif
+    FunctionExecutable* executable = callData.js.functionExecutable;
 
-    return codeBlock->isNumericCompareFunction();
+    TiObject* error = executable->compileForCall(exec, callData.js.scopeChain);
+    if (error)
+        return false;
+
+    return executable->generatedBytecodeForCall().isNumericCompareFunction();
 }
 
 // ------------------------------ ArrayPrototype ----------------------------
 
-const ClassInfo ArrayPrototype::info = {"Array", &TiArray::info, 0, TiExcState::arrayTable};
+const ClassInfo ArrayPrototype::s_info = {"Array", &TiArray::s_info, 0, TiExcState::arrayPrototypeTable};
 
 /* Source for ArrayPrototype.lut.h
-@begin arrayTable 16
+@begin arrayPrototypeTable 16
   toString       arrayProtoFuncToString       DontEnum|Function 0
   toLocaleString arrayProtoFuncToLocaleString DontEnum|Function 0
   concat         arrayProtoFuncConcat         DontEnum|Function 1
@@ -131,19 +121,21 @@ const ClassInfo ArrayPrototype::info = {"Array", &TiArray::info, 0, TiExcState::
 */
 
 // ECMA 15.4.4
-ArrayPrototype::ArrayPrototype(NonNullPassRefPtr<Structure> structure)
-    : TiArray(structure)
+ArrayPrototype::ArrayPrototype(TiGlobalObject* globalObject, Structure* structure)
+    : TiArray(globalObject->globalData(), structure)
 {
+    ASSERT(inherits(&s_info));
+    putAnonymousValue(globalObject->globalData(), 0, globalObject);
 }
 
 bool ArrayPrototype::getOwnPropertySlot(TiExcState* exec, const Identifier& propertyName, PropertySlot& slot)
 {
-    return getStaticFunctionSlot<TiArray>(exec, TiExcState::arrayTable(exec), this, propertyName, slot);
+    return getStaticFunctionSlot<TiArray>(exec, TiExcState::arrayPrototypeTable(exec), this, propertyName, slot);
 }
 
 bool ArrayPrototype::getOwnPropertyDescriptor(TiExcState* exec, const Identifier& propertyName, PropertyDescriptor& descriptor)
 {
-    return getStaticFunctionDescriptor<TiArray>(exec, TiExcState::arrayTable(exec), this, propertyName, descriptor);
+    return getStaticFunctionDescriptor<TiArray>(exec, TiExcState::arrayPrototypeTable(exec), this, propertyName, descriptor);
 }
 
 // ------------------------------ Array Functions ----------------------------
@@ -163,26 +155,46 @@ static void putProperty(TiExcState* exec, TiObject* obj, const Identifier& prope
     obj->put(exec, propertyName, value, slot);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+static unsigned argumentClampedIndexFromStartOrEnd(TiExcState* exec, int argument, unsigned length, unsigned undefinedValue = 0)
 {
+    TiValue value = exec->argument(argument);
+    if (value.isUndefined())
+        return undefinedValue;
+
+    double indexDouble = value.toInteger(exec);
+    if (indexDouble < 0) {
+        indexDouble += length;
+        return indexDouble < 0 ? 0 : static_cast<unsigned>(indexDouble);
+    }
+    return indexDouble > length ? length : static_cast<unsigned>(indexDouble);
+}
+
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState* exec)
+{
+    TiValue thisValue = exec->hostThisValue();
+
     bool isRealArray = isTiArray(&exec->globalData(), thisValue);
-    if (!isRealArray && !thisValue.inherits(&TiArray::info))
-        return throwError(exec, TypeError);
+    if (!isRealArray && !thisValue.inherits(&TiArray::s_info))
+        return throwVMTypeError(exec);
     TiArray* thisObj = asArray(thisValue);
     
-    HashSet<TiObject*>& arrayVisitedElements = exec->globalData().arrayVisitedElements;
-    if (arrayVisitedElements.size() >= MaxSmallThreadReentryDepth) {
-        if (arrayVisitedElements.size() >= exec->globalData().maxReentryDepth)
-            return throwError(exec, RangeError, "Maximum call stack size exceeded.");    
-    }
-
-    bool alreadyVisited = !arrayVisitedElements.add(thisObj).second;
-    if (alreadyVisited)
-        return jsEmptyString(exec); // return an empty string, avoiding infinite recursion.
-
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    StringRecursionChecker checker(exec, thisObj);
+    if (EncodedTiValue earlyReturnValue = checker.earlyReturnValue())
+        return earlyReturnValue;
+
     unsigned totalSize = length ? length - 1 : 0;
-    Vector<RefPtr<UString::Rep>, 256> strBuffer(length);
+#if OS(SYMBIAN)
+    // Symbian has very limited stack size available.
+    // This function could be called recursively and allocating 1K on stack here cause
+    // stack overflow on Symbian devices.
+    Vector<RefPtr<StringImpl> > strBuffer(length);
+#else
+    Vector<RefPtr<StringImpl>, 256> strBuffer(length);
+#endif    
     for (unsigned k = 0; k < length; k++) {
         TiValue element;
         if (isRealArray && thisObj->canGetIndex(k))
@@ -194,8 +206,8 @@ TiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState* exec, TiObject*, TiValu
             continue;
         
         UString str = element.toString(exec);
-        strBuffer[k] = str.rep();
-        totalSize += str.size();
+        strBuffer[k] = str.impl();
+        totalSize += str.length();
         
         if (!strBuffer.data()) {
             throwOutOfMemoryError(exec);
@@ -204,42 +216,40 @@ TiValue JSC_HOST_CALL arrayProtoFuncToString(TiExcState* exec, TiObject*, TiValu
         if (exec->hadException())
             break;
     }
-    arrayVisitedElements.remove(thisObj);
     if (!totalSize)
-        return jsEmptyString(exec);
+        return TiValue::encode(jsEmptyString(exec));
     Vector<UChar> buffer;
     buffer.reserveCapacity(totalSize);
     if (!buffer.data())
-        return throwOutOfMemoryError(exec);
+        return TiValue::encode(throwOutOfMemoryError(exec));
         
     for (unsigned i = 0; i < length; i++) {
         if (i)
             buffer.append(',');
-        if (RefPtr<UString::Rep> rep = strBuffer[i])
+        if (RefPtr<StringImpl> rep = strBuffer[i])
             buffer.append(rep->characters(), rep->length());
     }
     ASSERT(buffer.size() == totalSize);
-    return jsString(exec, UString::adopt(buffer));
+    return TiValue::encode(jsString(exec, UString::adopt(buffer)));
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState* exec)
 {
-    if (!thisValue.inherits(&TiArray::info))
-        return throwError(exec, TypeError);
+    TiValue thisValue = exec->hostThisValue();
+
+    if (!thisValue.inherits(&TiArray::s_info))
+        return throwVMTypeError(exec);
     TiObject* thisObj = asArray(thisValue);
 
-    HashSet<TiObject*>& arrayVisitedElements = exec->globalData().arrayVisitedElements;
-    if (arrayVisitedElements.size() >= MaxSmallThreadReentryDepth) {
-        if (arrayVisitedElements.size() >= exec->globalData().maxReentryDepth)
-            return throwError(exec, RangeError, "Maximum call stack size exceeded.");    
-    }
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    bool alreadyVisited = !arrayVisitedElements.add(thisObj).second;
-    if (alreadyVisited)
-        return jsEmptyString(exec); // return an empty string, avoding infinite recursion.
+    StringRecursionChecker checker(exec, thisObj);
+    if (EncodedTiValue earlyReturnValue = checker.earlyReturnValue())
+        return earlyReturnValue;
 
     TiStringBuilder strBuffer;
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     for (unsigned k = 0; k < length; k++) {
         if (k >= 1)
             strBuffer.append(',');
@@ -250,7 +260,7 @@ TiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState* exec, TiObject*, 
             TiValue conversionFunction = o->get(exec, exec->propertyNames().toLocaleString);
             UString str;
             CallData callData;
-            CallType callType = conversionFunction.getCallData(callData);
+            CallType callType = getCallData(conversionFunction, callData);
             if (callType != CallTypeNone)
                 str = call(exec, conversionFunction, callType, callData, element, exec->emptyList()).toString(exec);
             else
@@ -258,48 +268,61 @@ TiValue JSC_HOST_CALL arrayProtoFuncToLocaleString(TiExcState* exec, TiObject*, 
             strBuffer.append(str);
         }
     }
-    arrayVisitedElements.remove(thisObj);
-    return strBuffer.build(exec);
+
+    return TiValue::encode(strBuffer.build(exec));
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncJoin(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncJoin(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    HashSet<TiObject*>& arrayVisitedElements = exec->globalData().arrayVisitedElements;
-    if (arrayVisitedElements.size() >= MaxSmallThreadReentryDepth) {
-        if (arrayVisitedElements.size() >= exec->globalData().maxReentryDepth)
-            return throwError(exec, RangeError, "Maximum call stack size exceeded.");    
-    }
-
-    bool alreadyVisited = !arrayVisitedElements.add(thisObj).second;
-    if (alreadyVisited)
-        return jsEmptyString(exec); // return an empty string, avoding infinite recursion.
+    StringRecursionChecker checker(exec, thisObj);
+    if (EncodedTiValue earlyReturnValue = checker.earlyReturnValue())
+        return earlyReturnValue;
 
     TiStringBuilder strBuffer;
 
     UString separator;
-    if (!args.at(0).isUndefined())
-        separator = args.at(0).toString(exec);
+    if (!exec->argument(0).isUndefined())
+        separator = exec->argument(0).toString(exec);
 
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     unsigned k = 0;
     if (isTiArray(&exec->globalData(), thisObj)) {
         TiArray* array = asArray(thisObj);
-        for (; k < length; k++) {
-            if (!array->canGetIndex(k))
-                break;
-            if (k >= 1) {
-                if (separator.isNull())
-                    strBuffer.append(',');
-                else
-                    strBuffer.append(separator);
-            }
+
+        if (length) {
+            if (!array->canGetIndex(k)) 
+                goto skipFirstLoop;
             TiValue element = array->getIndex(k);
             if (!element.isUndefinedOrNull())
                 strBuffer.append(element.toString(exec));
+            k++;
+        }
+
+        if (separator.isNull()) {
+            for (; k < length; k++) {
+                if (!array->canGetIndex(k))
+                    break;
+                strBuffer.append(',');
+                TiValue element = array->getIndex(k);
+                if (!element.isUndefinedOrNull())
+                    strBuffer.append(element.toString(exec));
+            }
+        } else {
+            for (; k < length; k++) {
+                if (!array->canGetIndex(k))
+                    break;
+                strBuffer.append(separator);
+                TiValue element = array->getIndex(k);
+                if (!element.isUndefinedOrNull())
+                    strBuffer.append(element.toString(exec));
+            }
         }
     }
+ skipFirstLoop:
     for (; k < length; k++) {
         if (k >= 1) {
             if (separator.isNull())
@@ -312,19 +335,20 @@ TiValue JSC_HOST_CALL arrayProtoFuncJoin(TiExcState* exec, TiObject*, TiValue th
         if (!element.isUndefinedOrNull())
             strBuffer.append(element.toString(exec));
     }
-    arrayVisitedElements.remove(thisObj);
-    return strBuffer.build(exec);
+
+    return TiValue::encode(strBuffer.build(exec));
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncConcat(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncConcat(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
     TiArray* arr = constructEmptyArray(exec);
-    int n = 0;
+    unsigned n = 0;
     TiValue curArg = thisValue.toThisObject(exec);
-    ArgList::const_iterator it = args.begin();
-    ArgList::const_iterator end = args.end();
+    size_t i = 0;
+    size_t argCount = exec->argumentCount();
     while (1) {
-        if (curArg.inherits(&TiArray::info)) {
+        if (curArg.inherits(&TiArray::s_info)) {
             unsigned length = curArg.get(exec, exec->propertyNames().length).toUInt32(exec);
             TiObject* curObject = curArg.toObject(exec);
             for (unsigned k = 0; k < length; ++k) {
@@ -336,57 +360,69 @@ TiValue JSC_HOST_CALL arrayProtoFuncConcat(TiExcState* exec, TiObject*, TiValue 
             arr->put(exec, n, curArg);
             n++;
         }
-        if (it == end)
+        if (i == argCount)
             break;
-        curArg = (*it);
-        ++it;
+        curArg = (exec->argument(i));
+        ++i;
     }
     arr->setLength(n);
-    return arr;
+    return TiValue::encode(arr);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncPop(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncPop(TiExcState* exec)
 {
+    TiValue thisValue = exec->hostThisValue();
+
     if (isTiArray(&exec->globalData(), thisValue))
-        return asArray(thisValue)->pop();
+        return TiValue::encode(asArray(thisValue)->pop());
 
     TiObject* thisObj = thisValue.toThisObject(exec);
-    TiValue result;
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    TiValue result;
     if (length == 0) {
-        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length));
+        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length));
         result = jsUndefined();
     } else {
         result = thisObj->get(exec, length - 1);
         thisObj->deleteProperty(exec, length - 1);
-        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length - 1));
+        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length - 1));
     }
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncPush(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncPush(TiExcState* exec)
 {
-    if (isTiArray(&exec->globalData(), thisValue) && args.size() == 1) {
+    TiValue thisValue = exec->hostThisValue();
+
+    if (isTiArray(&exec->globalData(), thisValue) && exec->argumentCount() == 1) {
         TiArray* array = asArray(thisValue);
-        array->push(exec, *args.begin());
-        return jsNumber(exec, array->length());
+        array->push(exec, exec->argument(0));
+        return TiValue::encode(jsNumber(array->length()));
     }
 
     TiObject* thisObj = thisValue.toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    for (unsigned n = 0; n < args.size(); n++)
-        thisObj->put(exec, length + n, args.at(n));
-    length += args.size();
-    putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length));
-    return jsNumber(exec, length);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    for (unsigned n = 0; n < exec->argumentCount(); n++)
+        thisObj->put(exec, length + n, exec->argument(n));
+    length += exec->argumentCount();
+    putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length));
+    return TiValue::encode(jsNumber(length));
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncReverse(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncReverse(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    unsigned middle = length / 2;
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
+    unsigned middle = length / 2;
     for (unsigned k = 0; k < middle; k++) {
         unsigned lk1 = length - k - 1;
         TiValue obj2 = getProperty(exec, thisObj, lk1);
@@ -402,108 +438,97 @@ TiValue JSC_HOST_CALL arrayProtoFuncReverse(TiExcState* exec, TiObject*, TiValue
         else
             thisObj->deleteProperty(exec, lk1);
     }
-    return thisObj;
+    return TiValue::encode(thisObj);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncShift(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList&)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncShift(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     TiValue result;
 
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
     if (length == 0) {
-        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length));
+        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length));
         result = jsUndefined();
     } else {
         result = thisObj->get(exec, 0);
-        for (unsigned k = 1; k < length; k++) {
-            if (TiValue obj = getProperty(exec, thisObj, k))
-                thisObj->put(exec, k - 1, obj);
-            else
-                thisObj->deleteProperty(exec, k - 1);
+        if (isTiArray(&exec->globalData(), thisObj))
+            ((TiArray *)thisObj)->shiftCount(exec, 1);
+        else {
+            for (unsigned k = 1; k < length; k++) {
+                if (TiValue obj = getProperty(exec, thisObj, k))
+                    thisObj->put(exec, k - 1, obj);
+                else
+                    thisObj->deleteProperty(exec, k - 1);
+            }
+            thisObj->deleteProperty(exec, length - 1);
         }
-        thisObj->deleteProperty(exec, length - 1);
-        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length - 1));
+        putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length - 1));
     }
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncSlice(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncSlice(TiExcState* exec)
 {
     // http://developer.netscape.com/docs/manuals/js/client/jsref/array.htm#1193713 or 15.4.4.10
-
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
 
     // We return a new array
     TiArray* resObj = constructEmptyArray(exec);
     TiValue result = resObj;
-    double begin = args.at(0).toInteger(exec);
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    if (begin >= 0) {
-        if (begin > length)
-            begin = length;
-    } else {
-        begin += length;
-        if (begin < 0)
-            begin = 0;
-    }
-    double end;
-    if (args.at(1).isUndefined())
-        end = length;
-    else {
-        end = args.at(1).toInteger(exec);
-        if (end < 0) {
-            end += length;
-            if (end < 0)
-                end = 0;
-        } else {
-            if (end > length)
-                end = length;
-        }
-    }
 
-    int n = 0;
-    int b = static_cast<int>(begin);
-    int e = static_cast<int>(end);
-    for (int k = b; k < e; k++, n++) {
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    unsigned begin = argumentClampedIndexFromStartOrEnd(exec, 0, length);
+    unsigned end = argumentClampedIndexFromStartOrEnd(exec, 1, length, length);
+
+    unsigned n = 0;
+    for (unsigned k = begin; k < end; k++, n++) {
         if (TiValue v = getProperty(exec, thisObj, k))
             resObj->put(exec, n, v);
     }
     resObj->setLength(n);
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncSort(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncSort(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (!length || exec->hadException())
+        return TiValue::encode(thisObj);
 
-    TiValue function = args.at(0);
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
 
-    if (thisObj->classInfo() == &TiArray::info) {
+    if (thisObj->classInfo() == &TiArray::s_info) {
         if (isNumericCompareFunction(exec, callType, callData))
             asArray(thisObj)->sortNumeric(exec, function, callType, callData);
         else if (callType != CallTypeNone)
             asArray(thisObj)->sort(exec, function, callType, callData);
         else
             asArray(thisObj)->sort(exec);
-        return thisObj;
+        return TiValue::encode(thisObj);
     }
-
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-
-    if (!length)
-        return thisObj;
 
     // "Min" sort. Not the fastest, but definitely less code than heapsort
     // or quicksort, and much less swapping than bubblesort/insertionsort.
     for (unsigned i = 0; i < length - 1; ++i) {
         TiValue iObj = thisObj->get(exec, i);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
         unsigned themin = i;
         TiValue minObj = iObj;
         for (unsigned j = i + 1; j < length; ++j) {
             TiValue jObj = thisObj->get(exec, j);
+            if (exec->hadException())
+                return TiValue::encode(jsUndefined());
             double compareResult;
             if (jObj.isUndefined())
                 compareResult = 1; // don't check minObj because there's no need to differentiate == (0) from > (1)
@@ -528,118 +553,135 @@ TiValue JSC_HOST_CALL arrayProtoFuncSort(TiExcState* exec, TiObject*, TiValue th
             thisObj->put(exec, themin, iObj);
         }
     }
-    return thisObj;
+    return TiValue::encode(thisObj);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncSplice(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncSplice(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
     // 15.4.4.12
-    TiArray* resObj = constructEmptyArray(exec);
-    TiValue result = resObj;
 
-    // FIXME: Firefox returns an empty array.
-    if (!args.size())
-        return jsUndefined();
-
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    double relativeBegin = args.at(0).toInteger(exec);
-    unsigned begin;
-    if (relativeBegin < 0) {
-        relativeBegin += length;
-        begin = (relativeBegin < 0) ? 0 : static_cast<unsigned>(relativeBegin);
-    } else
-        begin = std::min<unsigned>(static_cast<unsigned>(relativeBegin), length);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    unsigned deleteCount;
-    if (args.size() > 1)
-        deleteCount = std::min<int>(std::max<int>(args.at(1).toUInt32(exec), 0), length - begin);
-    else
-        deleteCount = length - begin;
+    if (!exec->argumentCount())
+        return TiValue::encode(constructEmptyArray(exec));
 
-    for (unsigned k = 0; k < deleteCount; k++) {
-        if (TiValue v = getProperty(exec, thisObj, k + begin))
-            resObj->put(exec, k, v);
+    unsigned begin = argumentClampedIndexFromStartOrEnd(exec, 0, length);
+
+    unsigned deleteCount = length - begin;
+    if (exec->argumentCount() > 1) {
+        double deleteDouble = exec->argument(1).toInteger(exec);
+        if (deleteDouble < 0)
+            deleteCount = 0;
+        else if (deleteDouble > length - begin)
+            deleteCount = length - begin;
+        else
+            deleteCount = static_cast<unsigned>(deleteDouble);
     }
+
+    TiArray* resObj = new (exec) TiArray(exec->globalData(), exec->lexicalGlobalObject()->arrayStructure(), deleteCount, CreateCompact);
+    TiValue result = resObj;
+    TiGlobalData& globalData = exec->globalData();
+    for (unsigned k = 0; k < deleteCount; k++)
+        resObj->uncheckedSetIndex(globalData, k, getProperty(exec, thisObj, k + begin));
+
     resObj->setLength(deleteCount);
 
-    unsigned additionalArgs = std::max<int>(args.size() - 2, 0);
+    unsigned additionalArgs = std::max<int>(exec->argumentCount() - 2, 0);
     if (additionalArgs != deleteCount) {
         if (additionalArgs < deleteCount) {
-            for (unsigned k = begin; k < length - deleteCount; ++k) {
-                if (TiValue v = getProperty(exec, thisObj, k + deleteCount))
-                    thisObj->put(exec, k + additionalArgs, v);
-                else
-                    thisObj->deleteProperty(exec, k + additionalArgs);
+            if ((!begin) && (isTiArray(&exec->globalData(), thisObj)))
+                ((TiArray *)thisObj)->shiftCount(exec, deleteCount - additionalArgs);
+            else {
+                for (unsigned k = begin; k < length - deleteCount; ++k) {
+                    if (TiValue v = getProperty(exec, thisObj, k + deleteCount))
+                        thisObj->put(exec, k + additionalArgs, v);
+                    else
+                        thisObj->deleteProperty(exec, k + additionalArgs);
+                }
+                for (unsigned k = length; k > length - deleteCount + additionalArgs; --k)
+                    thisObj->deleteProperty(exec, k - 1);
             }
-            for (unsigned k = length; k > length - deleteCount + additionalArgs; --k)
-                thisObj->deleteProperty(exec, k - 1);
         } else {
-            for (unsigned k = length - deleteCount; k > begin; --k) {
-                if (TiValue obj = getProperty(exec, thisObj, k + deleteCount - 1))
-                    thisObj->put(exec, k + additionalArgs - 1, obj);
-                else
-                    thisObj->deleteProperty(exec, k + additionalArgs - 1);
+            if ((!begin) && (isTiArray(&exec->globalData(), thisObj)))
+                ((TiArray *)thisObj)->unshiftCount(exec, additionalArgs - deleteCount);
+            else {
+                for (unsigned k = length - deleteCount; k > begin; --k) {
+                    if (TiValue obj = getProperty(exec, thisObj, k + deleteCount - 1))
+                        thisObj->put(exec, k + additionalArgs - 1, obj);
+                    else
+                        thisObj->deleteProperty(exec, k + additionalArgs - 1);
+                }
             }
         }
     }
     for (unsigned k = 0; k < additionalArgs; ++k)
-        thisObj->put(exec, k + begin, args.at(k + 2));
+        thisObj->put(exec, k + begin, exec->argument(k + 2));
 
-    putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(exec, length - deleteCount + additionalArgs));
-    return result;
+    putProperty(exec, thisObj, exec->propertyNames().length, jsNumber(length - deleteCount + additionalArgs));
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncUnShift(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncUnShift(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
     // 15.4.4.13
+
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    unsigned nrArgs = args.size();
-    if (nrArgs) {
-        for (unsigned k = length; k > 0; --k) {
-            if (TiValue v = getProperty(exec, thisObj, k - 1))
-                thisObj->put(exec, k + nrArgs - 1, v);
-            else
-                thisObj->deleteProperty(exec, k + nrArgs - 1);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    unsigned nrArgs = exec->argumentCount();
+    if ((nrArgs) && (length)) {
+        if (isTiArray(&exec->globalData(), thisObj))
+            ((TiArray *)thisObj)->unshiftCount(exec, nrArgs);
+        else {
+            for (unsigned k = length; k > 0; --k) {
+                if (TiValue v = getProperty(exec, thisObj, k - 1))
+                    thisObj->put(exec, k + nrArgs - 1, v);
+                else
+                    thisObj->deleteProperty(exec, k + nrArgs - 1);
+            }
         }
     }
     for (unsigned k = 0; k < nrArgs; ++k)
-        thisObj->put(exec, k, args.at(k));
-    TiValue result = jsNumber(exec, length + nrArgs);
+        thisObj->put(exec, k, exec->argument(k));
+    TiValue result = jsNumber(length + nrArgs);
     putProperty(exec, thisObj, exec->propertyNames().length, result);
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncFilter(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncFilter(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    TiValue function = args.at(0);
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    TiObject* applyThis = args.at(1).isUndefinedOrNull() ? exec->globalThisValue() : args.at(1).toObject(exec);
+    TiObject* applyThis = exec->argument(1).isUndefinedOrNull() ? exec->globalThisValue() : exec->argument(1).toObject(exec);
     TiArray* resultArray = constructEmptyArray(exec);
 
     unsigned filterIndex = 0;
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     unsigned k = 0;
     if (callType == CallTypeJS && isTiArray(&exec->globalData(), thisObj)) {
         TiFunction* f = asFunction(function);
         TiArray* array = asArray(thisObj);
-        CachedCall cachedCall(exec, f, 3, exec->exceptionSlot());
+        CachedCall cachedCall(exec, f, 3);
         for (; k < length && !exec->hadException(); ++k) {
             if (!array->canGetIndex(k))
                 break;
             TiValue v = array->getIndex(k);
             cachedCall.setThis(applyThis);
             cachedCall.setArgument(0, v);
-            cachedCall.setArgument(1, jsNumber(exec, k));
+            cachedCall.setArgument(1, jsNumber(k));
             cachedCall.setArgument(2, thisObj);
             
             TiValue result = cachedCall.call();
@@ -647,57 +689,57 @@ TiValue JSC_HOST_CALL arrayProtoFuncFilter(TiExcState* exec, TiObject*, TiValue 
                 resultArray->put(exec, filterIndex++, v);
         }
         if (k == length)
-            return resultArray;
+            return TiValue::encode(resultArray);
     }
     for (; k < length && !exec->hadException(); ++k) {
         PropertySlot slot(thisObj);
-
         if (!thisObj->getPropertySlot(exec, k, slot))
             continue;
-
         TiValue v = slot.getValue(exec, k);
 
-        MarkedArgumentBuffer eachArguments;
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
+        MarkedArgumentBuffer eachArguments;
         eachArguments.append(v);
-        eachArguments.append(jsNumber(exec, k));
+        eachArguments.append(jsNumber(k));
         eachArguments.append(thisObj);
 
         TiValue result = call(exec, function, callType, callData, applyThis, eachArguments);
-
         if (result.toBoolean(exec))
             resultArray->put(exec, filterIndex++, v);
     }
-    return resultArray;
+    return TiValue::encode(resultArray);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
-    TiValue function = args.at(0);
-    CallData callData;
-    CallType callType = function.getCallData(callData);
-    if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
-
-    TiObject* applyThis = args.at(1).isUndefinedOrNull() ? exec->globalThisValue() : args.at(1).toObject(exec);
-
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    TiValue function = exec->argument(0);
+    CallData callData;
+    CallType callType = getCallData(function, callData);
+    if (callType == CallTypeNone)
+        return throwVMTypeError(exec);
+
+    TiObject* applyThis = exec->argument(1).isUndefinedOrNull() ? exec->globalThisValue() : exec->argument(1).toObject(exec);
 
     TiArray* resultArray = constructEmptyArray(exec, length);
     unsigned k = 0;
     if (callType == CallTypeJS && isTiArray(&exec->globalData(), thisObj)) {
         TiFunction* f = asFunction(function);
         TiArray* array = asArray(thisObj);
-        CachedCall cachedCall(exec, f, 3, exec->exceptionSlot());
+        CachedCall cachedCall(exec, f, 3);
         for (; k < length && !exec->hadException(); ++k) {
             if (UNLIKELY(!array->canGetIndex(k)))
                 break;
 
             cachedCall.setThis(applyThis);
             cachedCall.setArgument(0, array->getIndex(k));
-            cachedCall.setArgument(1, jsNumber(exec, k));
+            cachedCall.setArgument(1, jsNumber(k));
             cachedCall.setArgument(2, thisObj);
 
             resultArray->TiArray::put(exec, k, cachedCall.call());
@@ -707,20 +749,24 @@ TiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState* exec, TiObject*, TiValue thi
         PropertySlot slot(thisObj);
         if (!thisObj->getPropertySlot(exec, k, slot))
             continue;
-
         TiValue v = slot.getValue(exec, k);
 
-        MarkedArgumentBuffer eachArguments;
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
+        MarkedArgumentBuffer eachArguments;
         eachArguments.append(v);
-        eachArguments.append(jsNumber(exec, k));
+        eachArguments.append(jsNumber(k));
         eachArguments.append(thisObj);
+
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
         TiValue result = call(exec, function, callType, callData, applyThis, eachArguments);
         resultArray->put(exec, k, result);
     }
 
-    return resultArray;
+    return TiValue::encode(resultArray);
 }
 
 // Documentation for these three is available at:
@@ -728,87 +774,91 @@ TiValue JSC_HOST_CALL arrayProtoFuncMap(TiExcState* exec, TiObject*, TiValue thi
 // http://developer-test.mozilla.org/en/docs/Core_Ti_1.5_Reference:Objects:Array:forEach
 // http://developer-test.mozilla.org/en/docs/Core_Ti_1.5_Reference:Objects:Array:some
 
-TiValue JSC_HOST_CALL arrayProtoFuncEvery(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncEvery(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    TiValue function = args.at(0);
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    TiObject* applyThis = args.at(1).isUndefinedOrNull() ? exec->globalThisValue() : args.at(1).toObject(exec);
+    TiObject* applyThis = exec->argument(1).isUndefinedOrNull() ? exec->globalThisValue() : exec->argument(1).toObject(exec);
 
     TiValue result = jsBoolean(true);
 
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     unsigned k = 0;
     if (callType == CallTypeJS && isTiArray(&exec->globalData(), thisObj)) {
         TiFunction* f = asFunction(function);
         TiArray* array = asArray(thisObj);
-        CachedCall cachedCall(exec, f, 3, exec->exceptionSlot());
+        CachedCall cachedCall(exec, f, 3);
         for (; k < length && !exec->hadException(); ++k) {
             if (UNLIKELY(!array->canGetIndex(k)))
                 break;
             
             cachedCall.setThis(applyThis);
             cachedCall.setArgument(0, array->getIndex(k));
-            cachedCall.setArgument(1, jsNumber(exec, k));
+            cachedCall.setArgument(1, jsNumber(k));
             cachedCall.setArgument(2, thisObj);
             TiValue result = cachedCall.call();
             if (!result.toBoolean(cachedCall.newCallFrame(exec)))
-                return jsBoolean(false);
+                return TiValue::encode(jsBoolean(false));
         }
     }
     for (; k < length && !exec->hadException(); ++k) {
         PropertySlot slot(thisObj);
-
         if (!thisObj->getPropertySlot(exec, k, slot))
             continue;
 
         MarkedArgumentBuffer eachArguments;
-
         eachArguments.append(slot.getValue(exec, k));
-        eachArguments.append(jsNumber(exec, k));
+        eachArguments.append(jsNumber(k));
         eachArguments.append(thisObj);
 
-        bool predicateResult = call(exec, function, callType, callData, applyThis, eachArguments).toBoolean(exec);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
+        bool predicateResult = call(exec, function, callType, callData, applyThis, eachArguments).toBoolean(exec);
         if (!predicateResult) {
             result = jsBoolean(false);
             break;
         }
     }
 
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncForEach(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncForEach(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
-    TiValue function = args.at(0);
-    CallData callData;
-    CallType callType = function.getCallData(callData);
-    if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
-
-    TiObject* applyThis = args.at(1).isUndefinedOrNull() ? exec->globalThisValue() : args.at(1).toObject(exec);
-
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    TiValue function = exec->argument(0);
+    CallData callData;
+    CallType callType = getCallData(function, callData);
+    if (callType == CallTypeNone)
+        return throwVMTypeError(exec);
+
+    TiObject* applyThis = exec->argument(1).isUndefinedOrNull() ? exec->globalThisValue() : exec->argument(1).toObject(exec);
+
     unsigned k = 0;
     if (callType == CallTypeJS && isTiArray(&exec->globalData(), thisObj)) {
         TiFunction* f = asFunction(function);
         TiArray* array = asArray(thisObj);
-        CachedCall cachedCall(exec, f, 3, exec->exceptionSlot());
+        CachedCall cachedCall(exec, f, 3);
         for (; k < length && !exec->hadException(); ++k) {
             if (UNLIKELY(!array->canGetIndex(k)))
                 break;
 
             cachedCall.setThis(applyThis);
             cachedCall.setArgument(0, array->getIndex(k));
-            cachedCall.setArgument(1, jsNumber(exec, k));
+            cachedCall.setArgument(1, jsNumber(k));
             cachedCall.setArgument(2, thisObj);
 
             cachedCall.call();
@@ -821,45 +871,50 @@ TiValue JSC_HOST_CALL arrayProtoFuncForEach(TiExcState* exec, TiObject*, TiValue
 
         MarkedArgumentBuffer eachArguments;
         eachArguments.append(slot.getValue(exec, k));
-        eachArguments.append(jsNumber(exec, k));
+        eachArguments.append(jsNumber(k));
         eachArguments.append(thisObj);
+
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
         call(exec, function, callType, callData, applyThis, eachArguments);
     }
-    return jsUndefined();
+    return TiValue::encode(jsUndefined());
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncSome(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncSome(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    TiValue function = args.at(0);
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
-    TiObject* applyThis = args.at(1).isUndefinedOrNull() ? exec->globalThisValue() : args.at(1).toObject(exec);
+    TiObject* applyThis = exec->argument(1).isUndefinedOrNull() ? exec->globalThisValue() : exec->argument(1).toObject(exec);
 
     TiValue result = jsBoolean(false);
 
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
     unsigned k = 0;
     if (callType == CallTypeJS && isTiArray(&exec->globalData(), thisObj)) {
         TiFunction* f = asFunction(function);
         TiArray* array = asArray(thisObj);
-        CachedCall cachedCall(exec, f, 3, exec->exceptionSlot());
+        CachedCall cachedCall(exec, f, 3);
         for (; k < length && !exec->hadException(); ++k) {
             if (UNLIKELY(!array->canGetIndex(k)))
                 break;
             
             cachedCall.setThis(applyThis);
             cachedCall.setArgument(0, array->getIndex(k));
-            cachedCall.setArgument(1, jsNumber(exec, k));
+            cachedCall.setArgument(1, jsNumber(k));
             cachedCall.setArgument(2, thisObj);
             TiValue result = cachedCall.call();
             if (result.toBoolean(cachedCall.newCallFrame(exec)))
-                return jsBoolean(true);
+                return TiValue::encode(jsBoolean(true));
         }
     }
     for (; k < length && !exec->hadException(); ++k) {
@@ -869,40 +924,45 @@ TiValue JSC_HOST_CALL arrayProtoFuncSome(TiExcState* exec, TiObject*, TiValue th
 
         MarkedArgumentBuffer eachArguments;
         eachArguments.append(slot.getValue(exec, k));
-        eachArguments.append(jsNumber(exec, k));
+        eachArguments.append(jsNumber(k));
         eachArguments.append(thisObj);
 
-        bool predicateResult = call(exec, function, callType, callData, applyThis, eachArguments).toBoolean(exec);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
 
+        bool predicateResult = call(exec, function, callType, callData, applyThis, eachArguments).toBoolean(exec);
         if (predicateResult) {
             result = jsBoolean(true);
             break;
         }
     }
-    return result;
+    return TiValue::encode(result);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-    
-    TiValue function = args.at(0);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
 
     unsigned i = 0;
     TiValue rv;
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    if (!length && args.size() == 1)
-        return throwError(exec, TypeError);
+    if (!length && exec->argumentCount() == 1)
+        return throwVMTypeError(exec);
+
     TiArray* array = 0;
     if (isTiArray(&exec->globalData(), thisObj))
         array = asArray(thisObj);
 
-    if (args.size() >= 2)
-        rv = args.at(1);
+    if (exec->argumentCount() >= 2)
+        rv = exec->argument(1);
     else if (array && array->canGetIndex(0)){
         rv = array->getIndex(0);
         i = 1;
@@ -913,12 +973,12 @@ TiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState* exec, TiObject*, TiValue 
                 break;
         }
         if (!rv)
-            return throwError(exec, TypeError);
+            return throwVMTypeError(exec);
         i++;
     }
 
     if (callType == CallTypeJS && array) {
-        CachedCall cachedCall(exec, asFunction(function), 4, exec->exceptionSlot());
+        CachedCall cachedCall(exec, asFunction(function), 4);
         for (; i < length && !exec->hadException(); ++i) {
             cachedCall.setThis(jsNull());
             cachedCall.setArgument(0, rv);
@@ -928,51 +988,56 @@ TiValue JSC_HOST_CALL arrayProtoFuncReduce(TiExcState* exec, TiObject*, TiValue 
             else
                 break; // length has been made unsafe while we enumerate fallback to slow path
             cachedCall.setArgument(1, v);
-            cachedCall.setArgument(2, jsNumber(exec, i));
+            cachedCall.setArgument(2, jsNumber(i));
             cachedCall.setArgument(3, array);
             rv = cachedCall.call();
         }
         if (i == length) // only return if we reached the end of the array
-            return rv;
+            return TiValue::encode(rv);
     }
 
     for (; i < length && !exec->hadException(); ++i) {
         TiValue prop = getProperty(exec, thisObj, i);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
         if (!prop)
             continue;
         
         MarkedArgumentBuffer eachArguments;
         eachArguments.append(rv);
         eachArguments.append(prop);
-        eachArguments.append(jsNumber(exec, i));
+        eachArguments.append(jsNumber(i));
         eachArguments.append(thisObj);
         
         rv = call(exec, function, callType, callData, jsNull(), eachArguments);
     }
-    return rv;
+    return TiValue::encode(rv);
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState* exec)
 {
-    TiObject* thisObj = thisValue.toThisObject(exec);
-    
-    TiValue function = args.at(0);
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
+    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
+
+    TiValue function = exec->argument(0);
     CallData callData;
-    CallType callType = function.getCallData(callData);
+    CallType callType = getCallData(function, callData);
     if (callType == CallTypeNone)
-        return throwError(exec, TypeError);
+        return throwVMTypeError(exec);
     
     unsigned i = 0;
     TiValue rv;
-    unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    if (!length && args.size() == 1)
-        return throwError(exec, TypeError);
+    if (!length && exec->argumentCount() == 1)
+        return throwVMTypeError(exec);
+
     TiArray* array = 0;
     if (isTiArray(&exec->globalData(), thisObj))
         array = asArray(thisObj);
     
-    if (args.size() >= 2)
-        rv = args.at(1);
+    if (exec->argumentCount() >= 2)
+        rv = exec->argument(1);
     else if (array && array->canGetIndex(length - 1)){
         rv = array->getIndex(length - 1);
         i = 1;
@@ -983,12 +1048,12 @@ TiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState* exec, TiObject*, TiV
                 break;
         }
         if (!rv)
-            return throwError(exec, TypeError);
+            return throwVMTypeError(exec);
         i++;
     }
     
     if (callType == CallTypeJS && array) {
-        CachedCall cachedCall(exec, asFunction(function), 4, exec->exceptionSlot());
+        CachedCall cachedCall(exec, asFunction(function), 4);
         for (; i < length && !exec->hadException(); ++i) {
             unsigned idx = length - i - 1;
             cachedCall.setThis(jsNull());
@@ -996,91 +1061,86 @@ TiValue JSC_HOST_CALL arrayProtoFuncReduceRight(TiExcState* exec, TiObject*, TiV
             if (UNLIKELY(!array->canGetIndex(idx)))
                 break; // length has been made unsafe while we enumerate fallback to slow path
             cachedCall.setArgument(1, array->getIndex(idx));
-            cachedCall.setArgument(2, jsNumber(exec, idx));
+            cachedCall.setArgument(2, jsNumber(idx));
             cachedCall.setArgument(3, array);
             rv = cachedCall.call();
         }
         if (i == length) // only return if we reached the end of the array
-            return rv;
+            return TiValue::encode(rv);
     }
     
     for (; i < length && !exec->hadException(); ++i) {
         unsigned idx = length - i - 1;
         TiValue prop = getProperty(exec, thisObj, idx);
+        if (exec->hadException())
+            return TiValue::encode(jsUndefined());
         if (!prop)
             continue;
         
         MarkedArgumentBuffer eachArguments;
         eachArguments.append(rv);
         eachArguments.append(prop);
-        eachArguments.append(jsNumber(exec, idx));
+        eachArguments.append(jsNumber(idx));
         eachArguments.append(thisObj);
         
         rv = call(exec, function, callType, callData, jsNull(), eachArguments);
     }
-    return rv;        
+    return TiValue::encode(rv);        
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncIndexOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncIndexOf(TiExcState* exec)
 {
-    // Ti 1.5 Extension by Mozilla
-    // Documentation: http://developer.mozilla.org/en/docs/Core_Ti_1.5_Reference:Global_Objects:Array:indexOf
-
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
-    unsigned index = 0;
-    double d = args.at(1).toInteger(exec);
+    // 15.4.4.14
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    if (d < 0)
-        d += length;
-    if (d > 0) {
-        if (d > length)
-            index = length;
-        else
-            index = static_cast<unsigned>(d);
-    }
+    if (exec->hadException())
+        return TiValue::encode(jsUndefined());
 
-    TiValue searchElement = args.at(0);
+    unsigned index = argumentClampedIndexFromStartOrEnd(exec, 1, length);
+    TiValue searchElement = exec->argument(0);
     for (; index < length; ++index) {
         TiValue e = getProperty(exec, thisObj, index);
         if (!e)
             continue;
         if (TiValue::strictEqual(exec, searchElement, e))
-            return jsNumber(exec, index);
+            return TiValue::encode(jsNumber(index));
     }
 
-    return jsNumber(exec, -1);
+    return TiValue::encode(jsNumber(-1));
 }
 
-TiValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(TiExcState* exec, TiObject*, TiValue thisValue, const ArgList& args)
+EncodedTiValue JSC_HOST_CALL arrayProtoFuncLastIndexOf(TiExcState* exec)
 {
-    // Ti 1.6 Extension by Mozilla
-    // Documentation: http://developer.mozilla.org/en/docs/Core_Ti_1.5_Reference:Global_Objects:Array:lastIndexOf
-
-    TiObject* thisObj = thisValue.toThisObject(exec);
-
+    // 15.4.4.15
+    TiObject* thisObj = exec->hostThisValue().toThisObject(exec);
     unsigned length = thisObj->get(exec, exec->propertyNames().length).toUInt32(exec);
-    int index = length - 1;
-    double d = args.at(1).toIntegerPreserveNaN(exec);
+    if (!length)
+        return TiValue::encode(jsNumber(-1));
 
-    if (d < 0) {
-        d += length;
-        if (d < 0)
-            return jsNumber(exec, -1);
+    unsigned index = length - 1;
+    TiValue fromValue = exec->argument(1);
+    if (!fromValue.isUndefined()) {
+        double fromDouble = fromValue.toInteger(exec);
+        if (fromDouble < 0) {
+            fromDouble += length;
+            if (fromDouble < 0)
+                return TiValue::encode(jsNumber(-1));
+        }
+        if (fromDouble < length)
+            index = static_cast<unsigned>(fromDouble);
     }
-    if (d < length)
-        index = static_cast<int>(d);
 
-    TiValue searchElement = args.at(0);
-    for (; index >= 0; --index) {
+    TiValue searchElement = exec->argument(0);
+    do {
+        ASSERT(index < length);
         TiValue e = getProperty(exec, thisObj, index);
         if (!e)
             continue;
         if (TiValue::strictEqual(exec, searchElement, e))
-            return jsNumber(exec, index);
-    }
+            return TiValue::encode(jsNumber(index));
+    } while (index--);
 
-    return jsNumber(exec, -1);
+    return TiValue::encode(jsNumber(-1));
 }
 
 } // namespace TI

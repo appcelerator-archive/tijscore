@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -34,6 +34,7 @@
 #define APIShims_h
 
 #include "CallFrame.h"
+#include "GCActivityCallback.h"
 #include "TiLock.h"
 #include <wtf/WTFThreadData.h>
 
@@ -45,8 +46,12 @@ protected:
         : m_globalData(globalData)
         , m_entryIdentifierTable(wtfThreadData().setCurrentIdentifierTable(globalData->identifierTable))
     {
+        UNUSED_PARAM(registerThread);
+#if ENABLE(JSC_MULTIPLE_THREADS)
         if (registerThread)
-            globalData->heap.registerThread();
+            globalData->heap.machineThreads().addCurrentThread();
+#endif
+        m_globalData->heap.activityCallback()->synchronize();
         m_globalData->timeoutChecker.start();
     }
 
@@ -92,6 +97,7 @@ public:
 
     ~APICallbackShim()
     {
+        m_globalData->heap.activityCallback()->synchronize();
         wtfThreadData().setCurrentIdentifierTable(m_globalData->identifierTable);
     }
 

@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -27,8 +27,8 @@
 #include "config.h"
 #include "Lookup.h"
 
+#include "Executable.h"
 #include "TiFunction.h"
-#include "PrototypeFunction.h"
 
 namespace TI {
 
@@ -40,7 +40,7 @@ void HashTable::createTable(TiGlobalData* globalData) const
     for (int i = 0; i < compactSize; ++i)
         entries[i].setKey(0);
     for (int i = 0; values[i].key; ++i) {
-        UString::Rep* identifier = Identifier::add(globalData, values[i].key).releaseRef();
+        StringImpl* identifier = Identifier::add(globalData, values[i].key).leakRef();
         int hashIndex = identifier->existingHash() & compactHashSizeMask;
         HashEntry* entry = &entries[hashIndex];
 
@@ -67,7 +67,7 @@ void HashTable::deleteTable() const
     if (table) {
         int max = compactSize;
         for (int i = 0; i != max; ++i) {
-            if (UString::Rep* key = table[i].key())
+            if (StringImpl* key = table[i].key())
                 key->deref();
         }
         delete [] table;
@@ -77,23 +77,26 @@ void HashTable::deleteTable() const
 
 void setUpStaticFunctionSlot(TiExcState* exec, const HashEntry* entry, TiObject* thisObj, const Identifier& propertyName, PropertySlot& slot)
 {
+    ASSERT(thisObj->structure()->anonymousSlotCount() > 0);
+    ASSERT(thisObj->getAnonymousValue(0).isCell() && asObject(thisObj->getAnonymousValue(0).asCell())->isGlobalObject());
     ASSERT(entry->attributes() & Function);
-    TiValue* location = thisObj->getDirectLocation(propertyName);
+    WriteBarrierBase<Unknown>* location = thisObj->getDirectLocation(exec->globalData(), propertyName);
 
     if (!location) {
-        InternalFunction* function;
+        TiFunction* function;
+        TiGlobalObject* globalObject = asGlobalObject(thisObj->getAnonymousValue(0).asCell());
 #if ENABLE(JIT) && ENABLE(JIT_OPTIMIZE_NATIVE_CALL)
         if (entry->generator())
-            function = new (exec) NativeFunctionWrapper(exec, exec->lexicalGlobalObject()->prototypeFunctionStructure(), entry->functionLength(), propertyName, exec->globalData().getThunk(entry->generator()), entry->function());
+            function = new (exec) TiFunction(exec, globalObject, globalObject->functionStructure(), entry->functionLength(), propertyName, exec->globalData().getHostFunction(entry->function(), entry->generator()));
         else
 #endif
-            function = new (exec) NativeFunctionWrapper(exec, exec->lexicalGlobalObject()->prototypeFunctionStructure(), entry->functionLength(), propertyName, entry->function());
+            function = new (exec) TiFunction(exec, globalObject, globalObject->functionStructure(), entry->functionLength(), propertyName, entry->function());
 
-        thisObj->putDirectFunction(propertyName, function, entry->attributes());
-        location = thisObj->getDirectLocation(propertyName);
+        thisObj->putDirectFunction(exec->globalData(), propertyName, function, entry->attributes());
+        location = thisObj->getDirectLocation(exec->globalData(), propertyName);
     }
 
-    slot.setValueSlot(thisObj, location, thisObj->offsetForLocation(location));
+    slot.setValue(thisObj, location->get(), thisObj->offsetForLocation(location));
 }
 
 } // namespace TI

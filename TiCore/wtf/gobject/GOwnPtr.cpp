@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "GOwnPtr.h"
+
+#if ENABLE(GLIB_SUPPORT)
 
 #include <gio/gio.h>
 #include <glib.h>
@@ -66,9 +68,6 @@ template <> void freeOwnedGPtr<GDir>(GDir* ptr)
         g_dir_close(ptr);
 }
 
-template <> void freeOwnedGPtr<GFile>(GFile* ptr)
-{
-    if (ptr)
-        g_object_unref(ptr);
-}
 } // namespace WTI
+
+#endif // ENABLE(GLIB_SUPPORT)

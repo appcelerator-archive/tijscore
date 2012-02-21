@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -47,7 +47,7 @@ void RopeImpl::derefFibersNonRecursive(Vector<RopeImpl*, 32>& workQueue)
             else
                 nextRope->deref();
         } else
-            static_cast<UStringImpl*>(fiber)->deref();
+            static_cast<StringImpl*>(fiber)->deref();
     }
 }
 

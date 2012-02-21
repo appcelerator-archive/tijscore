@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -40,6 +40,7 @@
 #include "Opcode.h"
 #include "PropertySlot.h"
 #include "Structure.h"
+#include "StructureChain.h"
 #include <wtf/VectorTraits.h>
 
 #define POLYMORPHIC_LIST_CACHE_SIZE 8
@@ -61,70 +62,78 @@ namespace TI {
     class StructureChain;
 
     // Structure used by op_get_by_id_self_list and op_get_by_id_proto_list instruction to hold data off the main opcode stream.
-    struct PolymorphicAccessStructureList : FastAllocBase {
+    struct PolymorphicAccessStructureList {
+        WTF_MAKE_FAST_ALLOCATED;
+    public:
         struct PolymorphicStubInfo {
             bool isChain;
             PolymorphicAccessStructureListStubRoutineType stubRoutine;
-            Structure* base;
+            WriteBarrier<Structure> base;
             union {
-                Structure* proto;
-                StructureChain* chain;
+                WriteBarrierBase<Structure> proto;
+                WriteBarrierBase<StructureChain> chain;
             } u;
 
-            void set(PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base)
+            PolymorphicStubInfo()
+            {
+                u.proto.clear();
+            }
+
+            void set(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base)
             {
                 stubRoutine = _stubRoutine;
-                base = _base;
-                u.proto = 0;
+                base.set(globalData, owner, _base);
+                u.proto.clear();
                 isChain = false;
             }
             
-            void set(PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base, Structure* _proto)
+            void set(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base, Structure* _proto)
             {
                 stubRoutine = _stubRoutine;
-                base = _base;
-                u.proto = _proto;
+                base.set(globalData, owner, _base);
+                u.proto.set(globalData, owner, _proto);
                 isChain = false;
             }
             
-            void set(PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base, StructureChain* _chain)
+            void set(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType _stubRoutine, Structure* _base, StructureChain* _chain)
             {
                 stubRoutine = _stubRoutine;
-                base = _base;
-                u.chain = _chain;
+                base.set(globalData, owner, _base);
+                u.chain.set(globalData, owner, _chain);
                 isChain = true;
             }
         } list[POLYMORPHIC_LIST_CACHE_SIZE];
         
-        PolymorphicAccessStructureList(PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase)
+        PolymorphicAccessStructureList(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase)
         {
-            list[0].set(stubRoutine, firstBase);
+            list[0].set(globalData, owner, stubRoutine, firstBase);
         }
 
-        PolymorphicAccessStructureList(PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase, Structure* firstProto)
+        PolymorphicAccessStructureList(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase, Structure* firstProto)
         {
-            list[0].set(stubRoutine, firstBase, firstProto);
+            list[0].set(globalData, owner, stubRoutine, firstBase, firstProto);
         }
 
-        PolymorphicAccessStructureList(PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase, StructureChain* firstChain)
+        PolymorphicAccessStructureList(TiGlobalData& globalData, TiCell* owner, PolymorphicAccessStructureListStubRoutineType stubRoutine, Structure* firstBase, StructureChain* firstChain)
         {
-            list[0].set(stubRoutine, firstBase, firstChain);
+            list[0].set(globalData, owner, stubRoutine, firstBase, firstChain);
         }
 
-        void derefStructures(int count)
+        void visitAggregate(SlotVisitor& visitor, int count)
         {
             for (int i = 0; i < count; ++i) {
                 PolymorphicStubInfo& info = list[i];
-
-                ASSERT(info.base);
-                info.base->deref();
-
-                if (info.u.proto) {
-                    if (info.isChain)
-                        info.u.chain->deref();
-                    else
-                        info.u.proto->deref();
+                if (!info.base) {
+                    // We're being marked during initialisation of an entry
+                    ASSERT(!info.u.proto);
+                    continue;
                 }
+                
+                visitor.append(&info.base);
+                if (info.u.proto && !info.isChain)
+                    visitor.append(&info.u.proto);
+                if (info.u.chain && info.isChain)
+                    visitor.append(&info.u.chain);
             }
         }
     };
@@ -135,7 +144,7 @@ namespace TI {
 #if !ENABLE(COMPUTED_GOTO_INTERPRETER)
             // We have to initialize one of the pointer members to ensure that
             // the entire struct is initialized, when opcode is not a pointer.
-            u.jsCell = 0;
+            u.jsCell.clear();
 #endif
             u.opcode = opcode;
         }
@@ -144,25 +153,41 @@ namespace TI {
         {
             // We have to initialize one of the pointer members to ensure that
             // the entire struct is initialized in 64-bit.
-            u.jsCell = 0;
+            u.jsCell.clear();
             u.operand = operand;
         }
 
-        Instruction(Structure* structure) { u.structure = structure; }
-        Instruction(StructureChain* structureChain) { u.structureChain = structureChain; }
-        Instruction(TiCell* jsCell) { u.jsCell = jsCell; }
+        Instruction(TiGlobalData& globalData, TiCell* owner, Structure* structure)
+        {
+            u.structure.clear();
+            u.structure.set(globalData, owner, structure);
+        }
+        Instruction(TiGlobalData& globalData, TiCell* owner, StructureChain* structureChain)
+        {
+            u.structureChain.clear();
+            u.structureChain.set(globalData, owner, structureChain);
+        }
+        Instruction(TiGlobalData& globalData, TiCell* owner, TiCell* jsCell)
+        {
+            u.jsCell.clear();
+            u.jsCell.set(globalData, owner, jsCell);
+        }
         Instruction(PolymorphicAccessStructureList* polymorphicStructures) { u.polymorphicStructures = polymorphicStructures; }
         Instruction(PropertySlot::GetValueFunc getterFunc) { u.getterFunc = getterFunc; }
 
         union {
             Opcode opcode;
             int operand;
-            Structure* structure;
-            StructureChain* structureChain;
-            TiCell* jsCell;
+            WriteBarrierBase<Structure> structure;
+            WriteBarrierBase<StructureChain> structureChain;
+            WriteBarrierBase<TiCell> jsCell;
             PolymorphicAccessStructureList* polymorphicStructures;
             PropertySlot::GetValueFunc getterFunc;
         } u;
+        
+    private:
+        Instruction(StructureChain*);
+        Instruction(Structure*);
     };
 
 } // namespace TI

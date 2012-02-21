@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -52,16 +52,14 @@ namespace TI {
     public:
         static TiPropertyNameIterator* create(TiExcState*, TiObject*);
         
-        static PassRefPtr<Structure> createStructure(TiValue prototype)
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype)
         {
-            return Structure::create(prototype, TypeInfo(CompoundType, OverridesMarkChildren), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(CompoundType, OverridesVisitChildren), AnonymousSlotCount, &s_info);
         }
-        
-        virtual ~TiPropertyNameIterator();
 
         virtual bool isPropertyNameIterator() const { return true; }
 
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
 
         bool getOffset(size_t i, int& offset)
         {
@@ -74,41 +72,43 @@ namespace TI {
         TiValue get(TiExcState*, TiObject*, size_t i);
         size_t size() { return m_jsStringsSize; }
 
-        void setCachedStructure(Structure* structure)
+        void setCachedStructure(TiGlobalData& globalData, Structure* structure)
         {
             ASSERT(!m_cachedStructure);
             ASSERT(structure);
-            m_cachedStructure = structure;
+            m_cachedStructure.set(globalData, this, structure);
         }
         Structure* cachedStructure() { return m_cachedStructure.get(); }
 
-        void setCachedPrototypeChain(NonNullPassRefPtr<StructureChain> cachedPrototypeChain) { m_cachedPrototypeChain = cachedPrototypeChain; }
+        void setCachedPrototypeChain(TiGlobalData& globalData, StructureChain* cachedPrototypeChain) { m_cachedPrototypeChain.set(globalData, this, cachedPrototypeChain); }
         StructureChain* cachedPrototypeChain() { return m_cachedPrototypeChain.get(); }
+        
+        static const ClassInfo s_info;
 
     private:
         TiPropertyNameIterator(TiExcState*, PropertyNameArrayData* propertyNameArrayData, size_t numCacheableSlot);
 
-        RefPtr<Structure> m_cachedStructure;
-        RefPtr<StructureChain> m_cachedPrototypeChain;
+        WriteBarrier<Structure> m_cachedStructure;
+        WriteBarrier<StructureChain> m_cachedPrototypeChain;
         uint32_t m_numCacheableSlots;
         uint32_t m_jsStringsSize;
-        OwnArrayPtr<TiValue> m_jsStrings;
+        OwnArrayPtr<WriteBarrier<Unknown> > m_jsStrings;
     };
 
-    inline void Structure::setEnumerationCache(TiPropertyNameIterator* enumerationCache)
+    inline void Structure::setEnumerationCache(TiGlobalData& globalData, TiPropertyNameIterator* enumerationCache)
     {
         ASSERT(!isDictionary());
-        m_enumerationCache = enumerationCache;
-    }
-
-    inline void Structure::clearEnumerationCache(TiPropertyNameIterator* enumerationCache)
-    {
-        m_enumerationCache.clear(enumerationCache);
+        m_enumerationCache.set(globalData, this, enumerationCache);
     }
 
     inline TiPropertyNameIterator* Structure::enumerationCache()
     {
         return m_enumerationCache.get();
+    }
+
+    ALWAYS_INLINE TiPropertyNameIterator* Register::propertyNameIterator() const
+    {
+        return static_cast<TiPropertyNameIterator*>(jsValue().asCell());
     }
 
 } // namespace TI

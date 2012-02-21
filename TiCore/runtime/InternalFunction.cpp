@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -31,38 +31,43 @@
 #include "InternalFunction.h"
 
 #include "FunctionPrototype.h"
+#include "TiGlobalObject.h"
 #include "TiString.h"
 
 namespace TI {
 
+// Ensure the compiler generates a vtable for InternalFunction!
+void InternalFunction::vtableAnchor() {}
+
 ASSERT_CLASS_FITS_IN_CELL(InternalFunction);
 
-const ClassInfo InternalFunction::info = { "Function", 0, 0, 0 };
+const ClassInfo InternalFunction::s_info = { "Function", &TiObjectWithGlobalObject::s_info, 0, 0 };
 
-const ClassInfo* InternalFunction::classInfo() const
+InternalFunction::InternalFunction(VPtrStealingHackType)
+    : TiObjectWithGlobalObject(VPtrStealingHack)
 {
-    return &info;
 }
 
-InternalFunction::InternalFunction(TiGlobalData* globalData, NonNullPassRefPtr<Structure> structure, const Identifier& name)
-    : TiObject(structure)
+InternalFunction::InternalFunction(TiGlobalData* globalData, TiGlobalObject* globalObject, Structure* structure, const Identifier& name)
+    : TiObjectWithGlobalObject(globalObject, structure)
 {
-    putDirect(globalData->propertyNames->name, jsString(globalData, name.isNull() ? "" : name.ustring()), DontDelete | ReadOnly | DontEnum);
+    ASSERT(inherits(&s_info));
+    putDirect(*globalData, globalData->propertyNames->name, jsString(globalData, name.isNull() ? "" : name.ustring()), DontDelete | ReadOnly | DontEnum);
 }
 
 const UString& InternalFunction::name(TiExcState* exec)
 {
-    return asString(getDirect(exec->globalData().propertyNames->name))->tryGetValue();
+    return asString(getDirect(exec->globalData(), exec->globalData().propertyNames->name))->tryGetValue();
 }
 
 const UString InternalFunction::displayName(TiExcState* exec)
 {
-    TiValue displayName = getDirect(exec->globalData().propertyNames->displayName);
+    TiValue displayName = getDirect(exec->globalData(), exec->globalData().propertyNames->displayName);
     
     if (displayName && isTiString(&exec->globalData(), displayName))
         return asString(displayName)->tryGetValue();
     
-    return UString::null();
+    return UString();
 }
 
 const UString InternalFunction::calculatedDisplayName(TiExcState* exec)

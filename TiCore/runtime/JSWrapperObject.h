@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -35,40 +35,43 @@ namespace TI {
 
     // This class is used as a base for classes such as String,
     // Number, Boolean and Date which are wrappers for primitive types.
-    class JSWrapperObject : public TiObject {
+    class JSWrapperObject : public JSNonFinalObject {
     protected:
-        explicit JSWrapperObject(NonNullPassRefPtr<Structure>);
+        explicit JSWrapperObject(TiGlobalData&, Structure*);
 
     public:
-        TiValue internalValue() const { return m_internalValue; }
-        void setInternalValue(TiValue);
+        TiValue internalValue() const;
+        void setInternalValue(TiGlobalData&, TiValue);
 
-        static PassRefPtr<Structure> createStructure(TiValue prototype) 
+        static Structure* createStructure(TiGlobalData& globalData, TiValue prototype) 
         { 
-            return Structure::create(prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount);
+            return Structure::create(globalData, prototype, TypeInfo(ObjectType, StructureFlags), AnonymousSlotCount, &s_info);
         }
 
     protected:
-        static const unsigned AnonymousSlotCount = 1 + TiObject::AnonymousSlotCount;
+        static const unsigned StructureFlags = OverridesVisitChildren | JSNonFinalObject::StructureFlags;
 
     private:
-        virtual void markChildren(MarkStack&);
+        virtual void visitChildren(SlotVisitor&);
         
-        TiValue m_internalValue;
+        WriteBarrier<Unknown> m_internalValue;
     };
 
-    inline JSWrapperObject::JSWrapperObject(NonNullPassRefPtr<Structure> structure)
-        : TiObject(structure)
+    inline JSWrapperObject::JSWrapperObject(TiGlobalData& globalData, Structure* structure)
+        : JSNonFinalObject(globalData, structure)
     {
-        putAnonymousValue(0, jsNull());
     }
 
-    inline void JSWrapperObject::setInternalValue(TiValue value)
+    inline TiValue JSWrapperObject::internalValue() const
+    {
+        return m_internalValue.get();
+    }
+
+    inline void JSWrapperObject::setInternalValue(TiGlobalData& globalData, TiValue value)
     {
         ASSERT(value);
         ASSERT(!value.isObject());
-        m_internalValue = value;
-        putAnonymousValue(0, value);
+        m_internalValue.set(globalData, this, value);
     }
 
 } // namespace TI

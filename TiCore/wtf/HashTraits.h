@@ -2,7 +2,7 @@
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
  * are licensed under the Apache Public License (version 2) and
- * are Copyright (c) 2009 by Appcelerator, Inc.
+ * are Copyright (c) 2009-2012 by Appcelerator, Inc.
  */
 
 /*
@@ -88,11 +88,13 @@ namespace WTI {
         static bool isDeletedValue(P* value) { return value == reinterpret_cast<P*>(-1); }
     };
 
-    template<typename P> struct HashTraits<RefPtr<P> > : GenericHashTraits<RefPtr<P> > {
+    template<typename T> struct SimpleClassHashTraits : GenericHashTraits<T> {
         static const bool emptyValueIsZero = true;
-        static void constructDeletedValue(RefPtr<P>& slot) { new (&slot) RefPtr<P>(HashTableDeletedValue); }
-        static bool isDeletedValue(const RefPtr<P>& value) { return value.isHashTableDeletedValue(); }
+        static void constructDeletedValue(T& slot) { new (&slot) T(HashTableDeletedValue); }
+        static bool isDeletedValue(const T& value) { return value.isHashTableDeletedValue(); }
     };
+
+    template<typename P> struct HashTraits<RefPtr<P> > : SimpleClassHashTraits<RefPtr<P> > { };
 
     // special traits for pairs, helpful for their use in HashMap implementation
 
