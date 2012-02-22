@@ -57,7 +57,7 @@ GCC_WARN_NON_VIRTUAL_DESTRUCTOR = YES;
 LINKER_DISPLAYS_MANGLED_NAMES = YES;
 PREBINDING = NO;
 VALID_ARCHS = $(VALID_ARCHS_$(REAL_PLATFORM_NAME));
-VALID_ARCHS_iphoneos = $(ARCHS_STANDARD_32_64_BIT) armv7;
+VALID_ARCHS_iphoneos = $(ARCHS_STANDARD_32_64_BIT) armv6;
 VALID_ARCHS_iphonesimulator = $(ARCHS_STANDARD_32_BIT);
 VALID_ARCHS_macosx = i386 ppc x86_64 ppc64 $(ARCHS_UNIVERSAL_IPHONE_OS);
 WARNING_CFLAGS_BASE = -Wall -Wextra -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings;
