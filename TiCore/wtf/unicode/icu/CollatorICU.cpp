@@ -36,6 +36,15 @@
 #include "config.h"
 #include "Collator.h"
 
+// Because Apple "helpfully" disables access to ICU collation, we have to
+// implement our own collation mechanisms using CFString and CFLocale.
+// Fortunately, these are ICU-compatible, including ICU's UChar being
+// the same sizeof() as UniChar (16 bit)!
+//
+// If they ever change that, we just need to patch this out to #undef...
+// in case they change their minds (again).
+#define USE_TI_UCOL_REPLACEMENTS
+
 #if USE(ICU_UNICODE) && !UCONFIG_NO_COLLATION
 
 #include "Assertions.h"
@@ -50,12 +59,14 @@
 
 namespace WTI {
 
+#ifndef USE_TI_UCOL_REPLACEMENTS
 static UCollator* cachedCollator;
 static Mutex& cachedCollatorMutex()
 {
     AtomicallyInitializedStatic(Mutex&, mutex = *new Mutex);
     return mutex;
 }
+#endif
 
 Collator::Collator(const char* locale)
     : m_collator(0)
@@ -98,14 +109,48 @@ void Collator::setOrderLowerFirst(bool lowerFirst)
 
 Collator::Result Collator::collate(const UChar* lhs, size_t lhsLength, const UChar* rhs, size_t rhsLength) const
 {
+#ifndef USE_TI_UCOL_REPLACEMENTS
     if (!m_collator)
         createCollator();
 
     return static_cast<Result>(ucol_strcoll(m_collator, lhs, lhsLength, rhs, rhsLength));
+#else
+    RetainPtr<CFStringRef> localeStr = CFStringCreateWithCString(NULL, m_locale, kCFStringEncodingASCII);
+    RetainPtr<CFLocaleRef> locale = CFLocaleCreate(NULL, localeStr.get());
+    
+    if (!locale) {
+        locale = CFLocaleCopyCurrent();
+    }
+    
+    // CFStringCreateWithCharacters does not accept -1; we have to determine the terminator position ourselves.
+    if (lhsLength == (size_t)(-1)) {
+        lhsLength = 0;
+        while (*(lhs++) != 0x0000) {
+            lhsLength++;
+        }
+    }
+    if (rhsLength == (size_t)(-1)) {
+        rhsLength = 0;
+        while (*(rhs++) != 0x0000) {
+            rhsLength++;
+        }
+    }
+    
+    
+    RetainPtr<CFStringRef> lhsRef = CFStringCreateWithCharacters(NULL, (const UniChar*)lhs, lhsLength);
+    RetainPtr<CFStringRef> rhsRef = CFStringCreateWithCharacters(NULL, (const UniChar*)rhs, rhsLength);
+    
+    return static_cast<Result>(CFStringCompareWithOptionsAndLocale(lhsRef.get(), 
+                                                                   rhsRef.get(), 
+                                                                   CFRangeMake(0, CFStringGetLength(lhsRef.get())), 
+                                                                   kCFCompareLocalized, 
+                                                                   locale.get()));
+#endif
 }
 
 void Collator::createCollator() const
 {
+#ifndef USE_TI_UCOL_REPLACEMENTS
     ASSERT(!m_collator);
     UErrorCode status = U_ZERO_ERROR;
 
@@ -138,10 +183,12 @@ void Collator::createCollator() const
 
     ucol_setAttribute(m_collator, UCOL_CASE_FIRST, m_lowerFirst ? UCOL_LOWER_FIRST : UCOL_UPPER_FIRST, &status);
     ASSERT(U_SUCCESS(status));
+#endif
 }
 
 void Collator::releaseCollator()
 {
+#ifndef USE_TI_UCOL_REPLACEMENTS
     {
         Locker<Mutex> lock(cachedCollatorMutex());
         if (cachedCollator)
@@ -149,6 +196,7 @@ void Collator::releaseCollator()
         cachedCollator = m_collator;
         m_collator  = 0;
     }
+#endif
 }
 
 }
