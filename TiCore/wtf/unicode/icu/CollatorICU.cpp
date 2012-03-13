@@ -122,20 +122,7 @@ Collator::Result Collator::collate(const UChar* lhs, size_t lhsLength, const UCh
         locale = CFLocaleCopyCurrent();
     }
     
-    // CFStringCreateWithCharacters does not accept -1; we have to determine the terminator position ourselves.
-    if (lhsLength == (size_t)(-1)) {
-        lhsLength = 0;
-        while (*(lhs++) != 0x0000) {
-            lhsLength++;
-        }
-    }
-    if (rhsLength == (size_t)(-1)) {
-        rhsLength = 0;
-        while (*(rhs++) != 0x0000) {
-            rhsLength++;
-        }
-    }
-    
+    // We assume that lhsLength/rhsLength != -1, which is reasonable based on the source.
     
     RetainPtr<CFStringRef> lhsRef = CFStringCreateWithCharacters(NULL, (const UniChar*)lhs, lhsLength);
     RetainPtr<CFStringRef> rhsRef = CFStringCreateWithCharacters(NULL, (const UniChar*)rhs, rhsLength);
