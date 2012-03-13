@@ -6,7 +6,7 @@
 # naming conventions, etc so as not to conflict with an
 # existing install of KJS
 #
-import os, shutil, sys, re
+import os, shutil, sys, re, datetime
 
 if len(sys.argv) > 1:
 	root_dir = sys.argv[1]
@@ -72,7 +72,7 @@ copyright_ext = (
 
 #['jsAPIValueWrapper','TiAPIValueWrapper'],
 
-COPYRIGHT_NOW = date.today().strftime('%Y')
+COPYRIGHT_NOW = datetime.date.today().strftime('%Y')
 COPYRIGHT = """/**
  * Appcelerator Titanium License
  * This source code and all modifications done by Appcelerator
