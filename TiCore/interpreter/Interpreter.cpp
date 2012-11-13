@@ -2531,6 +2531,8 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int index = vPC[2].u.operand;
         int skip = vPC[3].u.operand;
 
+//NOTE: When merging in a newer JSCore, remove the following pragma because the newer version probably has something better.
+#pragma clang diagnostic ignored "-Wunused-variable"
         ScopeChainNode* scopeChain = callFrame->scopeChain();
         ScopeChainIterator iter = scopeChain->begin();
         ScopeChainIterator end = scopeChain->end();
