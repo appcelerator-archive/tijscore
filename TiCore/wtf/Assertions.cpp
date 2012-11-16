@@ -105,6 +105,8 @@ static void vprintf_stderr_common(const char* format, va_list args)
 {
     if (strstr(format, "%@")) {
         CFStringRef cfFormat = CFStringCreateWithCString(NULL, format, kCFStringEncodingUTF8);
+//TODO: When merging in a newer JSCore, remove the following pragma because the newer version already has it.
+#pragma clang diagnostic ignored "-Wformat-nonliteral"
         CFStringRef str = CFStringCreateWithFormatAndArguments(NULL, NULL, cfFormat, args);
 
         int length = CFStringGetMaximumSizeForEncoding(CFStringGetLength(str), kCFStringEncodingUTF8);

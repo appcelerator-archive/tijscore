@@ -72,6 +72,11 @@
 #include <stdio.h>
 #include <wtf/Threading.h>
 
+#include "TiContextRefPrivate.h"
+#include "TiStringRef.h"
+#include "TiValueRef.h"
+#include "TiObjectRef.h"
+
 #if ENABLE(JIT)
 #include "JIT.h"
 #endif
@@ -671,6 +676,17 @@ NEVER_INLINE HandlerInfo* Interpreter::throwException(CallFrame*& callFrame, TiV
         if (exception->isErrorInstance() && static_cast<ErrorInstance*>(exception)->appendSourceToMessage())
             appendSourceToError(callFrame, static_cast<ErrorInstance*>(exception), bytecodeOffset);
 
+		/* BEGIN APPCELERATOR PATCH: For allowing native Titanium modules to
+		 see the backtrace, which is hidden once the native function is called,
+		 we have to inject the backtrace into the error object itself. */
+		TiStringRef backtrace=TiContextCreateBacktrace((TiContextRef)callFrame,50);
+		TiValueRef backtraceValue = TiValueMakeString((TiContextRef)callFrame,backtrace);
+		TiStringRef backKey = TiStringCreateWithUTF8CString("backtrace");
+		TiObjectSetProperty((TiContextRef)callFrame, (TiObjectRef)exception, backKey, backtraceValue, 0, NULL);
+		TiStringRelease(backKey);
+		TiStringRelease(backtrace);
+		/* END APPCELERATOR PATCH - BTH*/
+		
         // Using hasExpressionInfo to imply we are interested in rich exception info.
         if (codeBlock->hasExpressionInfo() && !hasErrorInfo(callFrame, exception)) {
             ASSERT(codeBlock->hasLineInfo());
@@ -2515,6 +2531,8 @@ TiValue Interpreter::privateExecute(ExecutionFlag flag, RegisterFile* registerFi
         int index = vPC[2].u.operand;
         int skip = vPC[3].u.operand;
 
+//NOTE: When merging in a newer JSCore, remove the following pragma because the newer version probably has something better.
+#pragma clang diagnostic ignored "-Wunused-variable"
         ScopeChainNode* scopeChain = callFrame->scopeChain();
         ScopeChainIterator iter = scopeChain->begin();
         ScopeChainIterator end = scopeChain->end();
