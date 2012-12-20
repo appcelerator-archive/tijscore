@@ -20,8 +20,8 @@ xcodebuild -project TiCore/TiCore.xcodeproj -sdk iphoneos -configuration ${CONFI
 lipo TiCore/build/${CONFIG}-iphonesimulator/libTiCore.a TiCore/build/${CONFIG}-iphoneos/libTiCore.a -create -output TiCore/build/libTiCore.a
 
 for arch in armv7 armv7s i386; do
-	SYMCOUNT=`nm TiCore/build/libTiCore.a 2>/dev/null | grep $arch | wc -l`
-	if (( $SYMCOUNT == 0 )); then
+	xcrun -sdk iphoneos lipo TiCore/build/libTiCore.a -verify_arch $arch
+	if (( $? != 0 )); then
 		echo "ERROR: YOU DID NOT BUILD IN SYMBOLS FOR $arch"
 		exit 1
 	fi
