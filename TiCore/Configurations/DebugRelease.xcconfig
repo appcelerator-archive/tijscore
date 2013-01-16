@@ -24,7 +24,7 @@
 #include "Base.xcconfig"
 
 ARCHS = $(ARCHS_$(REAL_PLATFORM_NAME));
-ARCHS_iphoneos = $(ARCHS_STANDARD_32_64_BIT);
+ARCHS_iphoneos = $(ARCHS_STANDARD_32_64_BIT) armv6;
 ARCHS_iphonesimulator = $(NATIVE_ARCH);
 ARCHS_macosx = $(ARCHS_macosx_$(TARGET_MAC_OS_X_VERSION_MAJOR));
 ARCHS_macosx_1050 = $(NATIVE_ARCH);
