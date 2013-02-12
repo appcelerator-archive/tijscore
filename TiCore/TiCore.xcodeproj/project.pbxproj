@@ -3169,11 +3169,14 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_OBJC_UNUSED_IVARS = YES;
 				DEAD_CODE_STRIPPING = "$(DEAD_CODE_STRIPPING_debug)";
 				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
 				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
+				GCC_WARN_UNUSED_VALUE = NO;
 				SDKROOT = iphoneos;
 				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
+				WARNING_CFLAGS_BASE = "-Wall -Wextra -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings -Wno-unused-private-field";
 			};
 			name = Debug;
 		};
@@ -3181,8 +3184,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_OBJC_UNUSED_IVARS = YES;
+				GCC_WARN_UNUSED_VALUE = NO;
 				SDKROOT = iphoneos;
 				STRIP_INSTALLED_PRODUCT = NO;
+				WARNING_CFLAGS_BASE = "-Wall -Wextra -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings -Wno-unused-private-field";
 			};
 			name = Release;
 		};
@@ -3190,7 +3196,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_OBJC_UNUSED_IVARS = YES;
+				GCC_WARN_UNUSED_VALUE = NO;
 				SDKROOT = iphoneos;
+				WARNING_CFLAGS_BASE = "-Wall -Wextra -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings -Wno-unused-private-field";
 			};
 			name = Production;
 		};
@@ -3219,8 +3228,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				CLANG_ANALYZER_OBJC_UNUSED_IVARS = YES;
+				GCC_WARN_UNUSED_VALUE = NO;
 				SDKROOT = iphoneos;
 				STRIP_INSTALLED_PRODUCT = NO;
+				WARNING_CFLAGS_BASE = "-Wall -Wextra -Wcast-qual -Wchar-subscripts -Wextra-tokens -Wformat=2 -Winit-self -Wmissing-format-attribute -Wmissing-noreturn -Wpacked -Wpointer-arith -Wredundant-decls -Wundef -Wwrite-strings -Wno-unused-private-field";
 			};
 			name = Profiling;
 		};
