@@ -87,8 +87,8 @@ void ProfileGenerator::willExecute(TiExcState* callerCallFrame, const CallIdenti
         JAVASCRIPTCORE_PROFILE_WILL_EXECUTE(m_profileGroup, const_cast<char*>(name.data()), const_cast<char*>(url.data()), callIdentifier.m_lineNumber);
     }
 
-    if (!m_origin)
-        return;
+    //if (!m_origin)
+    //    return;
 
     ASSERT(m_currentNode);
     m_currentNode = m_currentNode->willExecute(callerCallFrame, callIdentifier);
@@ -102,8 +102,8 @@ void ProfileGenerator::didExecute(TiExcState* callerCallFrame, const CallIdentif
         JAVASCRIPTCORE_PROFILE_DID_EXECUTE(m_profileGroup, const_cast<char*>(name.data()), const_cast<char*>(url.data()), callIdentifier.m_lineNumber);
     }
 
-    if (!m_origin)
-        return;
+    //if (!m_origin)
+    //    return;
 
     ASSERT(m_currentNode);
     if (m_currentNode->callIdentifier() != callIdentifier) {

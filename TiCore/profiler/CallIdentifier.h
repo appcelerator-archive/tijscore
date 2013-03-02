@@ -53,8 +53,8 @@ namespace TI {
         }
 
         CallIdentifier(const UString& name, const UString& url, int lineNumber)
-            : m_name(name)
-            , m_url(!url.isNull() ? url : "")
+            : m_name(UString(name.characters(), name.length()))
+            , m_url(!url.isNull() ? UString(url.characters(), url.length()) : "")
             , m_lineNumber(lineNumber)
         {
         }
