@@ -227,7 +227,7 @@ namespace TI {
         Debugger* debugger() const { return m_debugger; }
         void setDebugger(Debugger* debugger) { m_debugger = debugger; }
 
-        virtual bool supportsProfiling() const { return false; }
+        virtual bool supportsProfiling() const { return m_profileGroup != 0; }
         virtual bool supportsRichSourceInfo() const { return true; }
 
         ScopeChainNode* globalScopeChain() { return m_globalScopeChain.get(); }
