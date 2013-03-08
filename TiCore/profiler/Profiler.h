@@ -69,8 +69,10 @@ namespace TI {
 
         void willExecute(TiExcState* callerCallFrame, TiValue function);
         void willExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber);
+        void willExecute(TiExcState* callerCallFrame, const UString& ident);
         void didExecute(TiExcState* callerCallFrame, TiValue function);
         void didExecute(TiExcState* callerCallFrame, const UString& sourceURL, int startingLineNumber);
+        void didExecute(TiExcState* callerCallFrame, const UString& ident);
 
         void exceptionUnwind(TiExcState* handlerCallFrame);
 
