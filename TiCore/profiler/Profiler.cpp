@@ -142,6 +142,15 @@ void Profiler::willExecute(TiExcState* callerCallFrame, const UString& sourceURL
 
     dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::willExecute, callIdentifier, callerCallFrame->lexicalGlobalObject()->profileGroup());
 }
+	
+void Profiler::willExecute(TiExcState* callerCallFrame, const UString& ident)
+{
+    ASSERT(!m_currentProfiles.isEmpty());
+	
+    CallIdentifier callIdentifier = CallIdentifier(ident, "", 0);
+	
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::willExecute, callIdentifier, callerCallFrame->lexicalGlobalObject()->profileGroup());
+}
 
 void Profiler::didExecute(TiExcState* callerCallFrame, TiValue function)
 {
@@ -155,6 +164,14 @@ void Profiler::didExecute(TiExcState* callerCallFrame, const UString& sourceURL,
     ASSERT(!m_currentProfiles.isEmpty());
 
     dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::didExecute, createCallIdentifier(callerCallFrame, TiValue(), sourceURL, startingLineNumber), callerCallFrame->lexicalGlobalObject()->profileGroup());
+}
+
+void Profiler::didExecute(TiExcState* callerCallFrame, const UString& ident)
+{		
+    ASSERT(!m_currentProfiles.isEmpty());
+	
+	CallIdentifier callIdentifier = CallIdentifier(ident, "", 0);
+    dispatchFunctionToProfiles(callerCallFrame, m_currentProfiles, &ProfileGenerator::didExecute, callIdentifier, callerCallFrame->lexicalGlobalObject()->profileGroup());
 }
 
 void Profiler::exceptionUnwind(TiExcState* handlerCallFrame)
