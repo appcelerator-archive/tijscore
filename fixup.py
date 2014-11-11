@@ -15,41 +15,65 @@ else:
 
 
 tokens = [
-	['JSString','TiString'],
-	['JavaScriptCore', 'TiCore'],
-	['JavaScript','Ti'],
-	['JSRetain','TiRetain'],
-	['JSRelease','TiRelease'],
-	['JSObject','TiObject'],
-	['JSLock','TiLock'],
-	['JSUnlock','TiUnlock'],
-	['JSCell','TiCell'],
+	['kJSProperty','kTiProperty'],
 	['JSClass','TiClass'],
-	['JSStatic','TiStatic'],
-	['JSContext','TiContext'],
-	['JSGlobal','TiGlobal'],
+	['kJS', 'kTI'],
+	['JSStringRef','TiStringRef'],
+	['JSObjectRef','TiObjectRef'],
 	['JSValue','TiValue'],
-	['JSArray','TiArray'],
-	['JSByte','TiArray'],
-	['JSFunction','TiFunction'],
-	['JSProperty','TiProperty'],
-	['ExecState','TiExcState'],
-	['JSGlobalData','TiGlobalData'],
-	['kJS','kTI'],
+	['JSContext','TiContext'],
+	['OpaqueJSString', 'OpaqueTiString'],
+	['OpaqueJSClass', 'OpaqueTiClass'],
+	['JSGlobalContext','TiGlobalContext'],
 	['JSEvaluate','TiEval'],
 	['JSCheck','TiCheck'],
 	['JSGarbage','TiGarbage'],
-	['JSType','TiType'],
-	['JSAPI','TiAPI'],
-	['JSCallback','TiCallback'],
-	['JSProfile','TiProfile'],
 	['JSBase','TiBase'],
-	['JSChar','TiChar'],
+	['JSExport','TiExport'],
+	['JSManagedValue','TiManagedValue'],
+	['JSVirtualMachine','TiVirtualMachine'],
+	['JavaScript.h','Ti.h'],
+	['JavaScriptCore.h','TiCore.h'],
+	['JavaScriptCore_h','TiCore_h'],
+	['JavaScript_h','Ti_h'],
+
+	['JSPropertyAttributes', 'TiPropertyAttributes'],
+	['JSClassAttributes', 'TiClassAttributes'],
+	['JSObjectInitializeCallback', 'TiObjectInitializeCallback'],
+	['JSObjectFinalizeCallback', 'TiObjectFinalizeCallback'],
+	['JSObjectConvertToTypeCallback','TiObjectConvertToTypeCallback'],
+	['JSStaticValue','TiStaticValue'],
+	['JSStaticFunction','TiStaticFunction'],
+	['JSPropertyNameArray','TiPropertyNameArray'],
+	['JSPropertyNameAccumulator','TiPropertyNameAccumulator'],
+
+	['JSObjectMake','TiObjectMake'],
+	['JSObjectGet','TiObjectGet'],
+	['JSObjectSet','TiObjectSet'],
+	['JSObjectHas','TiObjectHas'],
+	['JSObjectDelete','TiObjectDelete'],
+	['JSObjectIs','TiObjectIs'],
+	['JSObjectCall','TiObjectCall'],
+	['JSObjectCopy','TiObjectCopy'],
+
+	['JSStringCreateWithCharacters','TiStringCreateWithCharacters'],
+	['JSStringCreateWithUTF8CString','TiStringCreateWithUTF8CString'],
+	['JSStringRetain','TiStringRetain'],
+	['JSStringRelease','TiStringRelease'],
+	['JSStringGetLength','TiStringGetLength'],
+	['JSStringGetCharactersPtr','TiStringGetCharactersPtr'],
+	['JSStringGetMaximumUTF8CStringSize','TiStringGetMaximumUTF8CStringSize'],
+	['JSStringGetUTF8CString','TiStringGetUTF8CString'],
+	['JSStringIsEqual','TiStringIsEqual'],
+	['JSStringIsEqualToUTF8CString','TiStringIsEqualToUTF8CString'],
+	['JSStringCreateWithCFString','TiStringCreateWithCFString'],
+	['JSStringCopyCFString','TiStringCopyCFString'],
 	['WTFMain','WTIMain'],
 ]
 
 extensions = (
 	'.c',
+	'.cc',
 	'.cpp',
 	'.mm',
 	'.h',
@@ -67,6 +91,7 @@ copyright_ext = (
 	'.h',
 	'.cpp',
 	'.c',
+	'.cc',
 	'.mm'
 )
 
@@ -106,6 +131,7 @@ def fix_content(fn):
 	content = content.replace('using WTFNoncopyable::','using WTINoncopyable::')
 	content = content.replace('JSC::','TI::')
 	content = content.replace('WTF::','WTI::')
+	content = content.replace('<TiCore/','<JavaScriptCore/')
 	return content
 	
 def fix_filename(fn):
@@ -141,16 +167,5 @@ for root, dirs, files in os.walk(os.path.abspath(root_dir)):
 		from_ = os.path.join(root, file)
 		#print from_			  
 		fix_filename(from_)
-	
-
-xcode = os.path.join(root_dir,'JavaScriptCore.xcodeproj')
-if os.path.exists(xcode):
-	newxcode = os.path.join(root_dir,'TiCore.xcodeproj')
-	os.rename(xcode,newxcode)
-
-jsc = os.path.join(root_dir,'DerivedSources','JavaScriptCore')
-if os.path.exists(jsc):
-	newjsc = os.path.join(root_dir,'DerivedSources','TiCore')
-	os.rename(jsc,newjsc)
 
 sys.exit(0)
