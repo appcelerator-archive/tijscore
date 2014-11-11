@@ -1,5 +1,9 @@
 *~
-JavaScriptCore*
+.DS_Store
+project.xcworkspace
+xcuserdata
 .svn
+*.pyc
 *.rej
 *.orig
+Build/*
