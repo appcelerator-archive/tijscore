@@ -1,0 +1,14 @@
+language: objective-c
+
+env:
+ global:
+
+before_install:
+
+install:
+
+script: 
+ - ./buildWTF.sh
+ - ./buildTiCore.sh
+
+after_success:
