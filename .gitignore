@@ -1,5 +1,7 @@
 *~
-JavaScriptCore*
+.DS_Store
+project.xcworkspace
+xcuserdata
 .svn
 *.rej
 *.orig
