@@ -37,7 +37,7 @@
 #include "JSCellInlines.h"
 #include "JSMap.h"
 #include "SlotVisitorInlines.h"
-
+#include "StructureInlines.h"
 namespace TI {
 
 const ClassInfo JSMapIterator::s_info = { "Map Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSMapIterator) };

@@ -38,7 +38,7 @@
 #include "JSGlobalObject.h"
 #include "JSWeakMap.h"
 #include "WeakMapPrototype.h"
-
+#include "StructureInlines.h"
 namespace TI {
 
 const ClassInfo WeakMapConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(WeakMapConstructor) };
