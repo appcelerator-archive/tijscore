@@ -1,16 +1,25 @@
 #!/bin/sh
 
-rm -rf Build
+rm -rf build
 rm -rf WTF/build
-mkdir Build
+mkdir build
 xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF clean
 xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF clean
 xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF
 xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF
-lipo WTF/build/Release-iphonesimulator/libWTF.a WTF/build/Release-iphoneos/libWTF.a -create -output Build/libWTF.a
-xcrun -sdk iphoneos lipo -info Build/libWTF.a 
+lipo WTF/build/Release-iphonesimulator/libWTF.a WTF/build/Release-iphoneos/libWTF.a -create -output build/libWTF.a
+
+for arch in armv7 arm64 i386 x86_64; do
+	xcrun -sdk iphoneos lipo build/libWTF.a -verify_arch $arch
+	if (( $? != 0 )); then
+		echo "ERROR: YOU DID NOT BUILD IN SYMBOLS FOR $arch"
+		exit 1
+	fi
+done
+
+xcrun -sdk iphoneos lipo -info build/libWTF.a
 
 mkdir Build/PRIVATE_HEADERS
-cp -R WTF/build/Release-iphoneos/usr/local/include/ Build/PRIVATE_HEADERS
+cp -R WTF/build/Release-iphoneos/usr/local/include/ build/PRIVATE_HEADERS
 
 rm -rf WTF/build
