@@ -53,7 +53,7 @@
 #include "SlotVisitorInlines.h"
 #include <math.h>
 #include <wtf/Assertions.h>
-
+#include "StructureInlines.h"
 namespace TI {
 
 // We keep track of the size of the last array after it was grown. We use this
@@ -530,6 +530,131 @@ void JSObject::putByIndex(JSCell* cell, ExecState* exec, unsigned propertyName, 
     }
     
     thisObject->putByIndexBeyondVectorLength(exec, propertyName, value, shouldThrow);
+}
+
+template<JSObject::PutMode mode>
+inline bool JSObject::putDirectInternal(VM& vm, PropertyName propertyName, TiValue value, unsigned attributes, PutPropertySlot& slot, JSCell* specificFunction)
+{
+    ASSERT(value);
+    ASSERT(value.isGetterSetter() == !!(attributes & Accessor));
+    ASSERT(!Heap::heap(value) || Heap::heap(value) == Heap::heap(this));
+    ASSERT(propertyName.asIndex() == PropertyName::NotAnIndex);
+    
+    if (structure()->isDictionary()) {
+        unsigned currentAttributes;
+        JSCell* currentSpecificFunction;
+        PropertyOffset offset = structure()->get(vm, propertyName, currentAttributes, currentSpecificFunction);
+        if (offset != invalidOffset) {
+            // If there is currently a specific function, and there now either isn't,
+            // or the new value is different, then despecify.
+            if (currentSpecificFunction && (specificFunction != currentSpecificFunction))
+                structure()->despecifyDictionaryFunction(vm, propertyName);
+            if ((mode == PutModePut) && currentAttributes & ReadOnly)
+                return false;
+            
+            putDirect(vm, offset, value);
+            // At this point, the objects structure only has a specific value set if previously there
+            // had been one set, and if the new value being specified is the same (otherwise we would
+            // have despecified, above).  So, if currentSpecificFunction is not set, or if the new
+            // value is different (or there is no new value), then the slot now has no value - and
+            // as such it is cachable.
+            // If there was previously a value, and the new value is the same, then we cannot cache.
+            if (!currentSpecificFunction || (specificFunction != currentSpecificFunction))
+                slot.setExistingProperty(this, offset);
+            return true;
+        }
+        
+        if ((mode == PutModePut) && !isExtensible())
+            return false;
+        
+        DeferGC deferGC(vm.heap);
+        Butterfly* newButterfly = butterfly();
+        if (structure()->putWillGrowOutOfLineStorage())
+            newButterfly = growOutOfLineStorage(vm, structure()->outOfLineCapacity(), structure()->suggestedNewOutOfLineStorageCapacity());
+        offset = structure()->addPropertyWithoutTransition(vm, propertyName, attributes, specificFunction);
+        setStructureAndButterfly(vm, structure(), newButterfly);
+        
+        validateOffset(offset);
+        ASSERT(structure()->isValidOffset(offset));
+        putDirect(vm, offset, value);
+        // See comment on setNewProperty call below.
+        if (!specificFunction)
+            slot.setNewProperty(this, offset);
+        if (attributes & ReadOnly)
+            structure()->setContainsReadOnlyProperties();
+        return true;
+    }
+    
+    PropertyOffset offset;
+    size_t currentCapacity = structure()->outOfLineCapacity();
+    if (Structure* structure = Structure::addPropertyTransitionToExistingStructure(this->structure(), propertyName, attributes, specificFunction, offset)) {
+        DeferGC deferGC(vm.heap);
+        Butterfly* newButterfly = butterfly();
+        if (currentCapacity != structure->outOfLineCapacity()) {
+            ASSERT(structure != this->structure());
+            newButterfly = growOutOfLineStorage(vm, currentCapacity, structure->outOfLineCapacity());
+        }
+        
+        validateOffset(offset);
+        ASSERT(structure->isValidOffset(offset));
+        setStructureAndButterfly(vm, structure, newButterfly);
+        putDirect(vm, offset, value);
+        // This is a new property; transitions with specific values are not currently cachable,
+        // so leave the slot in an uncachable state.
+        if (!specificFunction)
+            slot.setNewProperty(this, offset);
+        return true;
+    }
+    
+    unsigned currentAttributes;
+    JSCell* currentSpecificFunction;
+    offset = structure()->get(vm, propertyName, currentAttributes, currentSpecificFunction);
+    if (offset != invalidOffset) {
+        if ((mode == PutModePut) && currentAttributes & ReadOnly)
+            return false;
+        
+        // There are three possibilities here:
+        //  (1) There is an existing specific value set, and we're overwriting with *the same value*.
+        //       * Do nothing - no need to despecify, but that means we can't cache (a cached
+        //         put could write a different value). Leave the slot in an uncachable state.
+        //  (2) There is a specific value currently set, but we're writing a different value.
+        //       * First, we have to despecify.  Having done so, this is now a regular slot
+        //         with no specific value, so go ahead & cache like normal.
+        //  (3) Normal case, there is no specific value set.
+        //       * Go ahead & cache like normal.
+        if (currentSpecificFunction) {
+            // case (1) Do the put, then return leaving the slot uncachable.
+            if (specificFunction == currentSpecificFunction) {
+                putDirect(vm, offset, value);
+                return true;
+            }
+            // case (2) Despecify, fall through to (3).
+            setStructure(vm, Structure::despecifyFunctionTransition(vm, structure(), propertyName));
+        }
+        
+        // case (3) set the slot, do the put, return.
+        slot.setExistingProperty(this, offset);
+        putDirect(vm, offset, value);
+        return true;
+    }
+    
+    if ((mode == PutModePut) && !isExtensible())
+        return false;
+    
+    Structure* structure = Structure::addPropertyTransition(vm, this->structure(), propertyName, attributes, specificFunction, offset, slot.context());
+    
+    validateOffset(offset);
+    ASSERT(structure->isValidOffset(offset));
+    setStructureAndReallocateStorageIfNecessary(vm, structure);
+    
+    putDirect(vm, offset, value);
+    // This is a new property; transitions with specific values are not currently cachable,
+    // so leave the slot in an uncachable state.
+    if (!specificFunction)
+        slot.setNewProperty(this, offset);
+    if (attributes & ReadOnly)
+        structure->setContainsReadOnlyProperties();
+    return true;
 }
 
 ArrayStorage* JSObject::enterDictionaryIndexingModeWhenArrayStorageAlreadyExists(VM& vm, ArrayStorage* storage)

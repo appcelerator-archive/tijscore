@@ -39,7 +39,7 @@
 #include "JSGlobalObject.h"
 #include "JSMap.h"
 #include "MapPrototype.h"
-
+#include "StructureInlines.h"
 namespace TI {
 
 const ClassInfo MapConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(MapConstructor) };

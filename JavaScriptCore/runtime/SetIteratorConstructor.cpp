@@ -38,7 +38,7 @@
 #include "JSGlobalObject.h"
 #include "JSSetIterator.h"
 #include "SetIteratorPrototype.h"
-
+#include "StructureInlines.h"
 namespace TI {
 
 const ClassInfo SetIteratorConstructor::s_info = { "Set Iterator", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(SetIteratorConstructor) };

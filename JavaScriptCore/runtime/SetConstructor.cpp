@@ -40,7 +40,7 @@
 #include "JSSet.h"
 #include "MapData.h"
 #include "SetPrototype.h"
-
+#include "StructureInlines.h"
 namespace TI {
 
 const ClassInfo SetConstructor::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(SetConstructor) };
