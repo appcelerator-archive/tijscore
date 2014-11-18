@@ -1502,7 +1502,7 @@ private:
 };
 
 // This method declaration, and the constants below, are taken from Libc/gen/malloc.c.
-extern "C" void (*malloc_logger)(uint32_t typeFlags, uintptr_t zone, uintptr_t size, uintptr_t pointer, uintptr_t returnValue, uint32_t numberOfFramesToSkip);
+//extern "C" void (*malloc_logger)(uint32_t typeFlags, uintptr_t zone, uintptr_t size, uintptr_t pointer, uintptr_t returnValue, uint32_t numberOfFramesToSkip);
 
 #endif
 
@@ -1518,7 +1518,13 @@ class MallocHook {
 
     static void record(uint32_t typeFlags, uintptr_t zone, uintptr_t size, void* pointer, void* returnValue, uint32_t numberOfFramesToSkip)
     {
-        malloc_logger(typeFlags, zone, size, reinterpret_cast<uintptr_t>(pointer), reinterpret_cast<uintptr_t>(returnValue), numberOfFramesToSkip);
+        #pragma unused (typeFlags)
+        #pragma unused (zone)
+        #pragma unused (size)
+        #pragma unused (pointer)
+        #pragma unused (returnValue)
+        #pragma unused (numberOfFramesToSkip)
+        //malloc_logger(typeFlags, zone, size, reinterpret_cast<uintptr_t>(pointer), reinterpret_cast<uintptr_t>(returnValue), numberOfFramesToSkip);
     }
 
     static NEVER_INLINE void recordAllocation(void* pointer, size_t size)
@@ -1541,7 +1547,7 @@ public:
     {
 #if OS(DARWIN)
         // If the system allocator's malloc_logger has been set up then stack logging is enabled.
-        stackLoggingEnabled = malloc_logger;
+        //stackLoggingEnabled = malloc_logger;
 #endif
     }
 
