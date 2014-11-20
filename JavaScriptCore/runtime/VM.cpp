@@ -685,7 +685,7 @@ TiValue VM::throwException(ExecState* exec, TiValue error)
     if (exception->hasProperty(exec, this->propertyNames->stack))
         return error;
     
-    exception->putDirect(*this, propertyNames->stack, interpreter->stackTraceAsString(topCallFrame, stackTrace), DontEnum);
+    exception->putDirect(*this, propertyNames->stack, interpreter->stackTraceAsString(topCallFrame, stackTrace), None);
     return error;
 }
     
