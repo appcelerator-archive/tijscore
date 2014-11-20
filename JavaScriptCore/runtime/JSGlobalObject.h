@@ -484,7 +484,7 @@ public:
     const GlobalObjectMethodTable* globalObjectMethodTable() const { return m_globalObjectMethodTable; }
 
     static bool allowsAccessFrom(const JSGlobalObject*, ExecState*) { return true; }
-    static bool supportsProfiling(const JSGlobalObject*) { return false; }
+    static bool supportsProfiling(const JSGlobalObject* obj) { return (obj->profileGroup() != 0); }
     static bool supportsRichSourceInfo(const JSGlobalObject*) { return true; }
 
     JS_EXPORT_PRIVATE ExecState* globalExec();

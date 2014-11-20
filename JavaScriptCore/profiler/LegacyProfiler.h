@@ -63,8 +63,10 @@ public:
 
     void willExecute(ExecState* callerCallFrame, TiValue function);
     void willExecute(ExecState* callerCallFrame, const WTI::String& sourceURL, int startingLineNumber);
+    void willExecute(ExecState* callerCallFrame, const WTI::String& ident);
     void didExecute(ExecState* callerCallFrame, TiValue function);
     void didExecute(ExecState* callerCallFrame, const WTI::String& sourceURL, int startingLineNumber);
+    void didExecute(ExecState* callerCallFrame, const WTI::String& ident);
 
     void exceptionUnwind(ExecState* handlerCallFrame);
 
