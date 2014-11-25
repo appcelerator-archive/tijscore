@@ -208,7 +208,7 @@ TiValue JSCallbackObject<Parent>::defaultValue(const JSObject* object, ExecState
     const JSCallbackObject* thisObject = jsCast<const JSCallbackObject*>(object);
     TiContextRef ctx = toRef(exec);
     TiObjectRef thisRef = toRef(thisObject);
-    ::JSType jsHint = hint == PreferString ? kTITypeString : kTITypeNumber;
+    ::TiType jsHint = hint == PreferString ? kTITypeString : kTITypeNumber;
 
     for (TiClassRef jsClass = thisObject->classRef(); jsClass; jsClass = jsClass->parentClass) {
         if (TiObjectConvertToTypeCallback convertToType = jsClass->convertToType) {
