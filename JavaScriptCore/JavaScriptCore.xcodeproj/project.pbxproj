@@ -6134,7 +6134,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
 			buildSettings = {
-				ENABLE_REMOTE_INSPECTOR = "ENABLE_REMOTE_INSPECTOR=0";
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
 			name = Debug;
@@ -6143,7 +6142,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
 			buildSettings = {
-				ENABLE_REMOTE_INSPECTOR = "ENABLE_REMOTE_INSPECTOR=0";
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
 			name = Release;
@@ -6153,7 +6151,6 @@
 			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
 			buildSettings = {
 				BUILD_VARIANTS = normal;
-				ENABLE_REMOTE_INSPECTOR = "ENABLE_REMOTE_INSPECTOR=0";
 			};
 			name = Production;
 		};
@@ -6401,7 +6398,6 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
 			buildSettings = {
-				ENABLE_REMOTE_INSPECTOR = "ENABLE_REMOTE_INSPECTOR=0";
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
 			name = Profiling;
