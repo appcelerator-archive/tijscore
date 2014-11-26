@@ -297,7 +297,7 @@ static bool MyObject_hasInstance(TiContextRef context, TiObjectRef constructor, 
     return TiValueIsInstanceOfConstructor(context, possibleValue, numberConstructor, exception);
 }
 
-static TiValueRef MyObject_convertToType(TiContextRef context, TiObjectRef object, JSType type, TiValueRef* exception)
+static TiValueRef MyObject_convertToType(TiContextRef context, TiObjectRef object, TiType type, TiValueRef* exception)
 {
     UNUSED_PARAM(object);
     UNUSED_PARAM(exception);
@@ -320,7 +320,7 @@ static TiValueRef MyObject_convertToType(TiContextRef context, TiObjectRef objec
     return TiValueMakeNull(context);
 }
 
-static TiValueRef MyObject_convertToTypeWrapper(TiContextRef context, TiObjectRef object, JSType type, TiValueRef* exception)
+static TiValueRef MyObject_convertToTypeWrapper(TiContextRef context, TiObjectRef object, TiType type, TiValueRef* exception)
 {
     UNUSED_PARAM(context);
     UNUSED_PARAM(object);
@@ -561,7 +561,7 @@ static bool EvilExceptionObject_hasInstance(TiContextRef context, TiObjectRef co
     return result && TiValueToBoolean(context, result);
 }
 
-static TiValueRef EvilExceptionObject_convertToType(TiContextRef context, TiObjectRef object, JSType type, TiValueRef* exception)
+static TiValueRef EvilExceptionObject_convertToType(TiContextRef context, TiObjectRef object, TiType type, TiValueRef* exception)
 {
     UNUSED_PARAM(object);
     UNUSED_PARAM(exception);

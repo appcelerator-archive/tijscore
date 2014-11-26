@@ -6,4 +6,6 @@ xcuserdata
 *.pyc
 *.rej
 *.orig
-Build/*
+build/*
+JavaScriptCore/build/*
+WTF/build/*

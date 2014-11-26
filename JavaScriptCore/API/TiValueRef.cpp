@@ -69,7 +69,7 @@ static bool evernoteHackNeeded()
 }
 #endif
 
-::JSType TiValueGetType(TiContextRef ctx, TiValueRef value)
+::TiType TiValueGetType(TiContextRef ctx, TiValueRef value)
 {
     if (!ctx) {
         ASSERT_NOT_REACHED();
