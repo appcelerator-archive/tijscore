@@ -114,9 +114,8 @@ void TiGarbageCollect(TiContextRef ctx)
         return;
 
     ExecState* exec = toJS(ctx);
-    APIEntryShim entryShim(exec, false);
-
-    exec->vm().heap.reportAbandonedObjectGraph();
+    APIEntryShim entryShim(exec);
+    exec->vm().heap.collectAllGarbage();
 }
 
 void JSReportExtraMemoryCost(TiContextRef ctx, size_t size)
