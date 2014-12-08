@@ -2090,8 +2090,6 @@
 		7E4EE7080EBB7963005934AA /* StructureChain.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StructureChain.h; sourceTree = "<group>"; };
 		7E4EE70E0EBB7A5B005934AA /* StructureChain.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StructureChain.cpp; sourceTree = "<group>"; };
 		7EFF00630EC05A9A00AA7C93 /* NodeInfo.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = NodeInfo.h; sourceTree = "<group>"; };
-		840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "JavaScriptCore-iOS.xcconfig"; path = "../../JavaScriptCore-iOS.xcconfig"; sourceTree = "<group>"; };
-		840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = "ToolExecutable-iOS.xcconfig"; path = "../../ToolExecutable-iOS.xcconfig"; sourceTree = "<group>"; };
 		860161DF0F3A83C100F84710 /* AbstractMacroAssembler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = AbstractMacroAssembler.h; sourceTree = "<group>"; };
 		860161E00F3A83C100F84710 /* MacroAssemblerX86.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacroAssemblerX86.h; sourceTree = "<group>"; };
 		860161E10F3A83C100F84710 /* MacroAssemblerX86_64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MacroAssemblerX86_64.h; sourceTree = "<group>"; };
@@ -3320,8 +3318,6 @@
 		1C90513E0BA9E8830081E9D0 /* Configurations */ = {
 			isa = PBXGroup;
 			children = (
-				840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */,
-				840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */,
 				1C9051450BA9E8A70081E9D0 /* Base.xcconfig */,
 				1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */,
 				449097EE0F8F81B50076A327 /* FeatureDefines.xcconfig */,
@@ -6083,28 +6079,28 @@
 		};
 		0FF922CB14F46B130041A24E /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */;
+			baseConfigurationReference = BC021BF2136900C300FC5467 /* ToolExecutable.xcconfig */;
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		0FF922CC14F46B130041A24E /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */;
+			baseConfigurationReference = BC021BF2136900C300FC5467 /* ToolExecutable.xcconfig */;
 			buildSettings = {
 			};
 			name = Release;
 		};
 		0FF922CD14F46B130041A24E /* Profiling */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */;
+			baseConfigurationReference = BC021BF2136900C300FC5467 /* ToolExecutable.xcconfig */;
 			buildSettings = {
 			};
 			name = Profiling;
 		};
 		0FF922CE14F46B130041A24E /* Production */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E71A02C7E900F65F68 /* ToolExecutable-iOS.xcconfig */;
+			baseConfigurationReference = BC021BF2136900C300FC5467 /* ToolExecutable.xcconfig */;
 			buildSettings = {
 			};
 			name = Production;
@@ -6132,7 +6128,7 @@
 		};
 		149C275E08902AFE008A9EFC /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
@@ -6140,7 +6136,7 @@
 		};
 		149C275F08902AFE008A9EFC /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
@@ -6148,9 +6144,8 @@
 		};
 		149C276108902AFE008A9EFC /* Production */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
-				BUILD_VARIANTS = normal;
 			};
 			name = Production;
 		};
@@ -6198,26 +6193,10 @@
 		};
 		149C277208902AFE008A9EFC /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
+			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				DEAD_CODE_STRIPPING = "$(DEAD_CODE_STRIPPING_debug)";
 				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
-				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"\"${BUILT_PRODUCTS_DIR}/usr/local/include\"",
-					"$(HEADER_SEARCH_PATHS)",
-					"${SOURCE_ROOT}/../WTF/",
-				);
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				LIBRARY_SEARCH_PATHS = "${SOURCE_ROOT}/../Build/";
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
-				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 			};
 			name = Debug;
 		};
@@ -6225,21 +6204,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"\"${BUILT_PRODUCTS_DIR}/usr/local/include\"",
-					"$(HEADER_SEARCH_PATHS)",
-					"${SOURCE_ROOT}/../WTF/",
-				);
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				LIBRARY_SEARCH_PATHS = "${SOURCE_ROOT}/../Build/";
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
-				STRIP_INSTALLED_PRODUCT = NO;
 			};
 			name = Release;
 		};
@@ -6247,20 +6212,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"\"${BUILT_PRODUCTS_DIR}/usr/local/include\"",
-					"$(HEADER_SEARCH_PATHS)",
-					"${SOURCE_ROOT}/../WTF/",
-				);
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				LIBRARY_SEARCH_PATHS = "${SOURCE_ROOT}/../Build/";
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
 			};
 			name = Production;
 		};
@@ -6343,7 +6295,7 @@
 		};
 		65FB3F7809D11EBD00F49DEB /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "Generate Derived Sources";
 			};
@@ -6351,7 +6303,7 @@
 		};
 		65FB3F7909D11EBD00F49DEB /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "Generate Derived Sources";
 			};
@@ -6359,7 +6311,7 @@
 		};
 		65FB3F7A09D11EBD00F49DEB /* Production */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "Generate Derived Sources";
 			};
@@ -6369,21 +6321,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051450BA9E8A70081E9D0 /* Base.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
-				HEADER_SEARCH_PATHS = (
-					.,
-					icu,
-					"\"${BUILT_PRODUCTS_DIR}/usr/local/include\"",
-					"$(HEADER_SEARCH_PATHS)",
-					"${SOURCE_ROOT}/../WTF/",
-				);
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				LIBRARY_SEARCH_PATHS = "${SOURCE_ROOT}/../Build/";
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
-				STRIP_INSTALLED_PRODUCT = NO;
 			};
 			name = Profiling;
 		};
@@ -6396,7 +6334,7 @@
 		};
 		A761483F0E6402F700E357FA /* Profiling */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				INSTALL_PATH = "$(BUILT_PRODUCTS_DIR)";
 			};
@@ -6404,7 +6342,7 @@
 		};
 		A76148400E6402F700E357FA /* Profiling */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E61A02C7E900F65F68 /* JavaScriptCore-iOS.xcconfig */;
+			baseConfigurationReference = 1C9051430BA9E8A70081E9D0 /* JavaScriptCore.xcconfig */;
 			buildSettings = {
 				PRODUCT_NAME = "Generate Derived Sources";
 			};
