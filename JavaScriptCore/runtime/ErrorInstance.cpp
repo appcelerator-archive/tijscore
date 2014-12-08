@@ -48,10 +48,10 @@ void ErrorInstance::finishCreation(VM& vm, const String& message, Vector<StackFr
     Base::finishCreation(vm);
     ASSERT(inherits(info()));
     if (!message.isNull())
-        putDirect(vm, vm.propertyNames->message, jsString(&vm, message), DontEnum);
+        putDirect(vm, vm.propertyNames->message, jsString(&vm, message), None);
     
     if (!stackTrace.isEmpty())
-        putDirect(vm, vm.propertyNames->stack, vm.interpreter->stackTraceAsString(vm.topCallFrame, stackTrace), DontEnum);
+        putDirect(vm, vm.propertyNames->stack, vm.interpreter->stackTraceAsString(vm.topCallFrame, stackTrace), None);
 }
     
 } // namespace TI
