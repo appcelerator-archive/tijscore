@@ -342,7 +342,6 @@
 		7E29C33D15FFD79B00516D61 /* ObjcRuntimeExtras.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ObjcRuntimeExtras.h; sourceTree = "<group>"; };
 		8134013615B092FD001FF0B8 /* Base64.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = Base64.cpp; sourceTree = "<group>"; };
 		8134013715B092FD001FF0B8 /* Base64.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = Base64.h; sourceTree = "<group>"; };
-		840096E51A02C3AC00F65F68 /* WTF-iOS.xcconfig */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.xcconfig; name = "WTF-iOS.xcconfig"; path = "../../WTF-iOS.xcconfig"; sourceTree = "<group>"; };
 		93B1AA7F180E5AF3004A2F05 /* PassRef.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = PassRef.h; sourceTree = "<group>"; };
 		974CFC8D16A4F327006D5404 /* WeakPtr.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = WeakPtr.h; sourceTree = "<group>"; };
 		9BC70F04176C379D00101DEC /* AtomicStringTable.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = AtomicStringTable.cpp; sourceTree = "<group>"; };
@@ -600,7 +599,6 @@
 		5D247B6D14689C4700E78B76 /* Configurations */ = {
 			isa = PBXGroup;
 			children = (
-				840096E51A02C3AC00F65F68 /* WTF-iOS.xcconfig */,
 				5D247B6E14689C4700E78B76 /* Base.xcconfig */,
 				6541CAF41630DB26006D0DEC /* CopyWTFHeaders.xcconfig */,
 				5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */,
@@ -1292,18 +1290,9 @@
 /* Begin XCBuildConfiguration section */
 		5D247B6414689B8600E78B76 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 5D247B6E14689C4700E78B76 /* Base.xcconfig */;
+			baseConfigurationReference = 5D247B7014689C4700E78B76 /* DebugRelease.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				DEAD_CODE_STRIPPING = "$(DEAD_CODE_STRIPPING_debug)";
-				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
-				GCC_OPTIMIZATION_LEVEL = "$(GCC_OPTIMIZATION_LEVEL_debug)";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
-				STRIP_INSTALLED_PRODUCT = "$(STRIP_INSTALLED_PRODUCT_debug)";
 			};
 			name = Debug;
 		};
@@ -1311,25 +1300,20 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B6E14689C4700E78B76 /* Base.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
 			};
 			name = Release;
 		};
 		5D247B6714689B8600E78B76 /* Debug */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E51A02C3AC00F65F68 /* WTF-iOS.xcconfig */;
+			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
 			};
 			name = Debug;
 		};
 		5D247B6814689B8600E78B76 /* Release */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E51A02C3AC00F65F68 /* WTF-iOS.xcconfig */;
+			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
 			};
 			name = Release;
@@ -1338,18 +1322,13 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B6E14689C4700E78B76 /* Base.xcconfig */;
 			buildSettings = {
-				CLANG_CXX_LANGUAGE_STANDARD = "c++0x";
-				CLANG_CXX_LIBRARY = "libc++";
-				GCC_TREAT_WARNINGS_AS_ERRORS = NO;
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
-				ONLY_ACTIVE_ARCH = NO;
-				SDKROOT = iphoneos;
 			};
 			name = Production;
 		};
 		5D247B7514689CC900E78B76 /* Production */ = {
 			isa = XCBuildConfiguration;
-			baseConfigurationReference = 840096E51A02C3AC00F65F68 /* WTF-iOS.xcconfig */;
+			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
 			};
 			name = Production;
