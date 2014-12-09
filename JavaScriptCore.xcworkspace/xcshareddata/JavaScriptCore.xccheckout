@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>IDESourceControlProjectFavoriteDictionaryKey</key>
+	<false/>
+	<key>IDESourceControlProjectIdentifier</key>
+	<string>45DA2F07-2DA9-4A81-AEEE-C3102A4A5948</string>
+	<key>IDESourceControlProjectName</key>
+	<string>JavaScriptCore</string>
+	<key>IDESourceControlProjectOriginsDictionary</key>
+	<dict>
+		<key>E909E6A3E1759762BA7F45B45DD9B52E7F88F4C4</key>
+		<string>https://github.com/appcelerator/tijscore.git</string>
+	</dict>
+	<key>IDESourceControlProjectPath</key>
+	<string>JavaScriptCore.xcworkspace</string>
+	<key>IDESourceControlProjectRelativeInstallPathDictionary</key>
+	<dict>
+		<key>E909E6A3E1759762BA7F45B45DD9B52E7F88F4C4</key>
+		<string>..</string>
+	</dict>
+	<key>IDESourceControlProjectURL</key>
+	<string>https://github.com/appcelerator/tijscore.git</string>
+	<key>IDESourceControlProjectVersion</key>
+	<integer>111</integer>
+	<key>IDESourceControlProjectWCCIdentifier</key>
+	<string>E909E6A3E1759762BA7F45B45DD9B52E7F88F4C4</string>
+	<key>IDESourceControlProjectWCConfigurations</key>
+	<array>
+		<dict>
+			<key>IDESourceControlRepositoryExtensionIdentifierKey</key>
+			<string>public.vcs.git</string>
+			<key>IDESourceControlWCCIdentifierKey</key>
+			<string>E909E6A3E1759762BA7F45B45DD9B52E7F88F4C4</string>
+			<key>IDESourceControlWCCName</key>
+			<string>tijscore</string>
+		</dict>
+	</array>
+</dict>
+</plist>
