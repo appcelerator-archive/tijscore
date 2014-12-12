@@ -11,7 +11,7 @@ declare -r sdk_list="iphoneos iphonesimulator"
 #declare -r sdk_list="iphonesimulator"
 declare -r iphoneos_arch_list="armv7 arm64"
 declare -r iphonesimulator_arch_list="i386 x86_64"
-#declare -r iphonesimulator_arch_list="x86_64"
+#declare -r iphonesimulator_arch_list="i386"
 
 # No user serviceable parts below this line.
 
