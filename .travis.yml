@@ -1,0 +1,46 @@
+language: objective-c
+
+env:
+ global:
+
+before_install:
+ - gem install xcpretty
+ 
+install:
+
+script:
+ # Build WTF
+ - rm -rf Build
+ - rm -rf WTF/build
+ - mkdir Build
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF clean | xcpretty -c
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF clean | xcpretty -c
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF | xcpretty -c
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF | xcpretty -c
+ - lipo WTF/build/Release-iphonesimulator/libWTF.a WTF/build/Release-iphoneos/libWTF.a -create -output Build/libWTF.a
+ - xcrun -sdk iphoneos lipo -info Build/libWTF.a 
+
+ - mkdir Build/PRIVATE_HEADERS
+ - cp -R WTF/build/Release-iphoneos/usr/local/include/ Build/PRIVATE_HEADERS
+
+ - rm -rf WTF/build
+
+ # Build TiJSCore
+ - rm -rf JavaScriptCore/build
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphonesimulator -configuration "Release" -target JavaScriptCore clean | xcpretty -c
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphoneos -configuration "Release" -target JavaScriptCore clean | xcpretty -c
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphonesimulator -configuration "Release" -target JavaScriptCore | xcpretty -c
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphoneos -configuration "Release" -target JavaScriptCore | xcpretty -c
+ - lipo JavaScriptCore/build/Release-iphonesimulator/libJavaScriptCore.a JavaScriptCore/build/Release-iphoneos/libJavaScriptCore.a -create -output Build/libTiCore.a
+ - xcrun -sdk iphoneos lipo -info Build/libTiCore.a 
+
+ - mkdir Build/PUBLIC_HEADERS
+ - cp -R JavaScriptCore/build/Release-iphoneos/usr/local/include/ Build/PUBLIC_HEADERS
+ - cp -R JavaScriptCore/build/Release-iphoneos/PRIVATE_HEADERS/ Build/PRIVATE_HEADERS
+
+ - rm -rf JavaScriptCore/build
+
+ - ls -la
+ - ls -la Build/
+
+after_success:
