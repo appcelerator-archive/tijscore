@@ -1,13 +1,20 @@
 #!/bin/sh
 
+CONFIG="Release"
+#CONFIG="Debug"
+
+
 rm -rf build
 rm -rf WTF/build
 mkdir build
-xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF clean
-xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF clean
-xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF
-xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF
-lipo WTF/build/Release-iphonesimulator/libWTF.a WTF/build/Release-iphoneos/libWTF.a -create -output build/libWTF.a
+
+xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration ${CONFIG} -target WTF clean
+xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration ${CONFIG} -target WTF clean
+
+xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration ${CONFIG} -target WTF
+xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration ${CONFIG} -target WTF
+
+lipo WTF/build/${CONFIG}-iphonesimulator/libWTF.a WTF/build/${CONFIG}-iphoneos/libWTF.a -create -output build/libWTF.a
 
 for arch in armv7 arm64 i386 x86_64; do
 	xcrun -sdk iphoneos lipo build/libWTF.a -verify_arch $arch
@@ -20,6 +27,6 @@ done
 xcrun -sdk iphoneos lipo -info build/libWTF.a
 
 mkdir Build/PRIVATE_HEADERS
-cp -R WTF/build/Release-iphoneos/usr/local/include/ build/PRIVATE_HEADERS
+cp -R WTF/build/${CONFIG}-iphoneos/usr/local/include/ build/PRIVATE_HEADERS
 
-rm -rf WTF/build
+#rm -rf WTF/build

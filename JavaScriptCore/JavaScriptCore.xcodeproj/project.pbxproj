@@ -6195,6 +6195,7 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 1C9051440BA9E8A70081E9D0 /* DebugRelease.xcconfig */;
 			buildSettings = {
+				DEBUG_DEFINES = "$(DEBUG_DEFINES_debug)";
 				IPHONEOS_DEPLOYMENT_TARGET = 7.0;
 			};
 			name = Debug;
