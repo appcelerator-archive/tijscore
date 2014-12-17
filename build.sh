@@ -6,14 +6,64 @@
 # Licensed under the terms of the Apache Public License.
 # Please see the LICENSE included with this distribution for details.
 
-declare -r configuration="Release"
-declare -r sdk_list="iphoneos iphonesimulator"
+declare configuration="Release"
 #declare -r sdk_list="iphonesimulator"
-declare -r iphoneos_arch_list="armv7 arm64"
-declare -r iphonesimulator_arch_list="i386 x86_64"
+#declare -r sdk_list="iphoneos iphonesimulator"
+#declare -r iphoneos_arch_list="armv7 arm64"
+#declare -r iphonesimulator_arch_list="i386 x86_64"
 #declare -r iphonesimulator_arch_list="i386"
 
 # No user serviceable parts below this line.
+
+declare usage="$0 [-a \"armv7 arm64 i386 x86_64\"] [-c \"Debug|Release\"]"
+
+declare iphoneos_arch_list
+declare iphonesimulator_arch_list
+declare arch_list
+declare sdk_list
+
+while getopts ':a:c:' opt
+do
+    case $opt in
+         a) arch_list=$OPTARG;;
+         c) configuration=$OPTARG;;
+        \?) echo "Usage: $usage"
+            exit 1;;
+    esac
+done
+
+if [ $# -eq 0 ]; then
+    sdk_list="iphoneos iphonesimulator"
+    iphoneos_arch_list="armv7 arm64"
+    iphonesimulator_arch_list="i386 x86_64"
+else
+    # Test for architectures
+    if [[ "$arch_list" =~ "armv7" ]]; then
+        iphoneos_arch_list+=" armv7"
+    fi
+    if [[ "$arch_list" =~ "armv64" ]]; then
+        iphoneos_arch_list+=" armv64"
+    fi
+    if [[ "$arch_list" =~ "i386" ]]; then
+        iphonesimulator_arch_list+=" i386"
+    fi
+    if [[ "$arch_list" =~ "x86_64" ]]; then
+        iphonesimulator_arch_list+=" x86_64"
+    fi
+
+    # add to SDK list
+    if [ -n "${iphoneos_arch_list}" ]; then
+        sdk_list+=" iphoneos"
+    fi
+    if [ -n "${iphonesimulator_arch_list}" ]; then
+        sdk_list+=" iphonesimulator"
+    fi
+fi
+
+echo "iPhone architectures: '$iphoneos_arch_list'"
+echo "iPhone simulator architectures: '$iphonesimulator_arch_list'"
+echo "SDKs to use: '$sdk_list'"
+echo "Build configuration: '$configuration'"
 
 declare -r project_name_list="WTF JavaScriptCore"
 declare -r build_dir="build"
