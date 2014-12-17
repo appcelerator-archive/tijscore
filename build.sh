@@ -15,7 +15,7 @@ declare configuration="Release"
 
 # No user serviceable parts below this line.
 
-declare usage="$0 [-a <a>]"
+declare usage="$0 [-a \"armv7 arm64 i386 x86_64\"] [-c \"Debug|Release\"]"
 
 declare iphoneos_arch_list
 declare iphonesimulator_arch_list
