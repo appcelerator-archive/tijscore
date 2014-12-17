@@ -21,6 +21,9 @@ declare -r universal_library_path="${build_dir}/libTiCore.a"
 declare -r private_header_dir="${build_dir}/PRIVATE_HEADERS"
 declare -r public_header_dir="${build_dir}/PUBLIC_HEADERS/JavaScriptCore"
 
+type -a xcpretty
+declare -r xcpretty_installed=$?
+
 function echo_and_eval {
     local -r cmd="${1:?}"
     echo "${cmd}" && eval "${cmd}"
@@ -43,8 +46,17 @@ for project_name in ${project_name_list}; do
             fi
 
             log_file="${build_dir}/build_output-${project_name}-${sdk}-${arch}.txt"
-            echo_and_eval "(time ${xcodebuild} clean        ) | tee    ${log_file} | xcpretty -c"
-            echo_and_eval "(time ${xcodebuild} -arch ${arch}) | tee -a ${log_file} | xcpretty -c"
+						cmd="(time ${xcodebuild} clean        ) | tee    ${log_file}"
+						if [ ${xcpretty_installed} -eq 0 ]; then
+								cmd+=" | xcpretty -c"
+						fi
+
+						cmd="(time ${xcodebuild} -arch ${arch}) | tee -a ${log_file}"
+						if [ ${xcpretty_installed} -eq 0 ]; then
+								cmd+=" | xcpretty -c"
+						fi
+
+            echo_and_eval "${cmd}"
             
             library_name1="lib${project_name}.a"
             library_path1="${project_build_dir}/${library_name1}"
