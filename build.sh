@@ -43,8 +43,8 @@ for project_name in ${project_name_list}; do
             fi
 
             log_file="${build_dir}/build_output-${project_name}-${sdk}-${arch}.txt"
-            echo_and_eval "(time ${xcodebuild} clean        ) | tee    ${log_file}"
-            echo_and_eval "(time ${xcodebuild} -arch ${arch}) | tee -a ${log_file}"
+            echo_and_eval "(time ${xcodebuild} clean        ) | tee    ${log_file} | xcpretty -c"
+            echo_and_eval "(time ${xcodebuild} -arch ${arch}) | tee -a ${log_file} | xcpretty -c"
             
             library_name1="lib${project_name}.a"
             library_path1="${project_build_dir}/${library_name1}"
