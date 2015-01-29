@@ -270,6 +270,7 @@
 		B38FD7BD168953E80065C969 /* FeatureDefines.h in Headers */ = {isa = PBXBuildFile; fileRef = B38FD7BC168953E80065C969 /* FeatureDefines.h */; };
 		CD5497AC15857D0300B5BC30 /* MediaTime.cpp in Sources */ = {isa = PBXBuildFile; fileRef = CD5497AA15857D0300B5BC30 /* MediaTime.cpp */; };
 		CD5497AD15857D0300B5BC30 /* MediaTime.h in Headers */ = {isa = PBXBuildFile; fileRef = CD5497AB15857D0300B5BC30 /* MediaTime.h */; };
+		CEF0DADC1A780C0600A3B086 /* TiNameMangle.h in Headers */ = {isa = PBXBuildFile; fileRef = CEF0DADB1A780C0600A3B086 /* TiNameMangle.h */; };
 		EB95E1F0161A72410089A2F5 /* ByteOrder.h in Headers */ = {isa = PBXBuildFile; fileRef = EB95E1EF161A72410089A2F5 /* ByteOrder.h */; };
 		FEDACD3D1630F83F00C69634 /* StackStats.cpp in Sources */ = {isa = PBXBuildFile; fileRef = FEDACD3B1630F83F00C69634 /* StackStats.cpp */; };
 		FEDACD3E1630F83F00C69634 /* StackStats.h in Headers */ = {isa = PBXBuildFile; fileRef = FEDACD3C1630F83F00C69634 /* StackStats.h */; };
@@ -546,6 +547,7 @@
 		B38FD7BC168953E80065C969 /* FeatureDefines.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = FeatureDefines.h; sourceTree = "<group>"; };
 		CD5497AA15857D0300B5BC30 /* MediaTime.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = MediaTime.cpp; sourceTree = "<group>"; };
 		CD5497AB15857D0300B5BC30 /* MediaTime.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = MediaTime.h; sourceTree = "<group>"; };
+		CEF0DADB1A780C0600A3B086 /* TiNameMangle.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = TiNameMangle.h; path = ../TiNameMangle.h; sourceTree = "<group>"; };
 		EB95E1EF161A72410089A2F5 /* ByteOrder.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = ByteOrder.h; sourceTree = "<group>"; };
 		FEDACD3B1630F83F00C69634 /* StackStats.cpp */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = StackStats.cpp; sourceTree = "<group>"; };
 		FEDACD3C1630F83F00C69634 /* StackStats.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = StackStats.h; sourceTree = "<group>"; };
@@ -582,6 +584,7 @@
 		5D247B5714689B8600E78B76 = {
 			isa = PBXGroup;
 			children = (
+				CEF0DADB1A780C0600A3B086 /* TiNameMangle.h */,
 				5D247B6D14689C4700E78B76 /* Configurations */,
 				5D247B6314689B8600E78B76 /* Products */,
 				5D247B7614689D7600E78B76 /* Source */,
@@ -960,6 +963,7 @@
 				A8A47438151A825B004123FF /* AtomicStringImpl.h in Headers */,
 				9BD8F40B176C2B470002D865 /* AtomicStringTable.h in Headers */,
 				1469419C16EAB10A0024E146 /* AutodrainedPool.h in Headers */,
+				CEF0DADC1A780C0600A3B086 /* TiNameMangle.h in Headers */,
 				A8A47389151A825B004123FF /* AVLTree.h in Headers */,
 				8134013915B092FD001FF0B8 /* Base64.h in Headers */,
 				A8A473A9151A825B004123FF /* bignum-dtoa.h in Headers */,
@@ -1308,6 +1312,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				OTHER_CFLAGS = (
+					"-include",
+					TiNameMangle.h,
+				);
 			};
 			name = Debug;
 		};
@@ -1315,6 +1323,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				OTHER_CFLAGS = (
+					"-include",
+					TiNameMangle.h,
+				);
 			};
 			name = Release;
 		};
@@ -1330,6 +1342,10 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 5D247B7314689C4700E78B76 /* WTF.xcconfig */;
 			buildSettings = {
+				OTHER_CFLAGS = (
+					"-include",
+					TiNameMangle.h,
+				);
 			};
 			name = Production;
 		};
