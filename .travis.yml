@@ -42,5 +42,17 @@ script:
 
  - ls -la
  - ls -la Build/
-
+ - mv Build libTiCore
+ - zip -r libTiCore.zip libTiCore
+ 
 after_success:
+
+deploy:
+  provider: releases
+  skip_cleanup: true
+  api_key:
+    secure: SqJbA96CYvtXxchrg14+6NSMZCgkDxjADR8iRcR/R4PnUEkFJByChgsYoy8ER5z8CNL51YNj8Lxkez/NjwjeU0Qkww2gXpepiM8HCMwpo25hjrjHqz83bp712PI2G4zaS72E+Pu2kahhOTno8yum3e+4hxySI9cegpXbBgrg7po=
+  file: $TRAVIS_BUILD_DIR/libTiCore.zip
+  on:
+    all_branches: true
+    tags: true
