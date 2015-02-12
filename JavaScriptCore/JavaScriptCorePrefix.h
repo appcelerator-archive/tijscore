@@ -11,6 +11,8 @@
 #define NULL ((void *)0)
 #endif
 
+#include "TiNameMangle.h"
+
 #include <ctype.h>
 #include <float.h>
 #include <locale.h>
