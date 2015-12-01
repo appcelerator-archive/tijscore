@@ -1,5 +1,5 @@
 language: objective-c
-
+osx_image: xcode7.1
 env:
  global:
 
@@ -15,8 +15,8 @@ script:
  - mkdir Build
  - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF clean | xcpretty -c
  - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF clean | xcpretty -c
- - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF | xcpretty -c
- - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF | xcpretty -c
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphonesimulator -configuration "Release" -target WTF OTHER_CFLAGS="-fembed-bitcode" CLANG_ENABLE_MODULE_DEBUGGING=NO GCC_PRECOMPILE_PREFIX_HEADER=NO DEBUG_INFORMATION_FORMAT="DWARF with dSYM"| xcpretty -c
+ - set -o pipefail && xcodebuild -project WTF/WTF.xcodeproj -sdk iphoneos -configuration "Release" -target WTF OTHER_CFLAGS="-fembed-bitcode" CLANG_ENABLE_MODULE_DEBUGGING=NO GCC_PRECOMPILE_PREFIX_HEADER=NO DEBUG_INFORMATION_FORMAT="DWARF with dSYM"| xcpretty -c
  - lipo WTF/build/Release-iphonesimulator/libWTF.a WTF/build/Release-iphoneos/libWTF.a -create -output Build/libWTF.a
  - xcrun -sdk iphoneos lipo -info Build/libWTF.a 
 
@@ -29,8 +29,8 @@ script:
  - rm -rf JavaScriptCore/build
  - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphonesimulator -configuration "Release" -target JavaScriptCore clean | xcpretty -c
  - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphoneos -configuration "Release" -target JavaScriptCore clean | xcpretty -c
- - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphonesimulator -configuration "Release" -target JavaScriptCore | xcpretty -c
- - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphoneos -configuration "Release" -target JavaScriptCore | xcpretty -c
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphonesimulator -configuration "Release" -target JavaScriptCore OTHER_CFLAGS="-fembed-bitcode" CLANG_ENABLE_MODULE_DEBUGGING=NO GCC_PRECOMPILE_PREFIX_HEADER=NO DEBUG_INFORMATION_FORMAT="DWARF with dSYM"| xcpretty -c
+ - set -o pipefail && xcodebuild -project JavaScriptCore/JavaScriptCore.xcodeproj -sdk iphoneos -configuration "Release" -target JavaScriptCore OTHER_CFLAGS="-fembed-bitcode" CLANG_ENABLE_MODULE_DEBUGGING=NO GCC_PRECOMPILE_PREFIX_HEADER=NO DEBUG_INFORMATION_FORMAT="DWARF with dSYM"| xcpretty -c
  - lipo JavaScriptCore/build/Release-iphonesimulator/libJavaScriptCore.a JavaScriptCore/build/Release-iphoneos/libJavaScriptCore.a -create -output Build/libTiCore.a
  - xcrun -sdk iphoneos lipo -info Build/libTiCore.a 
 
